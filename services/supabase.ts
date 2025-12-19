@@ -1,0 +1,849 @@
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { Message, AppSettings, ChatSession, MediaItem } from '../types';
+
+export class SupabaseService {
+  private client: SupabaseClient | null = null;
+  private sessionId: string;
+
+  constructor(settings: AppSettings) {
+    let storedSessionId = localStorage.getItem('chutes_session_id');
+    if (!storedSessionId) {
+      storedSessionId = crypto.randomUUID();
+      localStorage.setItem('chutes_session_id', storedSessionId);
+    }
+    this.sessionId = storedSessionId;
+
+    if (settings.useSupabase && settings.supabaseUrl && settings.supabaseKey) {
+      this.client = createClient(settings.supabaseUrl, settings.supabaseKey);
+    }
+  }
+
+  // --- Session Management ---
+
+  async getSessions(): Promise<ChatSession[]> {
+    if (!this.client) return [];
+
+    try {
+      const { data, error } = await this.client
+        .from('chat_sessions')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('Supabase Get Sessions Error:', error);
+        return [];
+      }
+
+      return data.map((row: any) => ({
+        id: row.id,
+        title: row.title || 'New Conversation',
+        preview: row.preview || '',
+        updatedAt: new Date(row.updated_at).getTime()
+      }));
+    } catch (err) {
+      console.error('Error fetching sessions:', err);
+      return [];
+    }
+  }
+
+  async upsertSession(session: ChatSession, userId?: string): Promise<void> {
+    if (!this.client) return;
+
+    try {
+      const payload: any = {
+        id: session.id,
+        title: session.title,
+        preview: session.preview,
+        updated_at: new Date(session.updatedAt).toISOString()
+      };
+      
+      // Add user_id if authenticated
+      if (userId) {
+        payload.user_id = userId;
+      }
+
+      const { error } = await this.client
+        .from('chat_sessions')
+        .upsert(payload, { onConflict: 'id' });
+
+      if (error) console.error('Supabase Upsert Session Error:', error);
+    } catch (err) {
+      console.error('Error upserting session:', err);
+    }
+  }
+
+  async updateSessionTitle(sessionId: string, title: string): Promise<void> {
+    if (!this.client) return;
+
+    try {
+      const { error } = await this.client
+        .from('chat_sessions')
+        .update({ title: title })
+        .eq('id', sessionId);
+
+      if (error) console.error('Supabase Update Title Error:', error);
+    } catch (err) {
+      console.error('Error updating session title:', err);
+    }
+  }
+
+  async deleteSession(sessionId: string): Promise<boolean> {
+    if (!this.client) return false;
+
+    try {
+      await this.client.from('messages').delete().eq('session_id', sessionId);
+      await this.client.from('media_history').delete().eq('session_id', sessionId); // Also clear media
+      
+      const { error } = await this.client
+        .from('chat_sessions')
+        .delete()
+        .eq('id', sessionId);
+
+      return !error;
+    } catch (err) {
+      console.error('Error deleting session:', err);
+      return false;
+    }
+  }
+
+  // --- Message Management ---
+
+  async loadMessages(targetSessionId?: string, userId?: string): Promise<Message[]> {
+    if (!this.client) return [];
+    const sid = targetSessionId || this.sessionId;
+
+    try {
+      let query = this.client
+        .from('messages')
+        .select('*')
+        .eq('session_id', sid);
+        
+      // Add user_id filter if authenticated
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+        
+      const { data, error } = await query.order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Supabase Load Error:', JSON.stringify(error, null, 2));
+        return [];
+      }
+
+      return data.map((row: any) => {
+        let content = row.content;
+        if (typeof content === 'string' && (content.startsWith('[') || content.startsWith('{'))) {
+            try {
+                content = JSON.parse(content);
+            } catch (e) { /* ignore */ }
+        }
+
+        return {
+          id: row.id.toString(),
+          role: row.role,
+          content: content,
+          timestamp: new Date(row.created_at).getTime(),
+          audio_url: row.audio_url,
+          audioUrl: row.audio_url
+        };
+      });
+    } catch (err) {
+      console.error("Unexpected error loading messages:", err);
+      return [];
+    }
+  }
+
+  async saveMessage(message: Message, targetSessionId?: string, userId?: string): Promise<string | null> {
+    if (!this.client) return null;
+
+    const sid = targetSessionId || this.sessionId;
+    const { audioUrl, ...msgToSave } = message;
+
+    const payload: any = {
+        session_id: sid,
+        role: msgToSave.role,
+        content: msgToSave.content,
+        audio_url: msgToSave.audio_url || null,
+        created_at: new Date().toISOString(),
+    };
+    
+    // Add user_id if authenticated
+    if (userId) {
+      payload.user_id = userId;
+    }
+
+    try {
+      const { data, error } = await this.client
+        .from('messages')
+        .insert(payload)
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('Supabase Save Error:', error);
+        return null;
+      }
+      return data?.id?.toString() || null;
+    } catch (err) {
+       console.error("Unexpected error saving message:", err);
+       return null;
+    }
+  }
+
+  async uploadAudio(blob: Blob, messageId: string, targetSessionId?: string): Promise<string | null> {
+    if (!this.client) return null;
+    const sid = targetSessionId || this.sessionId;
+
+    try {
+        const fileName = `${sid}/${messageId}.wav`;
+        const { error } = await this.client.storage
+            .from('chat-audio')
+            .upload(fileName, blob, {
+                contentType: 'audio/wav',
+                upsert: true
+            });
+
+        if (error) {
+            console.error('Supabase Upload Error:', error);
+            return null;
+        }
+
+        const { data: { publicUrl } } = this.client.storage
+            .from('chat-audio')
+            .getPublicUrl(fileName);
+
+        return publicUrl;
+    } catch (e) {
+        console.error("Exception uploading audio", e);
+        return null;
+    }
+  }
+
+  async updateMessageAudio(dbId: string, audioUrl: string) {
+    if (!this.client) return;
+    const { error } = await this.client
+        .from('messages')
+        .update({ audio_url: audioUrl })
+        .eq('id', dbId);
+    if (error) console.error('Supabase Update Error', error);
+  }
+
+  // --- Media Gallery Management ---
+
+  async saveMediaItem(item: MediaItem, blob: Blob, sessionId: string, userId?: string): Promise<void> {
+    if (!this.client) return;
+
+    try {
+        // 1. Upload Blob
+        const ext = item.type === 'video' ? 'mp4' : 'png';
+        const contentType = item.type === 'video' ? 'video/mp4' : 'image/png';
+        const fileName = userId ? `${userId}/${sessionId}/${item.id}.${ext}` : `${sessionId}/${item.id}.${ext}`;
+        
+        const { error: uploadError } = await this.client.storage
+            .from('media-assets')
+            .upload(fileName, blob, { contentType, upsert: true });
+
+        if (uploadError) {
+            console.error('Supabase Media Upload Error:', uploadError);
+            return; // Don't save record if upload fails
+        }
+
+        const { data: { publicUrl } } = this.client.storage
+            .from('media-assets')
+            .getPublicUrl(fileName);
+
+        // 2. Save Record
+        const record: any = {
+            id: item.id,
+            session_id: sessionId,
+            type: item.type,
+            title: item.title,
+            url: publicUrl,
+            prompt: item.prompt,
+            created_at: new Date(item.createdAt).toISOString()
+        };
+        
+        // Add user_id if authenticated
+        if (userId) {
+          record.user_id = userId;
+        }
+
+        const { error: dbError } = await this.client
+            .from('media_history')
+            .insert(record);
+
+        if (dbError) console.error('Supabase Media DB Error:', dbError);
+    } catch (e) {
+        console.error("Error saving media item:", e);
+    }
+  }
+
+  async updateMediaItemTitle(id: string, title: string): Promise<void> {
+    if (!this.client) return;
+    try {
+        const { error } = await this.client
+            .from('media_history')
+            .update({ title })
+            .eq('id', id);
+        if (error) console.error('Supabase Update Media Title Error:', error);
+    } catch (e) {
+        console.error("Error updating media title", e);
+    }
+  }
+
+  async getMediaHistory(sessionId: string): Promise<MediaItem[]> {
+      if (!this.client) return [];
+      
+      try {
+          const { data, error } = await this.client
+            .from('media_history')
+            .select('*')
+            .eq('session_id', sessionId)
+            .order('created_at', { ascending: false });
+            
+          if (error) {
+              console.error('Supabase Fetch Media Error:', error);
+              return [];
+          }
+
+          return data.map((row: any) => ({
+              id: row.id,
+              type: row.type,
+              title: row.title, // Retrieve title
+              url: row.url,
+              prompt: row.prompt,
+              createdAt: new Date(row.created_at).getTime()
+          }));
+      } catch (e) {
+          console.error("Error getting media history", e);
+          return [];
+      }
+  }
+  
+  async deleteMediaItem(item: MediaItem, sessionId: string, userId?: string): Promise<void> {
+      if (!this.client) return;
+      try {
+        // 1. Delete from Storage
+        const ext = item.type === 'video' ? 'mp4' : 'png';
+        const fileName = userId ? `${userId}/${sessionId}/${item.id}.${ext}` : `${sessionId}/${item.id}.${ext}`;
+        await this.client.storage.from('media-assets').remove([fileName]);
+        
+        // 2. Delete from DB
+        await this.client.from('media_history').delete().eq('id', item.id);
+      } catch (e) {
+          console.error("Error deleting media", e);
+      }
+  }
+    
+  // --- User Management & Credit System ---
+    
+  async getUserProfile(userId: string): Promise<any> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    const { data, error } = await this.client
+      .from('users')
+      .select('*')
+      .eq('id', userId);
+      
+    if (error) throw error;
+    
+    // Return first result or null if user doesn't exist (expected during user creation)
+    return data && data.length > 0 ? data[0] : null;
+  }
+
+  subscribeToCredits(userId: string, callback: (credits: number) => void) {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    return this.client
+      .channel(`public:users:id=${userId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'users',
+        filter: `id=eq.${userId}`,
+      }, (payload) => {
+        callback(payload.new.credits);
+      })
+      .subscribe();
+  }
+
+  async removeChannel(channel: any): Promise<void> {
+    if (!this.client) return;
+    await this.client.removeChannel(channel);
+  }
+
+  async deductCredits(userId: string, amount: number, action: string, model_used?: string): Promise<{ success: boolean; new_balance: number; message: string }> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    try {
+      const params: any = {
+        p_user_id: userId,
+        p_amount: amount,
+        p_action: action,
+      };
+      
+      // Only add optional parameters if provided
+      if (model_used) {
+        params.p_model_used = model_used;
+      }
+      
+      const { data, error } = await this.client.rpc('deduct_user_credits', params);
+      
+      if (error) {
+        console.error('RPC Error in deductCredits:', error);
+        throw error;
+      }
+      
+      // The function returns a table, handle both array and object formats
+      if (Array.isArray(data) && data.length > 0) {
+        return data[0];
+      } else if (data && typeof data === 'object') {
+        return data as { success: boolean; new_balance: number; message: string };
+      }
+      
+      return { success: false, new_balance: 0, message: 'Unknown error' };
+    } catch (error) {
+      console.error('Error deducting credits:', error);
+      throw error;
+    }
+  }
+
+  async addUserCredits(userId: string, amount: number, purchaseId?: string): Promise<void> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    const { error } = await this.client
+      .from('users')
+      .update({ 
+        credits: amount,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+      
+    if (error) throw error;
+    
+    // Log the transaction
+    await this.client
+      .from('credits_log')
+      .insert({
+        user_id: userId,
+        amount: amount,
+        action: 'purchase',
+        remaining_balance: amount,
+        metadata: purchaseId ? { purchase_id: purchaseId } : {}
+      });
+  }
+
+  async createSubscription(userId: string, subscriptionData: any): Promise<void> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    const { error } = await this.client
+      .from('subscriptions')
+      .insert({
+        user_id: userId,
+        stripe_subscription_id: subscriptionData.stripe_subscription_id,
+        tier: subscriptionData.tier,
+        status: subscriptionData.status,
+        price_amount: subscriptionData.price_amount,
+        currency: subscriptionData.currency || 'kes',
+        interval: subscriptionData.interval,
+        current_period_start: subscriptionData.current_period_start,
+        current_period_end: subscriptionData.current_period_end,
+        cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
+      });
+      
+    if (error) throw error;
+  }
+
+  async getUserSubscription(userId: string): Promise<any> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    const { data, error } = await this.client
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('current_period_end', { ascending: false })
+      .limit(1)
+      .single();
+      
+    if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows returned
+    return data;
+  }
+  // --- Enhanced User Management & Credit System ---
+
+  async createUserProfile(userId: string, email: string): Promise<boolean> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    try {
+      // Use upsert to handle existing users and ensure 10 credits for new users
+      const { data, error } = await this.client
+        .from('users')
+        .upsert({
+          id: userId,
+          email: email,
+          credits: 10, // Explicitly set 10 credits for new users
+          subscription_tier: 'free',
+          daily_credits: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, { 
+          onConflict: 'id',
+          ignoreDuplicates: false 
+        })
+        .select();
+      
+      if (error) throw error;
+      console.log('User profile created/updated:', userId, 'with 10 free credits');
+      return true;
+    } catch (error) {
+      console.error('Error creating user profile:', error);
+      throw error;
+    }
+  }
+
+  async updateUserProfile(userId: string, updates: Partial<{
+    credits: number;
+    subscription_tier: 'free' | 'basic' | 'plus' | 'pro';
+    daily_credits: number;
+  }>): Promise<void> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    const { error } = await this.client
+      .from('users')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+      
+    if (error) throw error;
+  }
+
+  async getUserCreditsHistory(userId: string, limit: number = 50): Promise<any[]> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    const { data, error } = await this.client
+      .from('credits_log')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+      
+    if (error) throw error;
+    return data || [];
+  }
+
+  async checkCreditAvailability(userId: string, amount: number): Promise<boolean> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    try {
+      const { data: profile } = await this.getUserProfile(userId);
+      if (!profile) return false;
+      
+      // Pro users have unlimited credits
+      if (profile.subscription_tier === 'pro') return true;
+      
+      return profile.credits >= amount;
+    } catch (error) {
+      console.error('Error checking credit availability:', error);
+      return false;
+    }
+  }
+
+  async useCredits(userId: string, amount: number, action: string, model_used?: string, session_id?: string): Promise<{ success: boolean; new_balance: number; message: string }> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    try {
+      const params: any = {
+        p_user_id: userId,
+        p_amount: amount,
+        p_action: action,
+        p_model_used: model_used,
+      };
+      
+      // Only add session_id if it's a valid UUID
+      if (session_id) {
+        // Check if it's a valid UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(session_id)) {
+          params.p_session_id = session_id;
+        }
+        // If not a UUID, don't include it to avoid type errors
+      }
+      
+      const { data, error } = await this.client.rpc('deduct_user_credits', params);
+      
+      if (error) {
+        console.error('RPC Error:', error);
+        throw error;
+      }
+      
+      return data || { success: false, new_balance: 0, message: 'Unknown error' };
+    } catch (error) {
+      console.error('Error using credits:', error);
+      throw error;
+    }
+  }
+
+  async purchaseCredits(userId: string, amount: number, purchaseId?: string): Promise<boolean> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    try {
+      const params: any = {
+        p_user_id: userId,
+        p_amount: amount,
+      };
+      
+      // Only add optional parameters if provided
+      if (purchaseId) {
+        params.p_purchase_id = purchaseId;
+      }
+      
+      const { data, error } = await this.client.rpc('add_user_credits', params);
+      
+      if (error) {
+        console.error('RPC Error in purchaseCredits:', error);
+        throw error;
+      }
+      
+      // The function returns boolean directly
+      return data === true;
+    } catch (error) {
+      console.error('Error purchasing credits:', error);
+      throw error;
+    }
+  }
+
+  async getUserApiKeys(userId: string): Promise<any[]> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    const { data, error } = await this.client
+      .from('user_api_keys')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  }
+
+  async addUserApiKey(userId: string, service: string, keyName: string, encryptedKey: string): Promise<void> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    const { error } = await this.client
+      .from('user_api_keys')
+      .insert({
+        user_id: userId,
+        service,
+        key_name: keyName,
+        encrypted_key: encryptedKey,
+      });
+      
+    if (error) throw error;
+  }
+
+  async deleteUserApiKey(keyId: string, userId: string): Promise<void> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    const { error } = await this.client
+      .from('user_api_keys')
+      .update({ is_active: false })
+      .eq('id', keyId)
+      .eq('user_id', userId);
+      
+    if (error) throw error;
+  }
+
+  async updateUserApiKeyUsage(keyId: string): Promise<void> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    // First get current count, then update
+    const { data: current } = await this.client
+      .from('user_api_keys')
+      .select('usage_count')
+      .eq('id', keyId)
+      .single();
+    
+    const newCount = (current?.usage_count || 0) + 1;
+    
+    const { error } = await this.client
+      .from('user_api_keys')
+      .update({
+        usage_count: newCount,
+        last_used_at: new Date().toISOString()
+      })
+      .eq('id', keyId);
+      
+    if (error) throw error;
+  }
+
+  // --- Subscription Management ---
+
+  async updateSubscription(userId: string, subscriptionData: {
+    stripe_subscription_id: string;
+    tier: 'basic' | 'plus' | 'pro';
+    status: 'active' | 'canceled' | 'past_due' | 'trialing';
+    price_amount: number;
+    currency?: string;
+    interval: 'monthly' | 'yearly';
+    current_period_start: string;
+    current_period_end: string;
+    cancel_at_period_end?: boolean;
+  }): Promise<void> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    // First, update user's subscription tier
+    await this.updateUserProfile(userId, { subscription_tier: subscriptionData.tier });
+    
+    // Then update or create subscription record
+    const { error } = await this.client
+      .from('subscriptions')
+      .upsert({
+        user_id: userId,
+        stripe_subscription_id: subscriptionData.stripe_subscription_id,
+        tier: subscriptionData.tier,
+        status: subscriptionData.status,
+        price_amount: subscriptionData.price_amount,
+        currency: subscriptionData.currency || 'kes',
+        interval: subscriptionData.interval,
+        current_period_start: subscriptionData.current_period_start,
+        current_period_end: subscriptionData.current_period_end,
+        cancel_at_period_end: subscriptionData.cancel_at_period_end || false,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'stripe_subscription_id' });
+      
+    if (error) throw error;
+  }
+
+  async cancelSubscription(userId: string): Promise<void> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    // Update subscription status
+    const { error } = await this.client
+      .from('subscriptions')
+      .update({
+        status: 'canceled',
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+      .eq('status', 'active');
+      
+    if (error) throw error;
+    
+    // Reset user to free tier at end of period
+    // This will be handled by webhook when subscription actually expires
+  }
+
+  // --- Analytics and Reporting ---
+
+  async getUserStats(userId: string): Promise<{
+    totalMessages: number;
+    totalImages: number;
+    totalVideos: number;
+    totalEdits: number;
+    creditsUsed: number;
+    creditsRemaining: number;
+    subscriptionTier: string;
+  }> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    try {
+      // Get user profile
+      const { data: profile } = await this.getUserProfile(userId);
+      
+      // Get usage stats from credits log
+      const { data: usage } = await this.client
+        .from('credits_log')
+        .select('action, amount')
+        .eq('user_id', userId)
+        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()); // Last 30 days
+        
+      const stats = {
+        totalMessages: 0,
+        totalImages: 0,
+        totalVideos: 0,
+        totalEdits: 0,
+        creditsUsed: 0,
+        creditsRemaining: profile?.credits || 0,
+        subscriptionTier: profile?.subscription_tier || 'free',
+      };
+      
+      usage?.forEach(log => {
+        if (log.amount < 0) { // Usage (negative amount)
+          stats.creditsUsed += Math.abs(log.amount);
+          switch (log.action) {
+            case 'chat':
+              stats.totalMessages++;
+              break;
+            case 'image':
+              stats.totalImages++;
+              break;
+            case 'video':
+              stats.totalVideos++;
+              break;
+            case 'edit':
+              stats.totalEdits++;
+              break;
+          }
+        }
+      });
+      
+      return stats;
+    } catch (error) {
+      console.error('Error getting user stats:', error);
+      throw error;
+    }
+  }
+
+  // --- Real-time subscription improvements ---
+  
+  subscribeToUserUpdates(userId: string, callbacks: {
+    onProfileUpdate?: (profile: any) => void;
+    onCreditChange?: (credits: number) => void;
+    onSubscriptionChange?: (subscription: any) => void;
+  }) {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    
+    const channels = [];
+    
+    // Subscribe to profile changes
+    if (callbacks.onProfileUpdate || callbacks.onCreditChange) {
+      const profileChannel = this.client
+        .channel(`public:users:id=${userId}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${userId}`,
+        }, (payload) => {
+          if (callbacks.onProfileUpdate) {
+            callbacks.onProfileUpdate(payload.new);
+          }
+          if (callbacks.onCreditChange) {
+            callbacks.onCreditChange(payload.new.credits);
+          }
+        })
+        .subscribe();
+      channels.push(profileChannel);
+    }
+    
+    // Subscribe to subscription changes
+    if (callbacks.onSubscriptionChange) {
+      const subscriptionChannel = this.client
+        .channel(`public:subscriptions:user_id=${userId}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'subscriptions',
+          filter: `user_id=eq.${userId}`,
+        }, (payload) => {
+          callbacks.onSubscriptionChange(payload.new);
+        })
+        .subscribe();
+      channels.push(subscriptionChannel);
+    }
+    
+    return channels;
+  }
+}

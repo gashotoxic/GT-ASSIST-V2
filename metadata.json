@@ -1,0 +1,7 @@
+{
+  "name": "GT Assistant",
+  "description": "A customizable voice and text chatbot using Chutes.ai models (GLM-4, Kokoro, Whisper).",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
