@@ -145,6 +145,13 @@ export class UserSyncService {
     try {
       console.log(`Checking Supabase for user: ${userId}`);
       const profile = await this.supabaseService.getUserProfile(userId);
+      
+      // Profile is null if user doesn't exist
+      if (!profile) {
+        console.log(`User ${userId} not found in Supabase - will create new user`);
+        return false;
+      }
+      
       console.log(`User found: ${userId}, credits: ${profile.credits}`);
       return true;
     } catch (error: any) {

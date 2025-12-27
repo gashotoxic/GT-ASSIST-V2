@@ -166,13 +166,52 @@ CREATE INDEX IF NOT EXISTS idx_user_api_keys_service ON user_api_keys(service);
 -- STEP 7: Enable Row Level Security (RLS)
 -- =====================================================
 
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE credits_log ENABLE ROW LEVEL SECURITY;
-ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_api_keys ENABLE ROW LEVEL SECURITY;
-ALTER TABLE chat_sessions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE media_history ENABLE ROW LEVEL SECURITY;
+-- Note: RLS disabled for tables as app uses Clerk auth, not Supabase auth
+-- RLS policies don't work with anon key and Clerk user IDs
+-- ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE credits_log ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE user_api_keys ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE chat_sessions ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE media_history ENABLE ROW LEVEL SECURITY;
+
+-- =====================================================
+-- ROW LEVEL SECURITY POLICIES - DISABLED
+-- =====================================================
+-- Since app uses Clerk auth with anon key, RLS policies are disabled
+-- All access control is handled by application logic and server-side functions
+
+-- Users table: Users can only access their own profile
+-- CREATE POLICY "Users can view own profile" ON users
+--   FOR SELECT USING (auth.uid()::text = id);
+
+-- CREATE POLICY "Users can update own profile" ON users
+--   FOR UPDATE USING (auth.uid()::text = id);
+
+-- Credits log: Users can only see their own credit transactions
+-- CREATE POLICY "Users can view own credit log" ON credits_log
+--   FOR SELECT USING (auth.uid()::text = user_id);
+
+-- Subscriptions: Users can only see their own subscriptions
+-- CREATE POLICY "Users can view own subscriptions" ON subscriptions
+--   FOR SELECT USING (auth.uid()::text = user_id);
+
+-- User API keys: Users can only manage their own API keys
+-- CREATE POLICY "Users can manage own API keys" ON user_api_keys
+--   FOR ALL USING (auth.uid()::text = user_id);
+
+-- Chat sessions: Users can only access their own sessions
+-- CREATE POLICY "Users can manage own chat sessions" ON chat_sessions
+--   FOR ALL USING (auth.uid()::text = user_id);
+
+-- Messages: Users can only access messages in their own sessions
+-- CREATE POLICY "Users can manage own messages" ON messages
+--   FOR ALL USING (auth.uid()::text = user_id);
+
+-- Media history: Users can only access their own media
+-- CREATE POLICY "Users can manage own media" ON media_history
+--   FOR ALL USING (auth.uid()::text = user_id);
 
 -- =====================================================
 -- STEP 8: Create functions with TEXT user_id parameters
