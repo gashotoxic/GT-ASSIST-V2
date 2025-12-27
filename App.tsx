@@ -1,28 +1,33 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Settings, Sparkles, AlertCircle, Moon, Sun, MessageSquare, Image as ImageIcon, Menu, Database, Monitor, PanelLeftOpen } from 'lucide-react';
+import { Settings, Sparkles, AlertCircle, Moon, Sun, MessageSquare, Image as ImageIcon, Menu, Database, Monitor, PanelLeftOpen, CreditCard, Bot, Zap } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import MediaStudio from './components/MediaStudio';
 import SettingsModal from './components/SettingsModal';
 import { AuthModal } from './components/AuthModal';
 import { UserProfile } from './components/UserProfile';
 import { Sidebar } from './components/Sidebar';
+import { PricingPage } from './components/PricingPage';
+import { AccountSettingsModal } from './components/AccountSettingsModal';
 import { Button } from './components/UI';
 import { AppSettings, DEFAULT_SYSTEM_PROMPT, ChatSession } from './types';
 import { SupabaseService } from './services/supabase';
 import { useAuthContext } from './context/AuthContext';
+import { useCredits } from './context/CreditContext';
 
 const DEFAULT_SETTINGS: AppSettings = {
-  apiKey: '',
-  model: 'zai-org/GLM-4.6',
+  apiKey: 'internal', // Use internal default key
+  model: 'moonshotai/Kimi-K2-Thinking-TEE',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   ttsVoice: 'af_heart',
   ttsSpeed: 1.0,
   useSupabase: false,
   searchProvider: 'tavily',
+  welcomeView: 'chat',
 };
 
 const App: React.FC = () => {
   const { isSignedIn, isLoaded, userId } = useAuthContext();
+  const { credits } = useCredits();
 
   const [showAuthModal, setShowAuthModal] = useState(false);
 
@@ -35,7 +40,8 @@ const App: React.FC = () => {
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [currentView, setCurrentView] = useState<'chat' | 'media'>('chat');
+  const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
+  const [currentView, setCurrentView] = useState<'chat' | 'media' | 'pricing'>('chat');
 
   // Sidebar State: Initialize based on screen width
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 1024);
@@ -150,7 +156,20 @@ const App: React.FC = () => {
     if (currentSessionId) {
       localStorage.setItem('chutes_current_session_id', currentSessionId);
     }
-  }, [currentSessionId]);
+    // Event listener for Account Settings
+    const handleOpenAccountSettings = () => setIsAccountSettingsOpen(true);
+    const handleOpenView = (e: any) => {
+      if (e.detail) setCurrentView(e.detail);
+    };
+
+    window.addEventListener('open-account-settings', handleOpenAccountSettings);
+    window.addEventListener('open-view', handleOpenView);
+
+    return () => {
+      window.removeEventListener('open-account-settings', handleOpenAccountSettings);
+      window.removeEventListener('open-view', handleOpenView);
+    };
+  }, [currentSessionId, isSignedIn, userId]);
 
   // -- HANDLERS --
 
@@ -279,13 +298,16 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const envKey = (import.meta as any).env?.VITE_CHUTES_API_KEY;
-    if (envKey && !settings.apiKey) {
-      setSettings(prev => ({ ...prev, apiKey: envKey }));
-    } else if (!settings.apiKey) {
-      setIsSettingsOpen(true);
+    if (!settings.apiKey || settings.apiKey === '') {
+      setSettings(prev => ({ ...prev, apiKey: 'internal' }));
     }
   }, []);
+
+  const navItems = [
+    { id: 'chat' as const, label: 'Chat', icon: MessageSquare },
+    { id: 'media' as const, label: 'Media', icon: ImageIcon },
+    { id: 'pricing' as const, label: 'Pricing', icon: CreditCard },
+  ];
 
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden font-sans selection:bg-primary/30 text-slate-900 dark:text-slate-100 transition-colors duration-500">
@@ -300,35 +322,32 @@ const App: React.FC = () => {
       </div>
 
       {/* Sidebar */}
-      {settings.apiKey && (
-        <Sidebar
-          isOpen={isSidebarOpen}
-          onClose={() => setIsSidebarOpen(false)}
-          sessions={sessions}
-          activeSessionId={currentSessionId}
-          onSelectSession={setCurrentSessionId}
-          onNewChat={handleNewChat}
-          onDeleteSession={handleDeleteSession}
-          onRenameSession={handleRenameSession}
-        />
-      )}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        sessions={sessions}
+        activeSessionId={currentSessionId}
+        onSelectSession={setCurrentSessionId}
+        onNewChat={handleNewChat}
+        onDeleteSession={handleDeleteSession}
+        onRenameSession={handleRenameSession}
+      />
 
       {/* Main Layout */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10 w-full min-w-0">
 
-        {/* Header - Fixed Height & Non-Shrinking */}
-        <header className="flex-none flex items-center justify-between px-3 sm:px-6 py-4 z-20 sticky top-0 gap-2">
+        {/* Header - Simple & Clean */}
+        <header className="flex-none flex items-center justify-between px-3 sm:px-6 py-4 z-20 gap-2 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-slate-900/40 backdrop-blur-xl">
 
           <div className="flex items-center gap-3 min-w-0">
-            {/* Mobile Menu Trigger */}
-            {settings.apiKey && !isSidebarOpen && (
+            {/* Sidebar Toggles */}
+            {!isSidebarOpen && (
               <Button variant="glass" size="icon" className="lg:hidden shrink-0" onClick={() => setIsSidebarOpen(true)}>
                 <Menu className="w-5 h-5" />
               </Button>
             )}
 
-            {/* Desktop Sidebar Toggle (Visible when closed) */}
-            {settings.apiKey && !isSidebarOpen && (
+            {!isSidebarOpen && (
               <Button
                 variant="glass"
                 size="icon"
@@ -340,129 +359,94 @@ const App: React.FC = () => {
               </Button>
             )}
 
-            <div className="flex items-center space-x-3 bg-white/30 dark:bg-slate-900/30 backdrop-blur-xl px-3 sm:px-4 py-2 rounded-full border border-white/40 dark:border-white/10 shadow-lg shadow-black/5 dark:shadow-black/20 shrink-0 min-w-0 max-w-[200px] sm:max-w-none">
-              <div className="bg-gradient-to-tr from-primary to-primary-light p-1.5 rounded-full shadow-lg shadow-primary/30 shrink-0">
-                <Sparkles className="w-4 h-4 text-white" />
+            {/* Logo */}
+            <div className="flex items-center gap-3 px-3 py-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 shadow-lg">
+              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
+                <Bot className="w-6 h-6 text-white" />
               </div>
-              <div className="truncate">
-                <h1 className="text-base sm:text-lg font-bold text-slate-800 dark:text-white tracking-tight leading-none truncate">
-                  GT <span className="text-primary hidden sm:inline">Assistant</span>
-                </h1>
-              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-white hidden sm:block">
+                GT <span className="text-primary italic">Assistant</span>
+              </h1>
             </div>
 
-            {/* Data Source Indicator */}
-            {settings.apiKey && (
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5 text-[10px] uppercase font-bold tracking-wider text-gray-500 shrink-0">
-                {settings.useSupabase ? (
-                  <>
-                    <Database className="w-3 h-3 text-blue-500" />
-                    <span className="text-blue-500">Cloud Sync</span>
-                  </>
-                ) : (
-                  <>
-                    <Monitor className="w-3 h-3" />
-                    <span>Local Browser</span>
-                  </>
-                )}
-              </div>
-            )}
+            {/* View Switcher - Standard Tabs */}
+            <div className="hidden md:flex items-center bg-black/5 dark:bg-white/10 p-1 rounded-2xl border border-white/10 ml-4">
+              {navItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setCurrentView(item.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 ${currentView === item.id
+                    ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    }`}
+                >
+                  <item.icon className="w-4 h-4" />
+                  <span className="hidden lg:inline">{item.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {settings.apiKey && (
-            <div className="flex items-center bg-white/20 dark:bg-slate-900/40 backdrop-blur-xl rounded-full p-1 border border-white/30 dark:border-white/5 shadow-inner shrink-0">
-              <button
-                onClick={() => setCurrentView('chat')}
-                className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all ${currentView === 'chat'
-                    ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-                  }`}
-              >
-                <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                Chat
-              </button>
-              <button
-                onClick={() => setCurrentView('media')}
-                className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all ${currentView === 'media'
-                    ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-                  }`}
-              >
-                <ImageIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                Media
-              </button>
+          <div className="flex items-center gap-4">
+            {/* Credit Display - Original Simple Style */}
+            <div
+              onClick={() => setCurrentView('pricing')}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 cursor-pointer transition-colors"
+            >
+              <Zap className="w-4 h-4 text-primary" />
+              <span className="text-sm font-bold text-primary">{credits}</span>
             </div>
-          )}
 
-          {/* User Profile or Sign In button */}
-          {isSignedIn ? (
-            <UserProfile />
-          ) : (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                setAuthMode('signin');
-                setShowAuthModal(true);
-              }}
-              className="rounded-full px-4 py-2 font-medium shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
-            >
-              Sign In
-            </Button>
-          )}
-
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="glass"
-              size="icon"
-              onClick={toggleTheme}
-              className="rounded-full w-9 h-9 shadow-lg shadow-black/5 dark:shadow-black/20 hover:shadow-xl transition-shadow border-white/40 dark:border-white/10"
-              title="Toggle Theme"
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-yellow-300" />
+            {/* User & Settings */}
+            <div className="flex items-center gap-2">
+              {isSignedIn ? (
+                <UserProfile />
               ) : (
-                <Moon className="w-4 h-4 text-slate-600" />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setAuthMode('signin');
+                    setShowAuthModal(true);
+                  }}
+                  className="rounded-full px-4 py-2 font-medium shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+                >
+                  Sign In
+                </Button>
               )}
-            </Button>
 
-            <Button
-              variant="glass"
-              size="sm"
-              onClick={() => setIsSettingsOpen(true)}
-              className={`rounded-full shadow-lg shadow-black/5 dark:shadow-black/20 hover:shadow-xl transition-shadow ${!settings.apiKey ? 'animate-pulse ring-2 ring-primary' : ''}`}
-            >
-              <Settings className="w-4 h-4 sm:mr-2 text-slate-700 dark:text-slate-200" />
-              <span className="text-slate-700 dark:text-slate-200 font-medium hidden sm:inline">Settings</span>
-            </Button>
+              <Button
+                variant="glass"
+                size="icon"
+                onClick={toggleTheme}
+                className="rounded-full w-9 h-9 border-white/40 dark:border-white/10"
+                title="Toggle Theme"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-yellow-300" />
+                ) : (
+                  <Moon className="w-4 h-4 text-slate-600" />
+                )}
+              </Button>
+
+              <Button
+                variant="glass"
+                size="sm"
+                onClick={() => setIsSettingsOpen(true)}
+                className="rounded-full shadow-lg shadow-black/5 dark:shadow-black/20 hover:shadow-xl transition-shadow"
+              >
+                <Settings className="w-4 h-4 lg:mr-2 text-slate-700 dark:text-slate-200" />
+                <span className="text-slate-700 dark:text-slate-200 font-medium hidden lg:inline">Settings</span>
+              </Button>
+            </div>
           </div>
         </header>
 
-        {/* Main Content Area - Scrollable */}
-        <main className="flex-1 w-full overflow-hidden relative z-10 px-0 sm:px-4 pb-0 sm:pb-4 pt-2 flex flex-col items-center min-h-0">
-          {!settings.apiKey ? (
-            <div className="flex flex-col items-center justify-center h-full p-8 text-center animate-in fade-in duration-500 w-full max-w-4xl mx-auto overflow-y-auto">
-              <div className="glass-card p-10 rounded-[2rem] w-full flex flex-col items-center border border-white/50 dark:border-white/10 shadow-2xl">
-                <div className="bg-primary/10 dark:bg-primary/20 p-5 rounded-full mb-6 ring-1 ring-primary/20 dark:ring-primary/40">
-                  <AlertCircle className="w-12 h-12 text-primary" />
-                </div>
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Activation Required</h2>
-                <p className="text-gray-600 dark:text-gray-300 mb-8 leading-relaxed text-lg">
-                  Please enter your <span className="font-semibold text-primary">Chutes API Key</span> to activate the assistant.
-                </p>
-                <Button
-                  size="lg"
-                  variant="primary"
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="w-full max-w-sm rounded-2xl py-6 text-lg shadow-xl shadow-primary/20 hover:shadow-primary/30"
-                >
-                  Open Settings
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="w-full h-full max-w-[1920px] mx-auto relative">
-              <div className={`h-full w-full transition-all duration-500 absolute inset-0 ${currentView === 'chat' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+        {/* Main Content Area - Scrollable Container */}
+        <main className="flex-1 w-full overflow-hidden relative z-10 px-0 sm:px-4 pb-0 md:pb-4 pt-4 sm:pt-6 flex flex-col items-center min-h-0 mb-20 md:mb-0">
+          <div className="w-full h-full max-w-[1920px] mx-auto relative">
+            {currentView === 'chat' && (
+              <div className="h-full w-full transition-all duration-500 animate-in fade-in zoom-in-95">
                 <ChatInterface
                   key={`${currentSessionId}-${settings.useSupabase ? 'cloud' : 'local'}`}
                   settings={settings}
@@ -473,7 +457,9 @@ const App: React.FC = () => {
                   userId={isSignedIn ? userId : undefined}
                 />
               </div>
-              <div className={`h-full w-full transition-all duration-500 absolute inset-0 ${currentView === 'media' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+            )}
+            {currentView === 'media' && (
+              <div className="h-full w-full transition-all duration-500 animate-in fade-in zoom-in-95">
                 <MediaStudio
                   settings={settings}
                   isAuthenticated={isSignedIn}
@@ -481,9 +467,43 @@ const App: React.FC = () => {
                   userId={isSignedIn ? userId : undefined}
                 />
               </div>
-            </div>
-          )}
+            )}
+            {currentView === 'pricing' && (
+              <div className="h-full w-full transition-all duration-500 animate-in fade-in zoom-in-95">
+                <PricingPage onBack={() => setCurrentView('chat')} />
+              </div>
+            )}
+          </div>
         </main>
+
+        {/* Mobile Bottom Navigation - User Friendly Commands */}
+        <nav className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl px-6 py-3 rounded-[2rem] border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-50 gap-8 min-w-[280px] justify-center transition-all duration-500 animate-in slide-in-from-bottom-10">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setCurrentView(item.id)}
+              className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${currentView === item.id
+                ? 'text-primary scale-110'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
+                }`}
+            >
+              <div className={`p-2 rounded-xl transition-all ${currentView === item.id ? 'bg-primary/10 shadow-inner' : 'bg-transparent'}`}>
+                <item.icon className={`w-5 h-5 ${currentView === item.id ? 'fill-current' : ''}`} />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest leading-none">{item.label}</span>
+            </button>
+          ))}
+          <div className="h-8 w-px bg-white/10 mx-1"></div>
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="flex flex-col items-center gap-1.5 text-slate-400"
+          >
+            <div className="p-2 rounded-xl">
+              <Menu className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-widest leading-none">History</span>
+          </button>
+        </nav>
       </div>
 
       {/* Settings Modal */}
@@ -491,6 +511,16 @@ const App: React.FC = () => {
         <SettingsModal
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
+          settings={settings}
+          onSave={setSettings}
+        />
+      )}
+
+      {/* Account Settings Modal */}
+      {isAccountSettingsOpen && (
+        <AccountSettingsModal
+          isOpen={isAccountSettingsOpen}
+          onClose={() => setIsAccountSettingsOpen(false)}
           settings={settings}
           onSave={setSettings}
         />

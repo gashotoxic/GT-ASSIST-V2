@@ -149,10 +149,11 @@ User subscription management for paid tiers.
 CREATE TABLE subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,  -- TEXT for Clerk compatibility
-  stripe_subscription_id TEXT UNIQUE,      -- Stripe subscription ID
+  paystack_subscription_id TEXT UNIQUE,    -- Paystack subscription ID (replaces Stripe)
+  paystack_customer_code TEXT,             -- Paystack customer code
   tier TEXT NOT NULL CHECK (tier IN ('basic', 'plus', 'pro')),
   status TEXT NOT NULL CHECK (status IN ('active', 'canceled', 'past_due', 'trialing')),
-  price_amount INTEGER NOT NULL,           -- Price in cents
+  price_amount INTEGER NOT NULL,           -- Price in cents/kobo
   currency TEXT DEFAULT 'kes',             -- Currency code
   interval TEXT NOT NULL CHECK (interval IN ('monthly', 'yearly')),
   current_period_start TIMESTAMP,          -- Current billing period start
@@ -166,7 +167,7 @@ CREATE TABLE subscriptions (
 **Indexes:**
 - `idx_subscriptions_user` - User subscriptions
 - `idx_subscriptions_status` - Status filtering
-- `idx_subscriptions_stripe` - Stripe webhook lookups
+- `idx_subscriptions_paystack` - Paystack webhook lookups
 
 **RLS Policies:**
 - Users can view own subscriptions
@@ -225,7 +226,7 @@ SELECT add_user_credits(
   p_user_id := 'user_36vSe3hO7LmgtIhM4D4pVfovrnz',  -- TEXT Clerk ID
   p_amount := 100,
   p_action := 'purchase',
-  p_purchase_id := 'stripe-session-id'
+  p_purchase_id := 'paystack-reference-id'
 );
 ```
 
@@ -382,7 +383,7 @@ const channels = supabaseService.subscribeToUserUpdates(userId, {
 - Added BYOK support
 
 ### Future Migrations
-- Week 4: Payment integration (Stripe webhooks)
+- Week 4: Payment integration (Paystack webhooks)
 - Week 7: Message branching support
 - Week 10: Enhanced media metadata
 

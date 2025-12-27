@@ -36,8 +36,8 @@ VITE_BRAVE_API_KEY=your_brave_key
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_KEY=your_supabase_anon_key
 
-# OPTIONAL: For Payments
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
+# OPTIONAL: For Payments (Paystack)
+VITE_PAYSTACK_PUBLIC_KEY=pk_test_...
 ```
 
 ---
@@ -78,15 +78,15 @@ For production, set up Clerk webhooks to sync user data to Supabase:
 
 ---
 
-## 💳 Stripe Configuration (Optional)
-
-### For Payment Integration
-
-1. Create account at [stripe.com](https://stripe.com)
-2. Go to **Developers > API Keys**
-3. Use **Publishable Key** for frontend
-4. Set up webhook endpoint for payment processing
-5. Configure pricing plans in Stripe dashboard
+## 💳 Paystack Configuration
+ 
+ ### For Payment Integration
+ 
+ 1. Create account at [paystack.com](https://paystack.com)
+ 2. Go to **Settings > API Keys & Webhooks**
+ 3. Use **Public Key** for frontend (`VITE_PAYSTACK_PUBLIC_KEY`)
+ 4. Set Secret Key in Supabase Edge Functions (`PAYSTACK_SECRET_KEY`)
+ 5. Create Plans in Paystack Dashboard for subscriptions
 
 ---
 
@@ -152,7 +152,7 @@ In Vercel dashboard, add these environment variables:
 | `VITE_SUPABASE_KEY` | Supabase Anon Key | Optional |
 | `VITE_TAVILY_API_KEY` | Tavily Search API Key | Optional |
 | `VITE_BRAVE_API_KEY` | Brave Search API Key | Optional |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe Publishable Key | Optional |
+| `VITE_PAYSTACK_PUBLIC_KEY` | Paystack Public Key | Optional |
 
 **⚠️ Important**: These variables will be bundled into the client-side code. Only include keys that are safe to expose.
 

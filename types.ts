@@ -54,18 +54,23 @@ export interface AppSettings {
   tavilyApiKey?: string;
   braveApiKey?: string;
   searchProvider: 'tavily' | 'brave';
+  welcomeView?: 'chat' | 'media';
 }
 
 export const DEFAULT_SYSTEM_PROMPT = "You are a helpful and empathetic AI assistant. You answer concisely and clearly.";
 
 export const AVAILABLE_MODELS = [
-  { id: "zai-org/GLM-4.6", name: "GLM 4.6 (Default)" },
-  { id: "deepseek-ai/DeepSeek-V3.2-Speciale", name: "DeepSeek V3.2 Speciale" },
-  { id: "meituan-longcat/LongCat-Flash-Chat-FP8", name: "LongCat Flash" },
-  { id: "MiniMaxAI/MiniMax-M2", name: "MiniMax M2" },
-  { id: "deepseek-ai/DeepSeek-R1-0528", name: "DeepSeek R1" },
-  { id: "moonshotai/Kimi-K2-Thinking", name: "Kimi K2 (Thinking)" },
-  { id: "Qwen/Qwen3-VL-235B-A22B-Thinking", name: "Qwen 3 VL (Thinking)" }
+  { id: "deepseek-ai/DeepSeek-R1-0528-TEE", name: "🧠 DeepSeek R1" },
+  { id: "deepseek-ai/DeepSeek-V3.2-TEE", name: "🧠 DeepSeek V3.2" },
+  { id: "deepseek-ai/DeepSeek-V3.2-Speciale-TEE", name: "🧠 DeepSeek V3.2 Speciale" },
+  { id: "zai-org/GLM-4.6V", name: "🧠👁️ GLM 4.6V" },
+  { id: "zai-org/GLM-4.7-TEE", name: "🧠 GLM 4.7" },
+  { id: "openai/gpt-oss-120b-TEE", name: "🧠👁️ GPT OSS 120B" },
+  { id: "moonshotai/Kimi-K2-Thinking-TEE", name: "🧠 Kimi K2 Thinking" },
+  { id: "MiniMaxAI/MiniMax-M2.1-TEE", name: "🧠 MiniMax M2.1" },
+  { id: "NousResearch/DeepHermes-3-Mistral-24B-Preview", name: "Nous Hermes 3 Mistral" },
+  { id: "Qwen/Qwen3-VL-235B-A22B-Thinking", name: "🧠👁️ Qwen 3 VL Thinking" },
+  { id: "XiaomiMiMo/MiMo-V2-Flash", name: "Xiaomi MiMo V2 Flash" }
 ];
 
 export const AVAILABLE_IMAGE_MODELS = [
@@ -87,10 +92,10 @@ export const AVAILABLE_VIDEO_MODELS = [
 ];
 
 export const AVAILABLE_VOICES = [
-  "af_heart", "af_alloy", "af_aoede", "af_bella", "af_jessica", "af_kore", 
-  "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky", "am_adam", 
-  "am_echo", "am_eric", "am_fenrir", "am_liam", "am_michael", "am_onyx", 
-  "am_puck", "am_santa", "bf_alice", "bf_emma", "bf_isabella", "bf_lily", 
+  "af_heart", "af_alloy", "af_aoede", "af_bella", "af_jessica", "af_kore",
+  "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky", "am_adam",
+  "am_echo", "am_eric", "am_fenrir", "am_liam", "am_michael", "am_onyx",
+  "am_puck", "am_santa", "bf_alice", "bf_emma", "bf_isabella", "bf_lily",
   "bm_daniel", "bm_fable", "bm_george", "bm_lewis"
 ];
 
@@ -120,9 +125,9 @@ export interface ImageGenRequest {
 }
 
 export interface ImageEditRequest {
-    prompt: string;
-    image_b64: string;
-    modelUrl: string;
+  prompt: string;
+  image_b64: string;
+  modelUrl: string;
 }
 
 export interface VideoGenRequest {

@@ -45,7 +45,7 @@ The app handles data storage in two distinct levels to support both privacy-focu
 ### `services/chutes.ts` (AI Inference)
 Handles communication with Chutes.ai.
 *   **Streaming:** Uses `fetch` with `ReadableStream` for LLM responses.
-*   **Prompt Enhancement:** Uses `meituan-longcat/LongCat-Flash-Chat-FP8` to rewrite simple user prompts into detailed artistic descriptions.
+*   **Prompt Enhancement:** Uses `NousResearch/DeepHermes-3-Mistral-24B-Preview` to rewrite simple user prompts into detailed artistic descriptions.
 *   **Tool Calling:** Intercepts `tool_calls`, executes `SearchService`, and recursively calls the LLM.
 *   **TTS (Kokoro):** Sanitizes text (removes Markdown/Thinking tags) before generation.
 *   **Media Generation:**
@@ -124,6 +124,7 @@ The media studio uses a **Parallel State Architecture**. You can generate an ima
 **Optional Keys:**
 *   `VITE_SUPABASE_URL` / `VITE_SUPABASE_KEY`: Cloud Sync.
 *   `VITE_TAVILY_API_KEY` / `VITE_BRAVE_API_KEY`: Web Search.
+*   `VITE_PAYSTACK_PUBLIC_KEY`: Paystack Payments.
 
 ---
 
@@ -140,4 +141,4 @@ The media studio uses a **Parallel State Architecture**. You can generate an ima
 *   **Video:**
     *   `wan-2.2-i2v` (Image-to-Video).
     *   `wan-2.1-t2v` (Text-to-Video).
-*   **Utility:** `meituan-longcat` (Used for Prompt Enhancer).
+*   **Utility:** `NousResearch/DeepHermes-3-Mistral-24B-Preview` (Used for Prompt Enhancer).

@@ -76,8 +76,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Check if search is actually available based on keys
-  const canSearch = (settings.searchProvider === 'tavily' && !!settings.tavilyApiKey) ||
-    (settings.searchProvider === 'brave' && !!settings.braveApiKey);
+  const canSearch = (settings.searchProvider === 'tavily' && !!(settings.tavilyApiKey || import.meta.env.VITE_TAVILY_API_KEY)) ||
+    (settings.searchProvider === 'brave' && !!(settings.braveApiKey || import.meta.env.VITE_BRAVE_API_KEY));
 
   // Cleanup effect when sessionId changes (Stop generation/audio)
   useEffect(() => {
@@ -318,7 +318,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
       const searchConfig = {
         enabled: isSearchEnabled,
-        apiKey: settings.searchProvider === 'brave' ? settings.braveApiKey! : settings.tavilyApiKey!,
+        apiKey: settings.searchProvider === 'brave'
+          ? (settings.braveApiKey || import.meta.env.VITE_BRAVE_API_KEY || '')
+          : (settings.tavilyApiKey || import.meta.env.VITE_TAVILY_API_KEY || ''),
         provider: settings.searchProvider
       };
 
@@ -590,7 +592,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
   };
 
   return (
-    <div key={sessionId} className="flex flex-col h-full w-full max-w-5xl mx-auto relative glass-card md:rounded-[2rem] overflow-hidden shadow-2xl transition-all duration-300 animate-in fade-in">
+    <div key={sessionId} className="flex flex-col h-full w-full max-w-5xl mx-auto relative glass-card md:rounded-[2rem] overflow-hidden shadow-2xl transition-all duration-300 animate-in fade-in border border-white/40 dark:border-white/10">
       <audio ref={audioRef} className="hidden" />
 
       {/* Messages Area */}

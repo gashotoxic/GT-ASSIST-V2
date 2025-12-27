@@ -53,36 +53,31 @@ export const UserProfile: React.FC = () => {
         variant="glass"
         size="sm"
         onClick={() => setShowDropdown(!showDropdown)}
-        className="rounded-full px-3 py-2 flex items-center gap-2 hover:bg-white/40 dark:hover:bg-slate-700/40 transition-all"
+        className="rounded-full px-3 py-1.5 flex items-center gap-2.5 hover:bg-white/40 dark:hover:bg-slate-700/40 transition-all border-white/20"
       >
         {user.imageUrl ? (
-          <img 
-            src={user.imageUrl} 
-            alt="Profile" 
-            className="w-6 h-6 rounded-full object-cover"
+          <img
+            src={user.imageUrl}
+            alt="Profile"
+            className="w-7 h-7 rounded-full object-cover ring-2 ring-primary/20"
           />
         ) : (
-          <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-semibold text-primary">
+          <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary border border-primary/20">
             {getInitials()}
           </div>
         )}
-        {/* Credit Display */}
-        <div className="hidden md:flex items-center gap-1 px-2 py-1 rounded-full bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
-          <Coins className="w-3 h-3 text-amber-500" />
-          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-            {subscriptionTier === 'pro' ? '∞' : credits}
-          </span>
+
+        <div className={`px-2 py-0.5 rounded-full text-[10px] font-black tracking-widest ${getTierColor(subscriptionTier)} shadow-sm`}>
+          {getTierLabel(subscriptionTier)}
         </div>
-        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 hidden lg:block">
-          {user.fullName || user.primaryEmailAddress?.emailAddress || 'User'}
-        </span>
-        <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+
+        <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-300 ${showDropdown ? 'rotate-180' : ''}`} />
       </Button>
 
       {showDropdown && (
         <>
-          <div 
-            className="fixed inset-0 z-40" 
+          <div
+            className="fixed inset-0 z-40"
             onClick={() => setShowDropdown(false)}
           />
           <div className="absolute right-0 top-12 z-50 w-72 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-2xl shadow-black/10 dark:shadow-black/30 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2">
@@ -136,29 +131,33 @@ export const UserProfile: React.FC = () => {
             <div className="py-2">
               <button
                 onClick={() => {
-                  window.location.href = '/settings/profile';
+                  const event = new CustomEvent('open-account-settings');
+                  window.dispatchEvent(event);
                   setShowDropdown(false);
                 }}
-                className="w-full px-4 py-2 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-primary/10 hover:text-primary transition-colors"
+                className="w-full px-4 py-2.5 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-primary/10 hover:text-primary transition-all group"
               >
-                <Settings className="w-4 h-4" />
+                <Settings className="w-4 h-4 group-hover:rotate-45 transition-transform" />
                 Profile Settings
               </button>
 
               <button
                 onClick={() => {
-                  window.location.href = '/settings/billing';
+                  const event = new CustomEvent('open-view', { detail: 'pricing' });
+                  window.dispatchEvent(event);
                   setShowDropdown(false);
                 }}
-                className="w-full px-4 py-2 flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 hover:bg-primary/10 hover:text-primary transition-colors"
+                className="w-full px-4 py-2.5 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-primary/10 hover:text-primary transition-all"
               >
                 <CreditCard className="w-4 h-4" />
                 Billing & Credits
               </button>
 
+              <div className="h-px bg-gray-100 dark:bg-white/5 my-1" />
+
               <button
                 onClick={handleSignOut}
-                className="w-full px-4 py-2 flex items-center gap-3 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                className="w-full px-4 py-2.5 flex items-center gap-3 text-sm font-bold text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all"
               >
                 <LogOut className="w-4 h-4" />
                 Sign Out

@@ -90,34 +90,51 @@ export const Select: React.FC<SelectProps> = ({ className = '', children, ...pro
 );
 
 // Modal/Dialog Overlay
-export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; children: React.ReactNode; title: string }> = ({
+export const Modal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  title: string;
+  size?: 'md' | 'lg' | 'xl';
+  showCloseButton?: boolean;
+}> = ({
   isOpen,
   onClose,
   children,
-  title
+  title,
+  size = 'md',
+  showCloseButton = true
 }) => {
-  if (!isOpen) return null;
+    if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/30 dark:bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg rounded-2xl bg-white/60 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/60 dark:border-white/10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] dark:shadow-[0_40px_70px_-10px_rgba(0,0,0,0.6)] animate-in zoom-in-95 slide-in-from-bottom-5 duration-300">
-        <div className="flex flex-col space-y-1.5 p-6 pb-4 border-b border-gray-200/50 dark:border-white/10">
-          <h3 className="text-xl font-bold leading-none text-gray-900 dark:text-white tracking-tight">{title}</h3>
+    const sizeClasses = {
+      md: 'max-w-lg',
+      lg: 'max-w-3xl',
+      xl: 'max-w-5xl'
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 dark:bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className={`relative w-full ${sizeClasses[size]} rounded-2xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-3xl border border-white/60 dark:border-white/10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] dark:shadow-[0_40px_70px_-10px_rgba(0,0,0,0.6)] animate-in zoom-in-95 slide-in-from-bottom-5 duration-300 overflow-hidden`}>
+          <div className="flex flex-col space-y-1.5 p-6 pb-4 border-b border-gray-200/50 dark:border-white/10 bg-white/20 dark:bg-white/5">
+            <h3 className="text-xl font-heading font-black leading-none text-gray-900 dark:text-white tracking-tight">{title}</h3>
+          </div>
+          <div className="p-6 overflow-y-auto max-h-[85vh] custom-scrollbar">
+            {children}
+          </div>
+          {showCloseButton && (
+            <button
+              onClick={onClose}
+              className="absolute right-5 top-5 rounded-full p-1.5 text-gray-400 hover:bg-gray-100/50 dark:hover:bg-white/10 hover:text-gray-600 dark:hover:text-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg>
+              <span className="sr-only">Close</span>
+            </button>
+          )}
         </div>
-        <div className="p-6 overflow-y-auto max-h-[70vh]">
-          {children}
-        </div>
-        <button
-          onClick={onClose}
-          className="absolute right-5 top-5 rounded-full p-1 text-gray-400 hover:bg-gray-100/50 dark:hover:bg-white/10 hover:text-gray-600 dark:hover:text-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" x2="6" y1="6" y2="18"></line><line x1="6" x2="18" y1="6" y2="18"></line></svg>
-          <span className="sr-only">Close</span>
-        </button>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
 // Dropdown Menu Components
 export const DropdownMenu: React.FC<{ children: React.ReactNode }> = ({ children }) => {

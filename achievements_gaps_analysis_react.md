@@ -29,7 +29,7 @@
 
 ### Media Studio
 - ✅ **Image Generation**: 6 models (Hunyuan, Qwen-Image, Z-Image-Turbo, HiDream, Juggernaut-XL, Flux-Schnell)
-- ✅ **Prompt Enhancer**: Meituan-longcat/LongCat-Flash-Chat-FP8 integration
+- ✅ **Prompt Enhancer**: NousResearch/DeepHermes-3-Mistral-24B-Preview integration
 - ✅ **Image Editing**: Qwen-Image-Edit with quick actions
 - ✅ **Video Generation**: Wan 2.2 I2V and Wan 2.1 T2V
 - ✅ **Video Extension**: Frame capture from last frame
@@ -69,10 +69,10 @@
    - **Dependencies**: Clerk Auth (✅ COMPLETE)
    - **Effort**: High
 
-3. **Payment Integration**
-   - **Status**: ❌ Not implemented (Week 4 Planned)
+3. **Payment Integration (Paystack)**
+   - **Status**: ✅ **IMPLEMENTED** (Week 4 Complete)
    - **Impact**: CRITICAL - Revenue generation
-   - **Implementation**: Stripe Checkout + Netlify/Vercel serverless functions
+   - **Implementation**: Paystack Inline + Supabase Edge Functions
    - **Dependencies**: Credit System (Week 2-3)
    - **Effort**: High
 
@@ -141,7 +141,7 @@
 |---------|--------|----------|--------|-------|--------------|
 | Clerk Auth | **✅ COMPLETE** | **P0** | Medium | 1 | None |
 | Credit System | Not Started | **P0** | High | 1 | Clerk Auth ✅ |
-| Stripe Payments | Not Started | **P0** | High | 1 | Credit System |
+| Paystack Payments | **✅ COMPLETE** | **P0** | High | 1 | Credit System |
 | Credit-Aware UI | Not Started | **P0** | Medium | 1 | Credit System |
 | Message Copy | Missing | **P1** | Low | 2 | None |
 | Message Edit | Missing | **P1** | Medium | 2 | None |

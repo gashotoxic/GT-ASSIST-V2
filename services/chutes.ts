@@ -14,8 +14,12 @@ export class ChutesService {
   }
 
   private getHeaders() {
+    let key = this.apiKey;
+    if (!key || key === 'internal') {
+      key = import.meta.env.VITE_CHUTES_API_KEY || '';
+    }
     return {
-      'Authorization': `Bearer ${this.apiKey}`,
+      'Authorization': `Bearer ${key}`,
       'Content-Type': 'application/json',
     };
   }
@@ -24,7 +28,7 @@ export class ChutesService {
   private async fetchWithRetry(url: string, options: RequestInit, retries = 3, initialDelay = 1000): Promise<Response> {
     try {
       const response = await fetch(url, options);
-      
+
       // Retry on 429 (Too Many Requests) or 5xx (Server Errors)
       if (!response.ok && (response.status === 429 || response.status >= 500)) {
         if (retries > 0) {
@@ -33,7 +37,7 @@ export class ChutesService {
           return this.fetchWithRetry(url, options, retries - 1, initialDelay);
         }
       }
-      
+
       return response;
     } catch (error) {
       // AbortError should not be retried
@@ -41,9 +45,9 @@ export class ChutesService {
         throw error;
       }
       if (retries > 0) {
-         const delay = initialDelay * Math.pow(2, 3 - retries);
-         await new Promise(resolve => setTimeout(resolve, delay));
-         return this.fetchWithRetry(url, options, retries - 1, initialDelay);
+        const delay = initialDelay * Math.pow(2, 3 - retries);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return this.fetchWithRetry(url, options, retries - 1, initialDelay);
       }
       throw error;
     }
@@ -71,33 +75,33 @@ export class ChutesService {
 
   async enhancePrompt(basePrompt: string): Promise<string> {
     if (!basePrompt.trim()) return "";
-    
+
     const systemPrompt = "You are an expert prompt engineer for AI image and video generation models. Your task is to rewrite the user's simple prompt into a highly detailed, descriptive, and artistic prompt suitable for models like Midjourney, Stable Diffusion, or Wan Video. Focus on lighting, artistic style, camera angles, texture, and mood. Output ONLY the enhanced prompt text, without any explanations or conversational filler.";
-    
+
     const messages: Message[] = [{ role: 'user', content: basePrompt }];
-    
+
     // We use a non-streaming approach for simplicity here, 
     // but reusing streamChat is cleaner to keep the codebase consistent.
     let fullResponse = '';
     // Use a fast model for this
-    const stream = this.streamChat(messages, systemPrompt, 'meituan-longcat/LongCat-Flash-Chat-FP8');
-    
+    const stream = this.streamChat(messages, systemPrompt, 'NousResearch/DeepHermes-3-Mistral-24B-Preview');
+
     for await (const chunk of stream) {
-        fullResponse += chunk;
+      fullResponse += chunk;
     }
-    
+
     return fullResponse.trim();
   }
 
   async *streamChat(
-    messages: Message[], 
-    systemPrompt: string, 
+    messages: Message[],
+    systemPrompt: string,
     model: string,
     searchConfig?: { enabled: boolean; apiKey: string; provider: 'tavily' | 'brave' },
     onStatusChange?: (status: string | null) => void,
     signal?: AbortSignal
   ): AsyncGenerator<string, void, unknown> {
-    
+
     // Setup Tools
     const tools = (searchConfig?.enabled && searchConfig?.apiKey && searchConfig.apiKey.length > 5) ? [
       {
@@ -144,8 +148,8 @@ export class ChutesService {
     });
 
     if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`LLM Error: ${response.status} - ${errorText}`);
+      const errorText = await response.text();
+      throw new Error(`LLM Error: ${response.status} - ${errorText}`);
     }
 
     if (!response.body) throw new Error('No response body');
@@ -153,7 +157,7 @@ export class ChutesService {
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
-    
+
     let currentToolCalls: any[] = [];
 
     try {
@@ -173,7 +177,7 @@ export class ChutesService {
               const data = JSON.parse(line.slice(6));
               const choice = data.choices[0];
               const delta = choice?.delta;
-              
+
               if (delta?.content) {
                 yield delta.content;
               }
@@ -200,22 +204,22 @@ export class ChutesService {
 
               if (choice?.finish_reason === 'tool_calls' || (choice?.finish_reason === 'stop' && currentToolCalls.length > 0)) {
                 if (onStatusChange) onStatusChange('Searching web...');
-                
+
                 const searchService = new SearchService(searchConfig!.apiKey, searchConfig!.provider);
-                
+
                 const assistantMsg: Message = {
                   role: 'assistant',
                   content: '',
                   tool_calls: currentToolCalls
                 };
-                
+
                 const newMessages = [...messages, assistantMsg];
 
                 for (const call of currentToolCalls) {
                   if (call.function.name === 'web_search') {
                     const args = JSON.parse(call.function.arguments);
                     const searchResult = await searchService.search(args.query);
-                    
+
                     newMessages.push({
                       role: 'tool',
                       tool_call_id: call.id,
@@ -227,8 +231,8 @@ export class ChutesService {
 
                 if (onStatusChange) onStatusChange(null);
 
-                yield *this.streamChat(newMessages, systemPrompt, model, searchConfig, onStatusChange, signal);
-                return; 
+                yield* this.streamChat(newMessages, systemPrompt, model, searchConfig, onStatusChange, signal);
+                return;
               }
 
             } catch (e) {
@@ -238,19 +242,19 @@ export class ChutesService {
         }
       }
     } catch (error: any) {
-        if (error.name === 'AbortError') {
-            console.log('Stream aborted');
-            return;
-        }
-        throw error;
+      if (error.name === 'AbortError') {
+        console.log('Stream aborted');
+        return;
+      }
+      throw error;
     } finally {
-        reader.releaseLock();
+      reader.releaseLock();
     }
   }
 
   async speak(request: TTSRequest): Promise<Blob> {
     if (!request.text || request.text.trim().length === 0) {
-        throw new Error("Text is empty");
+      throw new Error("Text is empty");
     }
 
     const response = await this.fetchWithRetry(BASE_TTS_URL, {
@@ -264,8 +268,8 @@ export class ChutesService {
     });
 
     if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`TTS Error: ${response.status} - ${errorText}`);
+      const errorText = await response.text();
+      throw new Error(`TTS Error: ${response.status} - ${errorText}`);
     }
 
     return await response.blob();
@@ -282,89 +286,89 @@ export class ChutesService {
     });
 
     if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`STT Error: ${response.status} - ${errorText}`);
+      const errorText = await response.text();
+      throw new Error(`STT Error: ${response.status} - ${errorText}`);
     }
 
-    const text = await response.text(); 
+    const text = await response.text();
     try {
-        const json = JSON.parse(text);
-        if (typeof json === 'string') return json;
-        if (json.text) return json.text;
-        return text;
+      const json = JSON.parse(text);
+      if (typeof json === 'string') return json;
+      if (json.text) return json.text;
+      return text;
     } catch {
-        return text;
+      return text;
     }
   }
 
   async generateImage(request: ImageGenRequest, signal?: AbortSignal): Promise<Blob> {
     let body: any = { prompt: request.prompt };
-    
+
     // Model Specific Logic
     if (request.modelId === 'qwen-image') {
-        body = {
-            model: "qwen-image",
-            prompt: request.prompt,
-            negative_prompt: "blur, distortion, low quality, ugly, deformed",
-            guidance_scale: 7.5,
-            width: 1024,
-            height: 1024,
-            num_inference_steps: 50
-        };
+      body = {
+        model: "qwen-image",
+        prompt: request.prompt,
+        negative_prompt: "blur, distortion, low quality, ugly, deformed",
+        guidance_scale: 7.5,
+        width: 1024,
+        height: 1024,
+        num_inference_steps: 50
+      };
     } else if (request.modelId === 'juggernaut-xl') {
-        body = {
-            model: "JuggernautXL-Ragnarok",
-            prompt: request.prompt,
-            negative_prompt: "blur, distortion, low quality, ugly, deformed",
-            guidance_scale: 7.5,
-            width: 1024,
-            height: 1024,
-            num_inference_steps: 50
-        };
+      body = {
+        model: "JuggernautXL-Ragnarok",
+        prompt: request.prompt,
+        negative_prompt: "blur, distortion, low quality, ugly, deformed",
+        guidance_scale: 7.5,
+        width: 1024,
+        height: 1024,
+        num_inference_steps: 50
+      };
     } else if (request.modelId === 'flux-schnell') {
-        body = {
-            model: "FLUX.1-schnell",
-            prompt: request.prompt,
-            negative_prompt: "blur, distortion, low quality, ugly, deformed",
-            guidance_scale: 7.5,
-            width: 1024,
-            height: 1024,
-            num_inference_steps: 50
-        };
+      body = {
+        model: "FLUX.1-schnell",
+        prompt: request.prompt,
+        negative_prompt: "blur, distortion, low quality, ugly, deformed",
+        guidance_scale: 7.5,
+        width: 1024,
+        height: 1024,
+        num_inference_steps: 50
+      };
     } else if (request.modelId === 'hidream') {
-        body = {
-            seed: null,
-            prompt: request.prompt,
-            resolution: "1024x1024",
-            guidance_scale: 5,
-            num_inference_steps: 50
-        };
+      body = {
+        seed: null,
+        prompt: request.prompt,
+        resolution: "1024x1024",
+        guidance_scale: 5,
+        num_inference_steps: 50
+      };
     } else if (!request.modelId && request.modelUrl) {
-        // Custom Model Fallback "Smart Payload"
-        // We try to send a superset of common fields. 
-        // Most well-behaved APIs will ignore extra fields.
-        body = {
-            prompt: request.prompt,
-            model: "custom", // Some APIs require this field to be present
-            width: 1024,
-            height: 1024,
-            resolution: "1024x1024",
-            guidance_scale: 7.5,
-            num_inference_steps: 40,
-            negative_prompt: "blur, low quality"
-        };
+      // Custom Model Fallback "Smart Payload"
+      // We try to send a superset of common fields. 
+      // Most well-behaved APIs will ignore extra fields.
+      body = {
+        prompt: request.prompt,
+        model: "custom", // Some APIs require this field to be present
+        width: 1024,
+        height: 1024,
+        resolution: "1024x1024",
+        guidance_scale: 7.5,
+        num_inference_steps: 40,
+        negative_prompt: "blur, low quality"
+      };
     }
 
     const response = await this.fetchWithRetry(request.modelUrl, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(body),
-        signal
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(body),
+      signal
     });
 
     if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Image Gen Error: ${response.status} - ${errorText}`);
+      const errorText = await response.text();
+      throw new Error(`Image Gen Error: ${response.status} - ${errorText}`);
     }
 
     return await response.blob();
@@ -373,30 +377,30 @@ export class ChutesService {
   async editImage(request: ImageEditRequest, signal?: AbortSignal): Promise<Blob> {
     let cleanImage = request.image_b64;
     if (cleanImage.includes('base64,')) {
-        cleanImage = cleanImage.split('base64,')[1];
+      cleanImage = cleanImage.split('base64,')[1];
     }
 
     const body = {
-        prompt: request.prompt,
-        image_b64s: [cleanImage],
-        true_cfg_scale: 4,
-        num_inference_steps: 40,
-        width: 1024,
-        height: 1024,
-        seed: null,
-        negative_prompt: ""
+      prompt: request.prompt,
+      image_b64s: [cleanImage],
+      true_cfg_scale: 4,
+      num_inference_steps: 40,
+      width: 1024,
+      height: 1024,
+      seed: null,
+      negative_prompt: ""
     };
 
     const response = await this.fetchWithRetry(request.modelUrl, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(body),
-        signal
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(body),
+      signal
     });
 
     if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Image Edit Error: ${response.status} - ${errorText}`);
+      const errorText = await response.text();
+      throw new Error(`Image Edit Error: ${response.status} - ${errorText}`);
     }
 
     return await response.blob();
@@ -406,42 +410,42 @@ export class ChutesService {
     let body: any = {};
 
     if (request.modelId === 'wan-2.1-t2v') {
-        // Text to Video Logic
-        body = {
-            prompt: request.prompt,
-            seed: 42,
-            sample_shift: null,
-            single_frame: false,
-            guidance_scale: 5
-        };
+      // Text to Video Logic
+      body = {
+        prompt: request.prompt,
+        seed: 42,
+        sample_shift: null,
+        single_frame: false,
+        guidance_scale: 5
+      };
     } else {
-        // Default / I2V Logic (Wan 2.2 I2V)
-        let cleanImage = request.image || '';
-        if (cleanImage.includes('base64,')) {
-            cleanImage = cleanImage.split('base64,')[1];
-        }
+      // Default / I2V Logic (Wan 2.2 I2V)
+      let cleanImage = request.image || '';
+      if (cleanImage.includes('base64,')) {
+        cleanImage = cleanImage.split('base64,')[1];
+      }
 
-        body = {
-            prompt: request.prompt,
-            image: cleanImage, 
-            frames: 81,
-            resolution: "480p",
-            seed: null,
-            negative_prompt: "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
-            guidance_scale_2: 1
-        };
+      body = {
+        prompt: request.prompt,
+        image: cleanImage,
+        frames: 81,
+        resolution: "480p",
+        seed: null,
+        negative_prompt: "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+        guidance_scale_2: 1
+      };
     }
 
     const response = await this.fetchWithRetry(request.modelUrl, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(body),
-        signal
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(body),
+      signal
     });
 
     if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Video Gen Error: ${response.status} - ${errorText}`);
+      const errorText = await response.text();
+      throw new Error(`Video Gen Error: ${response.status} - ${errorText}`);
     }
 
     return await response.blob();

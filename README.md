@@ -38,9 +38,9 @@ Before you begin, ensure you have the following:
 
 [📋 View Current Status → IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)
 
-> **Current Phase**: Week 4 (Payments Integration)
-> **Status**: ⏳ Planned
-> **Last Completed**: Week 3 (Credit System ✅ FULLY OPERATIONAL)
+> **Current Phase**: Week 4 (Paystack Integration)
+> **Status**: ✅ Completed
+> **Last Completed**: Week 4 (Payments & Webhooks)
 
 ## 🗄️ Setup & Configuration
 
@@ -50,7 +50,7 @@ Includes:
 - Environment variables and API keys
 - Supabase database configuration
 - Clerk authentication setup
-- Stripe payment integration
+- Paystack payment integration
 - Local development and deployment
 
 ## 🛠️ Development

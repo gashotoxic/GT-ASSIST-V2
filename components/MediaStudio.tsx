@@ -595,7 +595,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
     });
 
     return (
-        <div className="flex flex-col h-full w-full max-w-7xl mx-auto glass-card md:rounded-[2rem] overflow-hidden shadow-2xl animate-in fade-in duration-500 ring-1 ring-white/20 dark:ring-white/5 relative">
+        <div className="flex flex-col h-full w-full max-w-7xl mx-auto glass-card md:rounded-[2rem] overflow-hidden shadow-2xl animate-in fade-in duration-500 ring-1 ring-white/20 dark:ring-white/5 relative border border-white/40 dark:border-white/10">
 
             {/* Header Tabs */}
             <div className="flex border-b border-gray-200/50 dark:border-white/10 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl overflow-x-auto shrink-0">
@@ -701,10 +701,10 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                         )}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-0">
 
                         {/* Controls Column */}
-                        <div className="lg:col-span-4 flex flex-col gap-6 animate-in slide-in-from-left-4 duration-500 delay-100 order-2 lg:order-1 pb-10">
+                        <div className="lg:col-span-4 flex flex-col gap-6 animate-in slide-in-from-left-4 duration-500 delay-100 order-2 lg:order-1 pb-10 min-h-0">
                             {/* ... (Existing Image/Edit/Video Control Logic - No changes here, kept layout intact) ... */}
 
                             {/* Image Tab Controls */}
@@ -967,7 +967,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                         </div>
 
                         {/* Preview Column */}
-                        <div className="lg:col-span-8 flex flex-col h-full min-h-[400px] animate-in slide-in-from-right-4 duration-500 delay-200 order-1 lg:order-2">
+                        <div className="lg:col-span-8 flex flex-col min-h-[400px] animate-in slide-in-from-right-4 duration-500 delay-200 order-1 lg:order-2">
                             <div className="flex-1 rounded-2xl border border-white/40 dark:border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md shadow-inner flex items-center justify-center relative overflow-hidden group p-2 min-h-[400px]">
 
                                 {/* Only show overlay if this specific tab is generating */}

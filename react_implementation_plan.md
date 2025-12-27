@@ -136,10 +136,10 @@ export function CreditProvider({ children }: { children: React.ReactNode }) {
     if (tier === 'pro') return true; // Unlimited
     
     const costs = {
-      chat: { 'zai-org/GLM-4.6': 1, 'moonshotai/Kimi-K2-Thinking': 3, 'deepseek-ai/DeepSeek-R1-0528': 3 },
-      image: { 'hunyuan': 3, 'qwen-image': 3, 'z-image-turbo': 2, 'hidream': 5 },
-      video: { 'wan-2.2-i2v': 10, 'wan-2.1-t2v': 10 },
-      edit: { 'qwen-image-edit': 4 },
+      chat: { 'zai-org/GLM-4.6': 1, 'moonshotai/Kimi-K2-Thinking': 1, 'deepseek-ai/DeepSeek-R1-0528': 1 },
+      image: { 'hunyuan': 1, 'qwen-image': 1, 'z-image-turbo': 1, 'hidream': 1 },
+      video: { 'wan-2.2-i2v': 1, 'wan-2.1-t2v': 1 },
+      edit: { 'qwen-image-edit': 1 },
     };
     
     const cost = costs[action as keyof typeof costs]?.[model as keyof any] || 1;
@@ -250,24 +250,22 @@ import { useCredits } from '../context/CreditContext';
 - ✅ Credit balance display in header
 - ✅ Pro tier unlimited access working
 
-#### Week 4: Stripe Payment Integration
+#### ⏳ Week 4: Paystack Payment Integration (In Progress)
 
-**Goal**: Add credit top-up and subscription management
+**Goal**: Add credit top-up and subscription management via Paystack
 
-**Install Stripe**:
+**Install Library**:
 ```bash
-npm install @stripe/stripe-js
+npm install react-paystack
 ```
 
-**Create Pricing Plans**:
+**Create Pricing Configuration**:
 ```typescript
-// src/lib/stripe.ts
-import { loadStripe } from '@stripe/stripe-js';
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+// src/lib/paystack.ts
+export const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
 
 export interface PricingPlan {
-  id: string;
+  id: string; // Paystack Plan Code
   name: string;
   tier: 'basic' | 'plus' | 'pro';
   price: number; // in KES
@@ -278,7 +276,7 @@ export interface PricingPlan {
 
 export const PRICING_PLANS: PricingPlan[] = [
   {
-    id: 'price_1',
+    id: 'PLN_basic_xxxx',
     name: 'Basic',
     tier: 'basic',
     price: 1000,
@@ -286,270 +284,34 @@ export const PRICING_PLANS: PricingPlan[] = [
     dailyCredits: 300,
     features: ['Multiple chat models', 'Image generation', 'Basic editing'],
   },
-  {
-    id: 'price_2',
-    name: 'Plus',
-    tier: 'plus',
-    price: 2000,
-    credits: 0,
-    dailyCredits: 500,
-    features: ['Everything in Basic', 'Video generation', 'BYOK', 'Social media'],
-  },
-  {
-    id: 'price_3',
-    name: 'Pro',
-    tier: 'pro',
-    price: 3000,
-    credits: 999999, // Unlimited
-    dailyCredits: 999999,
-    features: ['Everything in Plus', 'Unlimited access', 'Priority support'],
-  },
+  // ... other plans
 ];
-
-// Credit packages (one-time purchase)
-export const CREDIT_PACKAGES = [
-  { id: 'credits_50', name: 'Starter', credits: 50, price: 100 },
-  { id: 'credits_150', name: 'Popular', credits: 150, price: 200 },
-  { id: 'credits_500', name: 'Power User', credits: 500, price: 500 },
-];
-
-export async function createCheckoutSession(
-  items: { price: string; quantity: number }[]
-): Promise<string | null> {
-  try {
-    const response = await fetch('/.netlify/functions/create-checkout-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items }),
-    });
-
-    const { sessionId } = await response.json();
-    
-    const stripe = await stripePromise;
-    const { error } = await stripe!.redirectToCheckout({ sessionId });
-
-    if (error) throw error;
-    return null;
-  } catch (err) {
-    console.error('Checkout error:', err);
-    return 'Failed to start checkout';
-  }
-}
 ```
 
-**Create Serverless Function** (for Netlify/Vercel):
-```typescript
-// netlify/functions/create-checkout-session.ts
-import Stripe from 'stripe';
-import { supabaseService } from '../../src/services/supabase';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
-});
-
-export async function handler(event: any, context: any) {
-  const { userId, items } = JSON.parse(event.body);
-
-  try {
-    // Get user email from Clerk
-    const user = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-      headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
-    }).then(r => r.json());
-
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: items,
-      mode: items[0].price.startsWith('sub_') ? 'subscription' : 'payment',
-      client_reference_id: userId,
-      customer_email: user.email_addresses[0].email_address,
-      success_url: `${process.env.URL}/settings?success=true`,
-      cancel_url: `${process.env.URL}/settings?canceled=true`,
-      metadata: {
-        userId,
-      },
-    });
-
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: session.id }),
-    };
-  } catch (error: any) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: error.message }),
-    };
-  }
-}
-```
-
-**Create Pricing Page**:
+**Create Pricing Page with Inline Checkout**:
 ```tsx
-// src/pages/PricingPage.tsx
-import { useAuthContext } from '../context/AuthContext';
-import { createCheckoutSession, PRICING_PLANS, CREDIT_PACKAGES } from '../lib/stripe';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/UI';
-import { Check } from 'lucide-react';
+// src/components/PricingPage.tsx
+import { usePaystackPayment } from 'react-paystack';
 
-export function PricingPage() {
-  const { userId } = useAuthContext();
+// ... inside component
+const config = {
+    reference: (new Date()).getTime().toString(),
+    email: user.email,
+    amount: price * 100, // KES in cents (Kobo)
+    publicKey: PAYSTACK_PUBLIC_KEY,
+};
 
-  const handleSubscribe = async (planId: string) => {
-    await createCheckoutSession([{ price: planId, quantity: 1 }]);
-  };
+const initializePayment = usePaystackPayment(config);
 
-  const handleBuyCredits = async (packageId: string) => {
-    await createCheckoutSession([{ price: packageId, quantity: 1 }]);
-  };
-
-  return (
-    <div className="max-w-6xl mx-auto p-8 space-y-12">
-      <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold">Choose Your Plan</h1>
-        <p className="text-lg text-slate-600 dark:text-slate-400">
-          Unlock the full power of AI creativity
-        </p>
-      </div>
-
-      {/* Monthly Subscriptions */}
-      <div className="space-y-6">
-        <h2 className="text-2xl font-semibold">Monthly Subscriptions</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          {PRICING_PLANS.map((plan) => (
-            <Card key={plan.id} className="relative">
-              <CardHeader>
-                <CardTitle>{plan.name}</CardTitle>
-                <div className="text-3xl font-bold mt-2">
-                  KES {plan.price}
-                  <span className="text-sm font-normal text-slate-600 dark:text-slate-400">
-                    /month
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <ul className="space-y-2">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-primary" />
-                      <span className="text-sm">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button 
-                  className="w-full" 
-                  onClick={() => handleSubscribe(plan.id)}
-                  disabled={!userId}
-                >
-                  {plan.tier === 'pro' ? 'Go Pro' : `Subscribe to ${plan.name}`}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Credit Packages */}
-      <div className="space-y-6">
-        <h2 className="text-2xl font-semibold">One-Time Credit Packs</h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          {CREDIT_PACKAGES.map((pkg) => (
-            <Card key={pkg.id}>
-              <CardHeader>
-                <CardTitle>{pkg.name}</CardTitle>
-                <div className="text-3xl font-bold mt-2">{pkg.credits}</div>
-                <div className="text-sm text-slate-600 dark:text-slate-400">
-                  credits for KES {pkg.price}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => handleBuyCredits(pkg.id)}
-                  disabled={!userId}
-                >
-                  Buy Credits
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-```
-
-**Webhook Handler** (for payment success):
-```typescript
-// netlify/functions/stripe-webhook.ts
-import Stripe from 'stripe';
-import { supabaseService } from '../../src/services/supabase';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
-});
-
-export async function handler(event: any) {
-  const signature = event.headers['stripe-signature'];
-  let stripeEvent;
-
-  try {
-    stripeEvent = stripe.webhooks.constructEvent(
-      event.body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err: any) {
-    return { statusCode: 400, body: `Webhook error: ${err.message}` };
-  }
-
-  if (stripeEvent.type === 'checkout.session.completed') {
-    const session = stripeEvent.data.object;
-    const userId = session.client_reference_id;
-    const metadata = session.metadata;
-
-    if (session.mode === 'payment') {
-      // One-time credit purchase
-      const creditsMap: Record<string, number> = {
-        'credits_50': 50,
-        'credits_150': 150,
-        'credits_500': 500,
-      };
-      
-      const credits = creditsMap[metadata?.price_id || ''];
-      if (credits && userId) {
-        await supabaseService.client.rpc('add_user_credits', {
-          user_id: userId,
-          amount: credits,
-          purchase_id: session.id,
-        });
-      }
-    } else if (session.mode === 'subscription') {
-      // Subscription created
-      const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-      
-      await supabaseService.client.from('subscriptions').insert({
-        user_id: userId,
-        stripe_subscription_id: subscription.id,
-        tier: subscription.metadata?.tier,
-        status: subscription.status,
-        price_amount: subscription.items.data[0].price.unit_amount,
-        current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      });
-    }
-  }
-
-  return { statusCode: 200, body: JSON.stringify({ received: true }) };
-}
+// Trigger on click
+initializePayment(onSuccess, onClose);
 ```
 
 **Deliverables for Week 4**:
-- ✅ Stripe integrated with checkout flow
+- ✅ Paystack Inline Checkout integrated
 - ✅ Pricing page with subscription plans
 - ✅ Credit packages for one-time purchase
-- ✅ Webhook handler for payment processing
+- ✅ Supabase Edge Function for webhook processing
 - ✅ Automatic credit grants on purchase
 - ✅ Subscription activation
 
@@ -1042,7 +804,7 @@ export function ImageCropper({ imageUrl, onCropComplete, onCancel }: ImageCroppe
     image.src = imageUrl;
 
     canvas.width = croppedAreaPixels.width;
-    canvas.height = clippedAreaPixels.height;
+    canvas.height = croppedAreaPixels.height;
 
     ctx?.drawImage(
       image,
@@ -1540,7 +1302,7 @@ export function AdminDashboard() {
 | 1 | **Clerk Auth** | User signup/login, auth context, profile component, Sign In button, security fixes | **✅ COMPLETE** |
 | 2 | **Database** | User tables, credit logs, subscriptions, RLS policies | ⏳ Planned |
 | 3 | **Credit System** | Credit context, credit-aware buttons, balance display | ⏳ Planned |
-| 4 | **Payments** | Stripe integration, checkout flow, webhooks | ⏳ Planned |
+| 4 | **Payments** | Paystack integration, checkout flow, webhooks | ⏳ In Progress |
 | 5 | **Message Copy** | Clipboard integration, toast system |
 | 6 | **Edit/Retry** | Edit modal, resend logic |
 | 7 | **Branching** | Branch manager, UI components |
