@@ -1,4 +1,5 @@
 import React from 'react';
+import { Check } from 'lucide-react';
 
 // Button
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -71,23 +72,73 @@ export const Label: React.FC<React.LabelHTMLAttributes<HTMLLabelElement>> = ({ c
   />
 );
 
-// Select
-interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> { }
-export const Select: React.FC<SelectProps> = ({ className = '', children, ...props }) => (
-  <div className="relative">
-    <select
-      className={`flex h-10 w-full items-center justify-between rounded-lg border border-gray-200/60 dark:border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 appearance-none shadow-sm dark:shadow-black/20 [&>option]:bg-white dark:[&>option]:bg-slate-950 dark:[&>option]:text-white ${className}`}
-      {...props}
-    >
-      {children}
-    </select>
-    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-      <svg className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
-      </svg>
+// Custom Select Component - Mobile Safe & Viewport Aware
+interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'onChange'> {
+  onChange?: (e: { target: { value: string, name?: string } }) => void;
+  options?: { id: string, name: string }[];
+  placeholder?: string;
+}
+
+export const Select: React.FC<SelectProps> = ({ className = '', children, value, onChange, placeholder, name, ...props }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+
+  // Extract options from children or use options prop
+  const optionsList: { id: string, name: string }[] = [];
+  React.Children.forEach(children, child => {
+    if (React.isValidElement(child) && child.type === 'option') {
+      optionsList.push({
+        id: child.props.value,
+        name: child.props.children?.toString() || ''
+      });
+    }
+  });
+
+  const selectedOption = optionsList.find(opt => opt.id === value);
+  const displayValue = selectedOption ? selectedOption.name : (placeholder || 'Select...');
+
+  const handleSelect = (val: string) => {
+    onChange?.({ target: { value: val, name } });
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative w-full">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex h-10 w-full items-center justify-between rounded-lg border border-gray-200/60 dark:border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md px-4 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 shadow-sm dark:shadow-black/20 ${className}`}
+        {...props as any}
+      >
+        <span className="truncate">{displayValue}</span>
+        <svg className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-[110]" onClick={() => setIsOpen(false)} />
+          <div className="absolute z-[120] mt-2 w-full min-w-[200px] max-h-[60vh] overflow-y-auto rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl py-2 animate-in fade-in zoom-in-95 slide-in-from-top-2 origin-top">
+            {optionsList.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => handleSelect(opt.id)}
+                className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between group
+                  ${opt.id === value
+                    ? 'bg-primary/10 text-primary font-bold'
+                    : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'
+                  }`}
+              >
+                <span className="truncate">{opt.name}</span>
+                {opt.id === value && <Check className="w-4 h-4" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 // Modal/Dialog Overlay
 export const Modal: React.FC<{
@@ -114,9 +165,9 @@ export const Modal: React.FC<{
     };
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 dark:bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-        <div className={`relative w-full ${sizeClasses[size]} rounded-2xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-3xl border border-white/60 dark:border-white/10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] dark:shadow-[0_40px_70px_-10px_rgba(0,0,0,0.6)] animate-in zoom-in-95 slide-in-from-bottom-5 duration-300 overflow-hidden`}>
-          <div className="flex flex-col space-y-1.5 p-6 pb-4 border-b border-gray-200/50 dark:border-white/10 bg-white/20 dark:bg-white/5">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/40 dark:bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className={`relative w-full ${sizeClasses[size]} rounded-2xl bg-white/95 dark:bg-slate-900 border border-white/60 dark:border-white/10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] dark:shadow-[0_40px_70px_-10px_rgba(0,0,0,0.6)] animate-in zoom-in-95 slide-in-from-bottom-5 duration-300 overflow-hidden`}>
+          <div className="flex flex-col space-y-1.5 p-4 sm:p-6 pb-4 border-b border-gray-200/50 dark:border-white/10 bg-white/20 dark:bg-white/5">
             <h3 className="text-xl font-heading font-black leading-none text-gray-900 dark:text-white tracking-tight">{title}</h3>
           </div>
           <div className="p-6 overflow-y-auto max-h-[85vh] custom-scrollbar">
@@ -211,7 +262,7 @@ export const DropdownMenuContent: React.FC<{
   return (
     <div
       ref={contentRef}
-      className={`absolute z-50 mt-2 w-56 rounded-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-lg dark:shadow-black/20 py-1 ${alignmentClasses[align]} ${className}`}
+      className={`absolute z-[100] mt-2 w-56 max-w-[calc(100vw-32px)] max-h-[70vh] overflow-y-auto overflow-x-hidden rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-xl py-1 ${alignmentClasses[align]} ${className}`}
     >
       {children}
     </div>

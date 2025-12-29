@@ -17,7 +17,7 @@ export interface PricingPlan {
 
 export const PRICING_PLANS: PricingPlan[] = [
     {
-        id: 'PLN_basic_xxxx', // Placeholder for actual Paystack Plan Code
+        id: 'PLN_cnrp7b3t24r6h88', // Basic Plan Code
         name: 'Basic',
         tier: 'basic',
         price: 1000,
@@ -30,7 +30,7 @@ export const PRICING_PLANS: PricingPlan[] = [
         ],
     },
     {
-        id: 'PLN_plus_xxxx',
+        id: 'PLN_wv1j2miyjn8ak05', // Plus Plan Code
         name: 'Plus',
         tier: 'plus',
         price: 2000,
@@ -44,7 +44,7 @@ export const PRICING_PLANS: PricingPlan[] = [
         popular: true,
     },
     {
-        id: 'PLN_pro_xxxx',
+        id: 'PLN_id88fbjhvfyjs1g', // Pro Plan Code
         name: 'Pro',
         tier: 'pro',
         price: 3000,

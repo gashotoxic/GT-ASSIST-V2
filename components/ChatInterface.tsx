@@ -752,7 +752,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       </div>
 
       {/* Input Area */}
-      <div className="p-3 sm:p-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-t border-white/50 dark:border-white/5 z-20">
+      <div className="p-3 pb-12 sm:p-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-t border-white/50 dark:border-white/5 z-20">
         <div className="max-w-4xl mx-auto flex flex-col gap-3">
           {attachment && (
             <div className="flex items-center gap-3 p-2 bg-white/50 dark:bg-slate-800/50 rounded-lg w-fit border border-primary/20 animate-in slide-in-from-bottom-2">

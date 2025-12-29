@@ -47,7 +47,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
 
     // Image Gen State
     const [imagePrompt, setImagePrompt] = useState('');
-    const [selectedImageModel, setSelectedImageModel] = useState(AVAILABLE_IMAGE_MODELS[0].id);
+    const [selectedImageModel, setSelectedImageModel] = useState('z-image-turbo');
     const [customImageModelUrl, setCustomImageModelUrl] = useState('');
     const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
 

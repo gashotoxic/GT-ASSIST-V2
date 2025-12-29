@@ -25,14 +25,21 @@ export class SupabaseService {
 
   // --- Session Management ---
 
-  async getSessions(): Promise<ChatSession[]> {
+  async getSessions(userId?: string): Promise<ChatSession[]> {
     if (!this.client) return [];
 
     try {
-      const { data, error } = await this.client
+      let query = this.client
         .from('chat_sessions')
         .select('*')
         .order('updated_at', { ascending: false });
+
+      // Filter by user_id if provided
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Supabase Get Sessions Error:', error);

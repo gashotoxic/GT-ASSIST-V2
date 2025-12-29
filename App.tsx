@@ -87,7 +87,7 @@ const App: React.FC = () => {
       // For authenticated users: ONLY use Supabase, NO fallbacks
       if (isSignedIn) {
         try {
-          const testResult = await supabaseService.getSessions();
+          const testResult = await supabaseService.getSessions(userId || undefined);
           loadedSessions = testResult;
         } catch (error) {
           console.error("Failed to load sessions from Supabase:", error);
@@ -331,6 +331,9 @@ const App: React.FC = () => {
         onNewChat={handleNewChat}
         onDeleteSession={handleDeleteSession}
         onRenameSession={handleRenameSession}
+        theme={theme}
+        toggleTheme={toggleTheme}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       {/* Main Layout */}
@@ -339,14 +342,8 @@ const App: React.FC = () => {
         {/* Header - Simple & Clean */}
         <header className="flex-none flex items-center justify-between px-3 sm:px-6 py-4 z-20 gap-2 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-slate-900/40 backdrop-blur-xl">
 
-          <div className="flex items-center gap-3 min-w-0">
-            {/* Sidebar Toggles */}
-            {!isSidebarOpen && (
-              <Button variant="glass" size="icon" className="lg:hidden shrink-0" onClick={() => setIsSidebarOpen(true)}>
-                <Menu className="w-5 h-5" />
-              </Button>
-            )}
-
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Sidebar Toggle - Only Desktop (Mobile uses Bottom Nav) */}
             {!isSidebarOpen && (
               <Button
                 variant="glass"
@@ -359,12 +356,12 @@ const App: React.FC = () => {
               </Button>
             )}
 
-            {/* Logo */}
-            <div className="flex items-center gap-3 px-3 py-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 shadow-lg">
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
-                <Bot className="w-6 h-6 text-white" />
+            {/* Logo - Optimized for mobile */}
+            <div className="flex items-center gap-2 px-2 py-1.5 sm:px-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 shadow-lg">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
+                <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-white hidden sm:block">
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-800 dark:text-white hidden sm:block">
                 GT <span className="text-primary italic">Assistant</span>
               </h1>
             </div>
@@ -398,7 +395,7 @@ const App: React.FC = () => {
             </div>
 
             {/* User & Settings */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 sm:gap-4">
               {isSignedIn ? (
                 <UserProfile />
               ) : (
@@ -409,35 +406,38 @@ const App: React.FC = () => {
                     setAuthMode('signin');
                     setShowAuthModal(true);
                   }}
-                  className="rounded-full px-4 py-2 font-medium shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+                  className="rounded-full px-4 py-2 text-xs sm:text-sm font-medium shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
                 >
                   Sign In
                 </Button>
               )}
 
-              <Button
-                variant="glass"
-                size="icon"
-                onClick={toggleTheme}
-                className="rounded-full w-9 h-9 border-white/40 dark:border-white/10"
-                title="Toggle Theme"
-              >
-                {theme === 'dark' ? (
-                  <Sun className="w-4 h-4 text-yellow-300" />
-                ) : (
-                  <Moon className="w-4 h-4 text-slate-600" />
-                )}
-              </Button>
+              {/* Desktop Only Buttons */}
+              <div className="hidden sm:flex items-center gap-2">
+                <Button
+                  variant="glass"
+                  size="icon"
+                  onClick={toggleTheme}
+                  className="rounded-full w-9 h-9 border-white/40 dark:border-white/10"
+                  title="Toggle Theme"
+                >
+                  {theme === 'dark' ? (
+                    <Sun className="w-4 h-4 text-yellow-300" />
+                  ) : (
+                    <Moon className="w-4 h-4 text-slate-600" />
+                  )}
+                </Button>
 
-              <Button
-                variant="glass"
-                size="sm"
-                onClick={() => setIsSettingsOpen(true)}
-                className="rounded-full shadow-lg shadow-black/5 dark:shadow-black/20 hover:shadow-xl transition-shadow"
-              >
-                <Settings className="w-4 h-4 lg:mr-2 text-slate-700 dark:text-slate-200" />
-                <span className="text-slate-700 dark:text-slate-200 font-medium hidden lg:inline">Settings</span>
-              </Button>
+                <Button
+                  variant="glass"
+                  size="sm"
+                  onClick={() => setIsSettingsOpen(true)}
+                  className="rounded-full shadow-lg shadow-black/5 dark:shadow-black/20 hover:shadow-xl transition-shadow"
+                >
+                  <Settings className="w-4 h-4 lg:mr-2 text-slate-700 dark:text-slate-200" />
+                  <span className="text-slate-700 dark:text-slate-200 font-medium hidden lg:inline">Settings</span>
+                </Button>
+              </div>
             </div>
           </div>
         </header>
@@ -477,7 +477,7 @@ const App: React.FC = () => {
         </main>
 
         {/* Mobile Bottom Navigation - User Friendly Commands */}
-        <nav className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl px-6 py-3 rounded-[2rem] border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-50 gap-8 min-w-[280px] justify-center transition-all duration-500 animate-in slide-in-from-bottom-10">
+        <nav className="md:hidden fixed bottom-10 left-1/2 -translate-x-1/2 flex items-center bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl px-6 py-3 rounded-[2rem] border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-50 gap-6 min-w-[280px] justify-center transition-all duration-500 animate-in slide-in-from-bottom-10">
           {navItems.map((item) => (
             <button
               key={item.id}

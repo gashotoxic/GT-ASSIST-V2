@@ -7,7 +7,7 @@
 - **UI Components**: Custom glassmorphic components (Button, Input, Modal, etc.)
 - **State Management**: React hooks with localStorage fallback
 - **AI Backend**: Chutes.ai API integration
-- **Persistence**: Supabase PostgreSQL with dual-mode strategy (local + cloud)
+- **Persistence**: Supabase PostgreSQL (cloud)
 - **Search**: Tavily (direct) + Brave (CORS proxy) integration
 - **Audio**: Kokoro TTS + Whisper STT with caching
 
@@ -24,7 +24,7 @@
   - Audio player with seek, play/pause controls
 - ✅ **File Attachments**: Images (base64) and text files (txt, md, json, js, ts, csv)
 - ✅ **Web Search**: Per-message toggle with Tavily/Brave
-- ✅ **Message History**: LocalStorage + Supabase persistence
+- ✅ **Message History**:Supabase persistence
 - ✅ **Session Management**: Create, delete, rename chat sessions
 
 ### Media Studio
@@ -37,7 +37,7 @@
 - ✅ **Watermarking**: "Gashotech" overlay on all generated images
 
 ### Technical Architecture
-- ✅ **Dual Storage**: Level 1 (localStorage) + Level 2 (Supabase) with automatic fallback
+- ✅ **Storage**: Supabase Storage buckets (chat-audio, media-assets)
 - ✅ **Streaming**: Real-time LLM response streaming with AbortController
 - ✅ **Audio Caching**: Supabase URL → local Blob → regenerate strategy
 - ✅ **Media Upload**: Supabase Storage buckets (chat-audio, media-assets)
@@ -173,21 +173,21 @@
 const CREDIT_COSTS = {
   chat: {
     'zai-org/GLM-4.6': 1,
-    'moonshotai/Kimi-K2-Thinking': 3,
-    'deepseek-ai/DeepSeek-R1-0528': 3,
+    'moonshotai/Kimi-K2-Thinking': 1,
+    'deepseek-ai/DeepSeek-R1-0528': 1,
   },
   image: {
-    'hunyuan': 3,
-    'qwen-image': 3,
-    'z-image-turbo': 2,
-    'hidream': 5,
+    'hunyuan': 1,
+    'qwen-image': 1,
+    'z-image-turbo': 1,
+    'hidream': 1,
   },
   video: {
-    'wan-2.2-i2v': 10,
-    'wan-2.1-t2v': 10,
+    'wan-2.2-i2v': 1,
+    'wan-2.1-t2v': 1,
   },
   edit: {
-    'qwen-image-edit': 4,
+    'qwen-image-edit': 1,
   },
 };
 ```
@@ -264,8 +264,8 @@ const CREDIT_COSTS = {
 - [ ] Add credit balance display in header
 - [ ] Implement Pro tier unlimited access
 
-#### ⏳ Week 4: Stripe Payment Integration (Planned)
-- [ ] Integrate Stripe Checkout
+#### ⏳ Week 4: paystack Payment Integration (Planned)
+- [ ] Integrate paystack Checkout
 - [ ] Create serverless function for checkout sessions
 - [ ] Add webhook handler for payment success
 - [ ] Build pricing page with subscription plans
@@ -303,7 +303,7 @@ The React + Vite foundation is **exceptionally solid**. Instead of rewriting for
 
 1. **Add Clerk as a wrapper** - existing components work unchanged
 2. **Implement credits via Supabase RPC** - secure server-side logic
-3. **Use serverless functions** for Stripe payments (no backend needed)
+3. **Use serverless functions** for paystack payments (no backend needed)
 4. **Add features as new layers** - maintain existing working code
 
 **Timeline: 10-12 weeks** (vs 16-23 for Next.js rewrite)  

@@ -12,7 +12,7 @@ interface PricingPageProps {
 
 export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
     const { userId, isSignedIn, user } = useAuthContext();
-    const { credits, subscriptionTier } = useCredits();
+    const { credits, subscriptionTier, refetch } = useCredits();
     const [loading, setLoading] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [config, setConfig] = useState<any>(null);
@@ -20,8 +20,14 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
 
     const handlePaystackSuccess = (reference: any) => {
         console.log('Payment successful:', reference);
-        // Refresh credits immediately (webhook will update DB, but we reload to show change)
-        window.location.reload();
+        // Refresh credits after a delay to allow webhook to process
+        setTimeout(() => {
+            refetch();
+        }, 2000);
+        // Also refetch again a bit later just in case
+        setTimeout(() => {
+            refetch();
+        }, 5000);
     };
 
     const handlePaystackClose = () => {
@@ -81,7 +87,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
     // Effect to trigger Paystack when config is set
     useEffect(() => {
         if (config) {
-            initializePayment(handlePaystackSuccess, handlePaystackClose);
+            initializePayment({ onSuccess: handlePaystackSuccess, onClose: handlePaystackClose });
             setConfig(null); // Reset after initialization
         }
     }, [config, initializePayment]);
@@ -106,24 +112,24 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
                             <ArrowLeft className="w-4 h-4" />
                             Back to Chat
                         </button>
-                        <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
+                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
                             Choose Your <span className="text-primary italic">Plan</span>
                         </h1>
-                        <p className="text-slate-500 dark:text-slate-400 max-w-md">
+                        <p className="text-slate-500 dark:text-slate-400 max-w-md text-sm">
                             Fuel your creativity with additional credits or unlock the full power of GT Assistant with a monthly subscription.
                         </p>
                     </div>
 
-                    <div className="glass-card p-6 rounded-2xl border border-white/20 dark:border-white/5 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl min-w-[280px] flex flex-col items-center shadow-lg">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                            <CreditCard className="w-6 h-6 text-primary" />
+                    <div className="glass-card p-4 md:p-6 rounded-2xl border border-white/20 dark:border-white/5 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl w-full md:min-w-[280px] flex flex-col items-center shadow-lg">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                            <CreditCard className="w-5 h-5 text-primary" />
                         </div>
-                        <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">Current Balance</span>
+                        <span className="text-slate-500 dark:text-slate-400 text-[10px] font-semibold uppercase tracking-wider">Current Balance</span>
                         <div className="flex items-baseline gap-2 mt-1">
-                            <span className="text-4xl font-bold">{credits}</span>
-                            <span className="text-slate-400 text-sm font-medium">Credits</span>
+                            <span className="text-3xl font-bold">{credits}</span>
+                            <span className="text-slate-400 text-xs font-medium">Credits</span>
                         </div>
-                        <div className="mt-4 px-3 py-1 bg-primary/10 rounded-full text-[10px] font-bold uppercase tracking-wider text-primary">
+                        <div className="mt-3 px-3 py-1 bg-primary/10 rounded-full text-[9px] font-bold uppercase tracking-wider text-primary">
                             {subscriptionTier} tier
                         </div>
                     </div>
@@ -137,8 +143,8 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
 
                 {/* Section 1: One-Time Credit Packs */}
                 <section className="mb-16">
-                    <div className="flex items-center gap-4 mb-8">
-                        <h2 className="text-xl font-bold">Credit Packs</h2>
+                    <div className="flex items-center gap-4 mb-6">
+                        <h2 className="text-lg font-bold">Credit Packs</h2>
                         <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
                     </div>
 
@@ -146,18 +152,18 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
                         {CREDIT_PACKAGES.map((pkg) => (
                             <div
                                 key={pkg.id}
-                                className="group relative p-8 rounded-2xl bg-white/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 hover:border-primary/50 transition-all shadow-sm hover:shadow-md"
+                                className="group relative p-6 rounded-2xl bg-white/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 hover:border-primary/50 transition-all shadow-sm hover:shadow-md"
                             >
-                                <h3 className="text-lg font-bold mb-1">{pkg.name} Pack</h3>
-                                <div className="flex items-baseline gap-1 mt-4">
-                                    <span className="text-5xl font-bold">{pkg.credits}</span>
-                                    <span className="text-slate-400 text-sm font-medium uppercase tracking-wider">Credits</span>
+                                <h3 className="text-base font-bold mb-1">{pkg.name} Pack</h3>
+                                <div className="flex items-baseline gap-1 mt-3">
+                                    <span className="text-3xl font-bold">{pkg.credits}</span>
+                                    <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">Credits</span>
                                 </div>
-                                <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
-                                    <div className="text-2xl font-bold mb-6">KES {pkg.price}</div>
+                                <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                    <div className="text-xl font-bold mb-4">KES {pkg.price}</div>
                                     <Button
                                         variant="primary"
-                                        className="w-full rounded-xl py-6 font-bold"
+                                        className="w-full rounded-xl py-3 text-sm font-bold"
                                         disabled={!isSignedIn || loading === pkg.id}
                                         onClick={() => handleBuyCredits(pkg.id, pkg.price)}
                                     >
@@ -171,8 +177,8 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
 
                 {/* Section 2: Monthly Subscriptions */}
                 <section className="mb-16">
-                    <div className="flex items-center gap-4 mb-8">
-                        <h2 className="text-xl font-bold">Subscription Plans</h2>
+                    <div className="flex items-center gap-4 mb-6">
+                        <h2 className="text-lg font-bold">Subscription Plans</h2>
                         <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
                     </div>
 
@@ -185,13 +191,13 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
                             return (
                                 <div
                                     key={plan.id}
-                                    className={`relative flex flex-col p-8 rounded-3xl transition-all border
+                                    className={`relative flex flex-col p-6 rounded-3xl transition-all border
                                         ${isPremium
                                             ? 'bg-white dark:bg-slate-900 border-primary ring-4 ring-primary/10 shadow-xl z-10 md:scale-105'
                                             : 'bg-white/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 shadow-sm'}`}
                                 >
                                     {isPremium && (
-                                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] font-bold uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white text-[9px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-lg">
                                             Recommended
                                         </div>
                                     )}
@@ -229,7 +235,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
                                                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-default'
                                                 : isPremium
                                                     ? 'bg-primary text-white hover:bg-primary-dark shadow-lg shadow-primary/20'
-                                                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+                                                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-black dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                     >
                                         {loading === plan.id ? 'Loading...' : isCurrentPlan ? 'Current Plan' : `Join ${plan.name}`}
                                     </Button>
