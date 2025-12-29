@@ -1,89 +1,45 @@
-
 # GT Assistant
 
-A next-generation, browser-based AI Assistant featuring real-time Chat, Voice (TTS/STT), Image Generation, Image Editing (Magic Edit), and Video Animation. Built with React 19, TypeScript, and powered by **Chutes.ai**.
+A next-generation AI Assistant platform featuring real-time Chat, Voice, Image Generation, Magic Editing, and Video Animation. Optimized for the Kenyan market with **Paystack (KES)** integration.
 
-![App Screenshot](https://via.placeholder.com/1200x600?text=GT+Assistant+Preview)
+## 🚀 Key Features
 
-## 🌟 Features
+*   **Multi-Model Chat**: DeepSeek R1 (Thinking), GLM-4, Qwen VL, and more.
+*   **Media Studio**:
+    *   **Generator**: High-quality images (Hunyuan, Flux).
+    *   **Magic Editor**: Edit images with simple text commands.
+    *   **Animator**: Wan 2.2 Image-to-Video and Text-to-Video.
+*   **Monetization**: Tiered subscriptions and credit packs via Paystack.
+*   **Cloud Sync**: Persist your history and media via Supabase.
+*   **Voice Engine**: STT (Whisper) and TTS (Kokoro) with 28 premium voices.
 
-*   **Multi-Model Chat:** Switch between GLM-4, DeepSeek V3, DeepSeek R1 (Thinking), and Qwen VL.
-*   **Voice Interaction:** Real-time Speech-to-Text (Whisper) and Text-to-Speech (Kokoro) with caching.
-*   **Media Studio:**
-    *   **Generator:** Text-to-Image using Hunyuan and Qwen.
-    *   **Magic Edit:** Edit images using natural language (Qwen Magic Edit).
-    *   **Animator:** Turn images into videos (Wan 2.1 I2V) and extend them.
-    *   **Magic Enhancer:** Auto-improve prompts with AI.
-    *   **Gallery:** Auto-save generations to session or cloud.
-*   **Dual-Mode Persistence:**
-    *   **Level 1 (Guest):** LocalStorage & In-Memory Blobs.
-    *   **Level 2 (Cloud):** Sync history and media to Supabase.
-*   **Web Search:** Grounding via Tavily or Brave Search.
+## 📊 Status: Phase 2 Started
 
----
+**Phase 1 (Monetization & Foundation): ✅ 100% COMPLETE**
+*   Clerk Auth 
+*   Supabase Cloud Persistence
+*   Paystack Payment Gateway (Live)
+*   Unified Credit System
 
-## 🛠️ Prerequisites
+**Phase 2 (Experience Enhancements): 🔄 IN PROGRESS**
+*   Message Actions (Copy/Delete)
+*   Advanced Knowledge Grounding
 
-Before you begin, ensure you have the following:
+## 🛠️ Setup
 
-1.  **Node.js** (v18 or higher)
-2.  **GitHub Account**
-3.  **Vercel Account**
-4.  **Chutes.ai API Key** (Required for all AI inference)
-5.  **Supabase Account** (Optional, for Cloud Sync)
+1.  **Clone** and `npm install`.
+2.  Configure `.env.local` using `.env.example`.
+3.  Deploy **Supabase Edge Functions** for Paystack webhooks.
+4.  Run `npm run dev`.
 
----
+Detailed guide: [docs/SETUP.md](docs/SETUP.md)
 
-## 📊 Implementation Status
+## 📚 Resources
 
-[📋 View Current Status → IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)
-
-> **Current Phase**: Week 4 (Paystack Integration)
-> **Status**: ✅ Completed
-> **Last Completed**: Week 4 (Payments & Webhooks)
-
-## 🗄️ Setup & Configuration
-
-[🔧 Complete Setup Guide → docs/SETUP.md](docs/SETUP.md)
-
-Includes:
-- Environment variables and API keys
-- Supabase database configuration
-- Clerk authentication setup
-- Paystack payment integration
-- Local development and deployment
-
-## 🛠️ Development
-
-### Quick Start
-```bash
-npm install
-npm run dev
-```
-
-Access at `http://localhost:5173`
-
-### Prerequisites
-- Node.js v18+
-- Chutes.ai API Key
-- Clerk Account (for auth)
-- Supabase Account (optional, for cloud sync)
+*   [🏗️ Master Plan](react_implementation_plan.md)
+*   [🎯 Status Report](IMPLEMENTATION_STATUS.md)
+*   [💳 Paystack Guide](docs/PAYSTACK_SETUP_GUIDE.md)
+*   [🗄️ Database Architecture](docs/DATABASE.md)
 
 ---
-
-## 📚 Documentation
-
-- [🏗️ Implementation Roadmap](react_implementation_plan.md) - Master timeline and weekly plans
-- [🗄️ Database Schema](docs/DATABASE.md) - Complete database structure
-- [🏛️ System Architecture](docs/ARCHITECTURE.md) - High-level design
-- [💳 Credit System](docs/CREDIT_COSTS.md) - Pricing and subscription models
-- [📝 Technical Notes](docs/phases/) - Weekly implementation details
-
----
-
-## 🧠 Architecture Notes
-
-*   **Brave Search Proxy:** The app uses `corsproxy.io` in `services/search.ts` to bypass CORS restrictions when using Brave Search directly from the browser.
-*   **Video Extension:** The "Extend Video" feature works by extracting the last frame of a generated video into a `<canvas>`, converting it to Base64, and feeding it back into the Wan 2.1 I2V model.
-*   **Magic Enhancer:** Uses the configured LLM to expand and refine short prompts into detailed artistic descriptions.
-*   **CORS:** If you host this on Vercel, ensure your Supabase project settings (Authentication > URL Configuration) allow your Vercel domain if you enable strict Auth later.
+**Powered by Chutes.ai** | Built with React 19 & Tailwind CSS

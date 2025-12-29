@@ -797,13 +797,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                 variant="ghost"
                 size="icon"
                 className={`rounded-full h-10 w-10 shrink-0 transition-all duration-300 ${isSearchEnabled
-                  ? 'bg-primary text-white hover:bg-primary-dark shadow-md shadow-primary/30' // Solid Primary
-                  : 'text-gray-500 hover:text-primary hover:bg-primary/5'
+                  ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                  : 'text-gray-500 hover:text-primary hover:bg-primary/5 dark:hover:bg-white/5'
                   }`}
                 onClick={() => setIsSearchEnabled(!isSearchEnabled)}
                 title={isSearchEnabled ? "Web Search Enabled" : "Enable Web Search"}
               >
-                <Globe className="w-5 h-5" />
+                <Globe className={`w-5 h-5 ${isSearchEnabled ? 'text-primary' : 'text-gray-500 dark:text-gray-400'}`} />
               </Button>
             )}
 

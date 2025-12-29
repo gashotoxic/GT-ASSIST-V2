@@ -34,15 +34,15 @@ export function CreditAwareButton({
   if (!userId) {
     return (
       <Button
-        variant="secondary"
-        size={size || 'md'}
+        variant="primary"
+        size={size === 'icon' ? 'md' : (size || 'md')}
         onClick={() => {
           // Trigger auth modal via custom event
           window.dispatchEvent(new CustomEvent('request-auth', { detail: { mode: 'signin' } }));
         }}
-        className={className}
+        className={`whitespace-nowrap min-w-max px-4 font-bold uppercase tracking-tight text-[10px] h-8 rounded-full shadow-md shadow-primary/20 ${className}`}
       >
-        Sign In to Continue
+        Sign In
       </Button>
     );
   }

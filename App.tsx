@@ -362,26 +362,26 @@ const App: React.FC = () => {
                 <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
               <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-800 dark:text-white hidden sm:block">
-                GT <span className="text-primary italic">Assistant</span>
+                Gasho<span className="text-primary italic">Chat</span>
               </h1>
             </div>
+          </div>
 
-            {/* View Switcher - Standard Tabs */}
-            <div className="hidden md:flex items-center bg-black/5 dark:bg-white/10 p-1 rounded-2xl border border-white/10 ml-4">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setCurrentView(item.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 ${currentView === item.id
-                    ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                    }`}
-                >
-                  <item.icon className="w-4 h-4" />
-                  <span className="hidden lg:inline">{item.label}</span>
-                </button>
-              ))}
-            </div>
+          {/* View Switcher - Centered Absolutely */}
+          <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center bg-black/5 dark:bg-white/10 p-1 rounded-2xl border border-white/10 shadow-inner">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setCurrentView(item.id)}
+                className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-semibold transition-all duration-300 ${currentView === item.id
+                  ? 'bg-white dark:bg-slate-800 text-primary shadow-sm scale-105'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'
+                  }`}
+              >
+                <item.icon className="w-4 h-4" />
+                <span className="inline">{item.label}</span>
+              </button>
+            ))}
           </div>
 
           <div className="flex items-center gap-4">
@@ -428,15 +428,6 @@ const App: React.FC = () => {
                   )}
                 </Button>
 
-                <Button
-                  variant="glass"
-                  size="sm"
-                  onClick={() => setIsSettingsOpen(true)}
-                  className="rounded-full shadow-lg shadow-black/5 dark:shadow-black/20 hover:shadow-xl transition-shadow"
-                >
-                  <Settings className="w-4 h-4 lg:mr-2 text-slate-700 dark:text-slate-200" />
-                  <span className="text-slate-700 dark:text-slate-200 font-medium hidden lg:inline">Settings</span>
-                </Button>
               </div>
             </div>
           </div>
