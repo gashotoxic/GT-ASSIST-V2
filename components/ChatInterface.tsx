@@ -606,8 +606,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
               </div>
             </div>
 
-            <div className="space-y-3 max-w-md">
-              <h2 className="text-3xl font-bold text-gray-800 dark:text-gray-100 tracking-tight drop-shadow-sm">How can I help?</h2>
+            <div className="space-y-3 max-w-md px-4">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100 tracking-tight drop-shadow-sm">How can I help?</h2>
               <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-white/30 dark:bg-slate-800/30 px-4 py-2 rounded-full w-fit mx-auto border border-white/40 dark:border-white/5 backdrop-blur-md shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_#1abc9c]"></span>
                 Running on <span className="font-semibold text-primary-dark dark:text-primary-light">{settings.model}</span>
@@ -624,7 +624,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
           >
             {/* Avatar */}
             {msg.role !== 'assistant' || msg.content !== '' ? (
-              <div className={`shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg transition-transform hover:scale-105 duration-300 ${msg.role === 'user'
+              <div className={`shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg transition-transform hover:scale-105 duration-300 ${msg.role === 'user'
                 ? 'bg-gradient-to-br from-primary to-primary-dark text-white border border-primary-light/30'
                 : msg.role === 'system'
                   ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-300'
@@ -651,7 +651,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                   )}
 
                   <div
-                    className={`relative px-6 py-4 rounded-2xl text-sm sm:text-base leading-relaxed shadow-md ${msg.role === 'user'
+                    className={`relative px-4 py-3 sm:px-6 sm:py-4 rounded-2xl text-sm sm:text-base leading-relaxed shadow-md ${msg.role === 'user'
                       ? 'bg-gradient-to-br from-primary to-primary-dark text-white rounded-br-sm shadow-primary/20'
                       : msg.role === 'system'
                         ? 'bg-rose-50/60 dark:bg-rose-900/20 text-rose-600 dark:text-rose-200 border border-rose-100 dark:border-rose-900/30 backdrop-blur-md w-full'
@@ -752,7 +752,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       </div>
 
       {/* Input Area */}
-      <div className="p-3 pb-12 sm:p-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-t border-white/50 dark:border-white/5 z-20">
+      <div className="p-3 pb-4 sm:p-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-t border-white/50 dark:border-white/5 z-20">
         <div className="max-w-4xl mx-auto flex flex-col gap-3">
           {attachment && (
             <div className="flex items-center gap-3 p-2 bg-white/50 dark:bg-slate-800/50 rounded-lg w-fit border border-primary/20 animate-in slide-in-from-bottom-2">
@@ -846,6 +846,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                 action="chat"
                 model={settings.model}
                 onClick={() => handleSendMessage(inputValue)}
+                onRequestAuth={onRequestAuth}
                 disabled={isLoading || (!inputValue.trim() && !attachment)}
                 size="icon"
                 className="rounded-full h-9 w-9 shadow-md shadow-primary/20"

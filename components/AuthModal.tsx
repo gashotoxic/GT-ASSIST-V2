@@ -25,8 +25,9 @@ export function AuthModal({ mode, isOpen, onClose, onModeChange }: AuthModalProp
       borderRadius: '0.75rem',
     },
     elements: {
-      rootBox: 'w-full',
-      card: 'bg-transparent shadow-none border-none p-0 w-full',
+      rootBox: 'w-full flex justify-center',
+      card: 'bg-transparent shadow-none border-none p-0 w-full max-w-full',
+      cardBox: 'w-full',
       headerTitle: 'hidden',
       headerSubtitle: 'hidden',
       socialButtonsBlockButton:
@@ -59,16 +60,16 @@ export function AuthModal({ mode, isOpen, onClose, onModeChange }: AuthModalProp
       />
 
       {/* Main Container */}
-      <div className="relative w-[90%] sm:w-full max-w-sm animate-in zoom-in-95 slide-in-from-bottom-5 duration-500 overflow-y-auto max-h-[90vh]">
+      <div className="relative w-[min(420px,calc(100vw-1.5rem))] animate-in zoom-in-95 slide-in-from-bottom-5 duration-500 overflow-y-auto max-h-[95vh] my-auto">
 
         {/* Glass Card */}
-        <div className="relative bg-slate-900/90 backdrop-blur-xl rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden ring-1 ring-white/5">
+        <div className="relative bg-slate-900/95 backdrop-blur-xl rounded-[2rem] border border-white/10 shadow-2xl ring-1 ring-white/5">
 
           {/* Header Section */}
-          <div className="relative px-8 pt-8 pb-2 text-center">
+          <div className="relative px-4 sm:px-8 pt-6 sm:pt-8 pb-2 text-center">
             <button
               onClick={onClose}
-              className="absolute right-6 top-6 p-2 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-all"
+              className="absolute right-4 top-4 sm:right-6 sm:top-6 p-2 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-all"
             >
               <X className="w-5 h-5" />
             </button>
@@ -88,7 +89,7 @@ export function AuthModal({ mode, isOpen, onClose, onModeChange }: AuthModalProp
           </div>
 
           {/* Form Section */}
-          <div className="px-8 pb-6">
+          <div className="px-3 sm:px-8 pb-6">
             {mode === 'signin' ? (
               <SignIn appearance={clerkAppearance} />
             ) : (

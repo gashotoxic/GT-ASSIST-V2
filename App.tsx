@@ -339,11 +339,11 @@ const App: React.FC = () => {
       {/* Main Layout */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10 w-full min-w-0">
 
-        {/* Header - Simple & Clean */}
-        <header className="flex-none flex items-center justify-between px-3 sm:px-6 py-4 z-20 gap-2 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-slate-900/40 backdrop-blur-xl">
+        {/* Header - Mobile Optimized with Navigation */}
+        <header className="flex-none flex items-center justify-between px-2 sm:px-6 py-3 sm:py-4 z-20 gap-2 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-slate-900/40 backdrop-blur-xl">
 
           <div className="flex items-center gap-2 min-w-0">
-            {/* Sidebar Toggle - Only Desktop (Mobile uses Bottom Nav) */}
+            {/* Sidebar Toggle - Only Desktop */}
             {!isSidebarOpen && (
               <Button
                 variant="glass"
@@ -356,18 +356,42 @@ const App: React.FC = () => {
               </Button>
             )}
 
-            {/* Logo - Optimized for mobile */}
+            {/* Logo - Compact on Mobile */}
             <div className="flex items-center gap-2 px-2 py-1.5 sm:px-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 shadow-lg">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
-                <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
+                <Bot className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               </div>
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-800 dark:text-white hidden sm:block">
+              <h1 className="text-base sm:text-xl font-bold tracking-tight text-slate-800 dark:text-white hidden md:block">
                 Gasho<span className="text-primary italic">Chat</span>
               </h1>
             </div>
+
+            {/* Mobile Navigation - Chat & Media */}
+            <div className="flex md:hidden items-center gap-1">
+              <button
+                onClick={() => setCurrentView('chat')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${currentView === 'chat'
+                    ? 'bg-primary/10 text-primary shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span className="hidden xs:inline">Chat</span>
+              </button>
+              <button
+                onClick={() => setCurrentView('media')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${currentView === 'media'
+                    ? 'bg-primary/10 text-primary shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+              >
+                <ImageIcon className="w-4 h-4" />
+                <span className="hidden xs:inline">Media</span>
+              </button>
+            </div>
           </div>
 
-          {/* View Switcher - Centered Absolutely */}
+          {/* Desktop View Switcher - Centered Absolutely */}
           <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center bg-black/5 dark:bg-white/10 p-1 rounded-2xl border border-white/10 shadow-inner">
             {navItems.map((item) => (
               <button
@@ -384,18 +408,28 @@ const App: React.FC = () => {
             ))}
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Credit Display - Original Simple Style */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Pricing for Guest Users on Mobile */}
+            {!isSignedIn && (
+              <button
+                onClick={() => setCurrentView('pricing')}
+                className="md:hidden flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-primary hover:bg-primary/5 transition-all"
+              >
+                <CreditCard className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Credit Display */}
             <div
               onClick={() => setCurrentView('pricing')}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 cursor-pointer transition-colors"
+              className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 cursor-pointer transition-colors"
             >
-              <Zap className="w-4 h-4 text-primary" />
-              <span className="text-sm font-bold text-primary">{credits}</span>
+              <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
+              <span className="text-xs sm:text-sm font-bold text-primary">{credits}</span>
             </div>
 
             {/* User & Settings */}
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-2">
               {isSignedIn ? (
                 <UserProfile />
               ) : (
@@ -406,7 +440,7 @@ const App: React.FC = () => {
                     setAuthMode('signin');
                     setShowAuthModal(true);
                   }}
-                  className="rounded-full px-4 py-2 text-xs sm:text-sm font-medium shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+                  className="rounded-full px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
                 >
                   Sign In
                 </Button>
@@ -434,7 +468,7 @@ const App: React.FC = () => {
         </header>
 
         {/* Main Content Area - Scrollable Container */}
-        <main className="flex-1 w-full overflow-hidden relative z-10 px-0 sm:px-4 pb-0 md:pb-4 pt-4 sm:pt-6 flex flex-col items-center min-h-0 mb-20 md:mb-0">
+        <main className="flex-1 w-full overflow-hidden relative z-10 px-0 sm:px-4 pb-0 md:pb-4 pt-4 sm:pt-6 flex flex-col items-center min-h-0">
           <div className="w-full h-full max-w-[1920px] mx-auto relative">
             {currentView === 'chat' && (
               <div className="h-full w-full transition-all duration-500 animate-in fade-in zoom-in-95">
@@ -467,34 +501,7 @@ const App: React.FC = () => {
           </div>
         </main>
 
-        {/* Mobile Bottom Navigation - User Friendly Commands */}
-        <nav className="md:hidden fixed bottom-10 left-1/2 -translate-x-1/2 flex items-center bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl px-6 py-3 rounded-[2rem] border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-50 gap-6 min-w-[280px] justify-center transition-all duration-500 animate-in slide-in-from-bottom-10">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setCurrentView(item.id)}
-              className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${currentView === item.id
-                ? 'text-primary scale-110'
-                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
-                }`}
-            >
-              <div className={`p-2 rounded-xl transition-all ${currentView === item.id ? 'bg-primary/10 shadow-inner' : 'bg-transparent'}`}>
-                <item.icon className={`w-5 h-5 ${currentView === item.id ? 'fill-current' : ''}`} />
-              </div>
-              <span className="text-[10px] font-black uppercase tracking-widest leading-none">{item.label}</span>
-            </button>
-          ))}
-          <div className="h-8 w-px bg-white/10 mx-1"></div>
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="flex flex-col items-center gap-1.5 text-slate-400"
-          >
-            <div className="p-2 rounded-xl">
-              <Menu className="w-5 h-5" />
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-widest leading-none">History</span>
-          </button>
-        </nav>
+        {/* Mobile Navigation Moved to Top Header - No Bottom Nav Needed */}
       </div>
 
       {/* Settings Modal */}

@@ -12,6 +12,7 @@ interface CreditAwareButtonProps {
   disabled?: boolean;
   size?: 'sm' | 'md' | 'lg' | 'icon';
   variant?: 'primary' | 'secondary' | 'ghost' | 'destructive' | 'glass';
+  onRequestAuth?: () => void;
 }
 
 export function CreditAwareButton({
@@ -22,7 +23,8 @@ export function CreditAwareButton({
   className,
   disabled = false,
   size = 'md',
-  variant = 'primary'
+  variant = 'primary',
+  onRequestAuth
 }: CreditAwareButtonProps) {
   const { userId } = useAuthContext();
   const { credits, subscriptionTier, loading, canAfford } = useCredits();
@@ -37,8 +39,12 @@ export function CreditAwareButton({
         variant="primary"
         size={size === 'icon' ? 'md' : (size || 'md')}
         onClick={() => {
-          // Trigger auth modal via custom event
-          window.dispatchEvent(new CustomEvent('request-auth', { detail: { mode: 'signin' } }));
+          if (onRequestAuth) {
+            onRequestAuth();
+          } else {
+            // Trigger auth modal via custom event fallback
+            window.dispatchEvent(new CustomEvent('request-auth', { detail: { mode: 'signin' } }));
+          }
         }}
         className={`whitespace-nowrap min-w-max px-4 font-bold uppercase tracking-tight text-[10px] h-8 rounded-full shadow-md shadow-primary/20 ${className}`}
       >
