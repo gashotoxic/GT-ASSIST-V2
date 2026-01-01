@@ -152,10 +152,16 @@ const App: React.FC = () => {
     return newId;
   };
 
-  // -- PERSIST CURRENT ID --
+  // -- PERSIST CURRENT ID & Handle Session Model --
   useEffect(() => {
     if (currentSessionId) {
       localStorage.setItem('chutes_current_session_id', currentSessionId);
+
+      // Auto-switch model if the session has a specific model preference
+      const session = sessions.find(s => s.id === currentSessionId);
+      if (session?.model && session.model !== settings.model) {
+        setSettings(prev => ({ ...prev, model: session.model! }));
+      }
     }
     // Event listener for Account Settings
     const handleOpenAccountSettings = () => setIsAccountSettingsOpen(true);
@@ -170,43 +176,39 @@ const App: React.FC = () => {
       window.removeEventListener('open-account-settings', handleOpenAccountSettings);
       window.removeEventListener('open-view', handleOpenView);
     };
-  }, [currentSessionId, isSignedIn, userId]);
+  }, [currentSessionId, sessions]);
 
   // -- HANDLERS --
 
   const updateSessionPreview = async (id: string, preview: string) => {
     const timestamp = Date.now();
     const shortTitle = summarizePrompt(preview);
-    const sessionToSave = { id, title: shortTitle, updatedAt: timestamp, preview } as ChatSession;
 
-    // Functional update to ensure no race conditions
     setSessions(prevSessions => {
-      const updatedSessions = prevSessions.map(s =>
-        s.id === id ? { ...s, title: s.title === 'New Conversation' ? (shortTitle || 'Conversation') : s.title, preview, updatedAt: timestamp } : s
-      );
-      updatedSessions.sort((a, b) => b.updatedAt - a.updatedAt);
+      const existing = prevSessions.find(s => s.id === id);
+      if (!existing) return prevSessions;
 
-      // Persist
+      const updatedSession: ChatSession = {
+        ...existing,
+        title: (existing.title && existing.title !== 'New Conversation') ? existing.title : (shortTitle || 'Conversation'),
+        preview,
+        updatedAt: timestamp,
+      };
+
+      // Persist immediately using the latest metadata-rich object
       if (isSignedIn) {
-        // Authenticated: ONLY use Supabase, no fallbacks
-        supabaseService.upsertSession(sessionToSave, userId).catch(error => {
+        supabaseService.upsertSession(updatedSession, userId).catch(error => {
           console.error("Failed to update session in Supabase:", error);
         });
       } else {
-        // Guest: use localStorage
-        localStorage.setItem('chutes_chat_sessions', JSON.stringify(updatedSessions));
+        const updatedList = prevSessions.map(s => s.id === id ? updatedSession : s);
+        localStorage.setItem('chutes_chat_sessions', JSON.stringify(updatedList));
       }
-      return updatedSessions;
-    });
 
-    // Update Supabase separately (outside the functional update)
-    if (isSignedIn) {
-      try {
-        await supabaseService.upsertSession(sessionToSave, userId);
-      } catch (error) {
-        console.error("Failed to update session in Supabase:", error);
-      }
-    }
+      const finalList = prevSessions.map(s => s.id === id ? updatedSession : s);
+      finalList.sort((a, b) => b.updatedAt - a.updatedAt);
+      return finalList;
+    });
   };
 
   const handleRenameSession = async (id: string, newTitle: string) => {
@@ -492,6 +494,8 @@ const App: React.FC = () => {
                   settings={settings}
                   sessionId={currentSessionId}
                   onSessionUpdate={updateSessionPreview}
+                  onSwitchSession={setCurrentSessionId}
+                  onNewSession={(s) => setSessions(prev => [s, ...prev])}
                   isAuthenticated={isSignedIn}
                   onRequestAuth={() => { setAuthMode('signin'); setShowAuthModal(true); }}
                   userId={isSignedIn ? userId : undefined}

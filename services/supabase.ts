@@ -50,7 +50,9 @@ export class SupabaseService {
         id: row.id,
         title: row.title || 'New Conversation',
         preview: row.preview || '',
-        updatedAt: new Date(row.updated_at).getTime()
+        updatedAt: new Date(row.updated_at).getTime(),
+        isBranch: row.is_branch,
+        model: row.model
       }));
     } catch (err) {
       console.error('Error fetching sessions:', err);
@@ -66,7 +68,9 @@ export class SupabaseService {
         id: session.id,
         title: session.title,
         preview: session.preview,
-        updated_at: new Date(session.updatedAt).toISOString()
+        updated_at: new Date(session.updatedAt).toISOString(),
+        is_branch: session.isBranch || false,
+        model: session.model || null
       };
 
       // Add user_id if authenticated
@@ -155,6 +159,7 @@ export class SupabaseService {
           role: row.role,
           content: content,
           timestamp: new Date(row.created_at).getTime(),
+          model: row.model,
           audio_url: row.audio_url,
           audioUrl: row.audio_url
         };
@@ -175,6 +180,7 @@ export class SupabaseService {
       session_id: sid,
       role: msgToSave.role,
       content: msgToSave.content,
+      model: msgToSave.model || null,
       audio_url: msgToSave.audio_url || null,
       created_at: new Date().toISOString(),
     };
@@ -238,6 +244,50 @@ export class SupabaseService {
       .update({ audio_url: audioUrl })
       .eq('id', dbId);
     if (error) console.error('Supabase Update Error', error);
+  }
+
+  async updateMessage(message: Message, sessionId: string): Promise<boolean> {
+    if (!this.client || !message.id) return false;
+
+    try {
+      const { error } = await this.client
+        .from('messages')
+        .update({ content: message.content })
+        .eq('id', message.id)
+        .eq('session_id', sessionId);
+
+      if (error) {
+        console.error('Supabase Update Message Error:', error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('Error updating message:', err);
+      return false;
+    }
+  }
+
+  // Deletes all messages in a session created AFTER a specific timestamp
+  // Used for "Retry" or "Edit" where future context becomes invalid
+  async deleteMessagesAfter(sessionId: string, timestamp: number): Promise<boolean> {
+    if (!this.client) return false;
+
+    try {
+      const { error } = await this.client
+        .from('messages')
+        .delete()
+        .eq('session_id', sessionId)
+        .gt('created_at', new Date(timestamp).toISOString());
+
+      if (error) {
+        console.error('Supabase Delete Future Messages Error:', error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('Error deleting future messages:', err);
+      return false;
+    }
   }
 
   // --- Media Gallery Management ---

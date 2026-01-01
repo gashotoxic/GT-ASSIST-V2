@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, MessageSquare, Trash2, X, Pencil, Check, PanelLeftClose, ChevronLeft } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, X, Pencil, Check, PanelLeftClose, ChevronLeft, GitBranch } from 'lucide-react';
 import { ChatSession } from '../types';
 import { Button } from './UI';
 
@@ -159,7 +159,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                             : 'bg-gray-100 dark:bg-white/5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300'
                                         }
                     `}>
-                                        <MessageSquare className="w-4 h-4" />
+                                        {session.isBranch ? <GitBranch className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
                                     </div>
 
                                     <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">

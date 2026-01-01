@@ -12,6 +12,7 @@ export interface Message {
   content: string | ContentPart[];
   id?: string;
   timestamp?: number;
+  model?: string; // Track which model generated this message
   audioUrl?: string; // Blob URL for local playback
   audio_url?: string; // Remote URL from Supabase
   tool_call_id?: string; // For tool responses
@@ -24,6 +25,8 @@ export interface ChatSession {
   title: string;
   updatedAt: number;
   preview: string;
+  isBranch?: boolean;
+  model?: string;
 }
 
 export interface MediaItem {

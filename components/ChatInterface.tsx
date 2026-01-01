@@ -1,8 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Mic, Square, Loader2, Volume2, Bot, User, StopCircle, Paperclip, X, FileText, Play, Search, Globe, Pause, RotateCcw, BrainCircuit } from 'lucide-react';
+import { Send, Mic, Square, Loader2, Volume2, Bot, User, StopCircle, Paperclip, X, FileText, Play, Search, Globe, Pause, RotateCcw, BrainCircuit, Edit3, Cpu, Copy, GitBranch, Check } from 'lucide-react';
 import { Button } from './UI';
-import { Message, AppSettings, FileAttachment } from '../types';
+import { Message, AppSettings, FileAttachment, ChatSession, AVAILABLE_MODELS } from '../types';
 import { ChutesService } from '../services/chutes';
 import { SupabaseService } from '../services/supabase';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
@@ -10,11 +10,15 @@ import { CreditAwareButton } from './CreditAwareButton';
 import { useCredits } from '../context/CreditContext';
 import { useAuthContext } from '../context/AuthContext';
 import { getCreditCost } from '../services/creditCosts';
+import { EditMessageModal } from './EditMessageModal';
+import { BranchModelModal } from './BranchModelModal';
 
 interface ChatInterfaceProps {
   settings: AppSettings;
   sessionId: string;
   onSessionUpdate: (id: string, preview: string) => void;
+  onSwitchSession: (id: string) => void;
+  onNewSession: (session: ChatSession) => void;
   isAuthenticated: boolean;
   onRequestAuth: () => void;
   userId?: string | null;
@@ -27,7 +31,23 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSessionUpdate, isAuthenticated, onRequestAuth, userId }) => {
+const formatModelName = (modelId: string) => {
+  if (!modelId) return "";
+
+  // 1. Try lookup in models list
+  const model = AVAILABLE_MODELS.find(m => m.id === modelId);
+  let name = model ? model.name : (modelId.split('/').pop() || modelId);
+
+  // 2. Remove emojis
+  name = name.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+
+  // 3. Strip common technical suffixes like TEE
+  name = name.replace(/-TEE$/i, '').replace(/ TEE$/i, '').replace(/-Speciale$/i, '').replace(/-Flash$/i, '').replace(/-Thinking$/i, '');
+
+  return name.trim();
+};
+
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSessionUpdate, onSwitchSession, onNewSession, isAuthenticated, onRequestAuth, userId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -37,6 +57,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
   const [attachment, setAttachment] = useState<FileAttachment | null>(null);
   const [generatingAudioId, setGeneratingAudioId] = useState<string | null>(null);
   const [isSearchEnabled, setIsSearchEnabled] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<{ message: Message; index: number } | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [branchingIndex, setBranchingIndex] = useState<number | null>(null);
 
   // Audio State
   const [currentTime, setCurrentTime] = useState(0);
@@ -291,7 +314,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       }
     }
 
-    const userMsg: Message = { role: 'user', content: userContent, id: Date.now().toString() };
+    const userMsg: Message = {
+      role: 'user',
+      content: userContent,
+      id: Date.now().toString(),
+      timestamp: Date.now(),
+      model: settings.model // Track user intent model
+    };
 
     // Determine the history context to use
     const currentHistory = historyOverride || messages;
@@ -311,7 +340,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     }
 
     try {
-      let assistantMsg: Message = { role: 'assistant', content: '', id: (Date.now() + 1).toString() };
+      let assistantMsg: Message = {
+        role: 'assistant',
+        content: '',
+        id: (Date.now() + 1).toString(),
+        timestamp: Date.now() + 1,
+        model: settings.model
+      };
       setMessages(prev => [...prev, assistantMsg]);
 
       let fullResponse = '';
@@ -398,29 +433,152 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     }
   };
 
-  const handleRetry = (index: number, msg: Message) => {
+  const handleRetry = async (index: number, msg: Message) => {
+    // If retrying a USER message: We resend that message content. History is everything BEFORE this message.
+    // If retrying an ASSISTANT message: We resend the LAST USER message (index-1). History is everything BEFORE the user message.
+
     let text = '';
     let retryAttachment: FileAttachment | null = null;
+    let targetIndex = index;
 
-    if (typeof msg.content === 'string') {
-      text = msg.content;
-    } else if (Array.isArray(msg.content)) {
-      msg.content.forEach(part => {
-        if (part.type === 'text') text = part.text || '';
-        if (part.type === 'image_url' && part.image_url) {
-          retryAttachment = {
-            type: 'image',
-            name: 'image-retry.png',
-            mimeType: 'image/png',
-            data: part.image_url.url
-          };
-        }
-      });
+    if (msg.role === 'assistant') {
+      // Retry the assistant response = re-run the user prompt before it
+      targetIndex = index - 1;
+      if (targetIndex < 0) return; // Should not happen
+      const userMsg = messages[targetIndex];
+      // Type safe extraction
+      if (typeof userMsg.content === 'string') {
+        text = userMsg.content;
+      } else if (Array.isArray(userMsg.content)) {
+        userMsg.content.forEach(part => {
+          if (part.type === 'text') text += (part.text || '');
+          if (part.type === 'image_url' && part.image_url) {
+            retryAttachment = { type: 'image', name: 'retry.png', data: part.image_url.url, mimeType: 'image/png' };
+          }
+        });
+      }
+    } else {
+      // Retrying the user's own message
+      if (typeof msg.content === 'string') {
+        text = msg.content;
+      } else if (Array.isArray(msg.content)) {
+        msg.content.forEach(part => {
+          if (part.type === 'text') text += (part.text || '');
+          if (part.type === 'image_url' && part.image_url) {
+            retryAttachment = { type: 'image', name: 'retry.png', data: part.image_url.url, mimeType: 'image/png' };
+          }
+        });
+      }
     }
 
-    const newHistory = messages.slice(0, index);
+    // Slice history to keep everything BEFORE the target message (user message being retried)
+    const newHistory = messages.slice(0, targetIndex);
     setMessages(newHistory);
+
+    // Sync deletion with Supabase
+    // We want to delete the target message and everything after it
+    // The timestamp of the message at targetIndex is the cutoff
+    const cutoffMsg = messages[targetIndex];
+    if (isAuthenticated && userId) {
+      const cutoffTime = cutoffMsg?.timestamp || Date.now();
+      // AWAIT here to ensure database is in expected state before handleSendMessage re-saves
+      await supabaseService.deleteMessagesAfter(sessionId, cutoffTime - 1);
+    }
+
     handleSendMessage(text, retryAttachment, newHistory);
+  };
+
+  const handleEdit = (msg: Message, index: number) => {
+    setEditingMessage({ message: msg, index });
+  };
+
+  const handleSaveEdit = async (newContent: string) => {
+    if (!editingMessage) return;
+    const { message, index } = editingMessage;
+
+    // 1. Update the message object locally (just for the re-send logic)
+    const updatedMsg = { ...message, content: newContent };
+
+    // 2. Truncate history to BEFORE this message
+    const historyBefore = messages.slice(0, index);
+
+    // 3. Update State
+    setMessages(historyBefore);
+
+    // 4. Sync Database: Delete this message and all future ones
+    if (isAuthenticated && userId && message.timestamp) {
+      // We delete from this point forward because we are re-inserting the edited version as a new message 
+      // effectively to ensure clean timeline. 
+      // Alternatively, update the content and delete only *future* messages.
+      // For simplicity and "Resend" logic, deleting forward is safest.
+      await supabaseService.deleteMessagesAfter(sessionId, message.timestamp - 1);
+    }
+
+    // 5. Trigger Send (this will re-save the user message and generate new response)
+    // We treat the edited message as a "new" input for the AI
+    handleSendMessage(newContent, null, historyBefore);
+
+    setEditingMessage(null);
+  };
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleBranch = (index: number) => {
+    setBranchingIndex(index);
+  };
+
+  const confirmBranch = async (selectedModel: string) => {
+    if (branchingIndex === null) return;
+    const index = branchingIndex;
+    setBranchingIndex(null);
+
+    // Branching: Create a new session with messages up to this point
+    const branchedHistory = messages.slice(0, index + 1);
+    const newSessionId = crypto.randomUUID();
+
+    // Determine title
+    const firstUserMsg = branchedHistory.find(m => m.role === 'user');
+    const title = typeof firstUserMsg?.content === 'string'
+      ? firstUserMsg.content.slice(0, 40).trim() + (firstUserMsg.content.length > 40 ? '...' : '')
+      : 'Branched Conversation';
+
+    const newSession: ChatSession = {
+      id: newSessionId,
+      title,
+      preview: title,
+      updatedAt: Date.now(),
+      isBranch: true,
+      model: selectedModel
+    };
+
+    if (isAuthenticated && userId) {
+      // 1. Create Session in Supabase
+      await supabaseService.upsertSession(newSession, userId);
+
+      // 2. Clone messages to new session
+      let baseTime = Date.now();
+      for (const msg of branchedHistory) {
+        baseTime += 10;
+        const newMsg = {
+          ...msg,
+          id: undefined,
+          timestamp: baseTime
+        };
+        await supabaseService.saveMessage(newMsg, newSessionId, userId);
+      }
+    } else {
+      localStorage.setItem(`chutes_messages_${newSessionId}`, JSON.stringify(branchedHistory));
+      const currentStored = JSON.parse(localStorage.getItem('chutes_chat_sessions') || '[]');
+      localStorage.setItem('chutes_chat_sessions', JSON.stringify([newSession, ...currentStored]));
+    }
+
+    // 3. Update App State
+    onNewSession(newSession);
+    onSwitchSession(newSessionId);
   };
 
   const generateTTS = async (text: string): Promise<{ url: string | null, blob: Blob | null }> => {
@@ -610,7 +768,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100 tracking-tight drop-shadow-sm">How can I help?</h2>
               <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-white/30 dark:bg-slate-800/30 px-4 py-2 rounded-full w-fit mx-auto border border-white/40 dark:border-white/5 backdrop-blur-md shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_#1abc9c]"></span>
-                Running on <span className="font-semibold text-primary-dark dark:text-primary-light">{settings.model}</span>
+                Running on <span className="font-semibold text-primary-dark dark:text-primary-light">{formatModelName(settings.model)}</span>
               </div>
             </div>
           </div>
@@ -638,18 +796,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
             {msg.content && (
               <div className={`flex flex-col gap-1 max-w-[85%] sm:max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
 
-                <div className="flex items-center gap-2">
-                  {msg.role === 'user' && !isLoading && (
-                    <button
-                      onClick={() => handleRetry(idx, msg)}
-                      className={`p-1.5 rounded-full text-gray-400 hover:text-primary hover:bg-white/50 dark:hover:bg-white/10 transition-all ${idx === messages.length - 1 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                        }`}
-                      title="Reload/Retry this message"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </button>
-                  )}
-
+                <div className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <div
                     className={`relative px-4 py-3 sm:px-6 sm:py-4 rounded-2xl text-sm sm:text-base leading-relaxed shadow-md ${msg.role === 'user'
                       ? 'bg-gradient-to-br from-primary to-primary-dark text-white rounded-br-sm shadow-primary/20'
@@ -661,67 +808,103 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                     {renderMessageContent(msg.content)}
 
                     {msg.role === 'assistant' && (
-                      <div className={`mt-3 pt-3 border-t border-gray-200/40 dark:border-white/5 transition-all duration-300 ${(playingMessageId === msg.id || msg.audio_url || msg.audioUrl) ? 'block' : 'hidden group-hover:block'
-                        }`}>
-                        {playingMessageId === msg.id ? (
-                          <div className="flex items-center gap-3 select-none">
-                            <button
-                              onClick={() => handleReplay(msg)}
-                              className="w-8 h-8 flex items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20 text-primary hover:bg-primary/20 dark:hover:bg-primary/30 transition-colors"
-                            >
-                              {isPlayingAudio ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
-                            </button>
+                      <div className={`mt-3 pt-3 border-t border-gray-200/40 dark:border-white/5 transition-all duration-300 ${playingMessageId === msg.id ? 'block' : 'hidden'}`}>
+                        <div className="flex items-center gap-3 select-none">
+                          <button
+                            onClick={() => handleReplay(msg)}
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20 text-primary hover:bg-primary/20 dark:hover:bg-primary/30 transition-colors"
+                          >
+                            {isPlayingAudio ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
+                          </button>
 
-                            <div className="flex-1 flex items-center gap-2">
-                              <input
-                                type="range"
-                                min="0"
-                                max={duration || 100}
-                                value={currentTime}
-                                onChange={handleSeek}
-                                className="w-full h-1.5 bg-gray-200 dark:bg-slate-600 rounded-full appearance-none cursor-pointer accent-primary hover:accent-primary-dark"
-                              />
-                            </div>
+                          <div className="flex-1 flex items-center gap-2">
+                            <input
+                              type="range"
+                              min="0"
+                              max={duration || 100}
+                              value={currentTime}
+                              onChange={handleSeek}
+                              className="w-full h-1.5 bg-gray-200 dark:bg-slate-600 rounded-full appearance-none cursor-pointer accent-primary hover:accent-primary-dark"
+                            />
+                          </div>
 
-                            <span className="text-xs font-mono text-gray-500 dark:text-gray-400 min-w-[36px]">
-                              {formatTime(currentTime)}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex justify-end">
-                            <Button
-                              variant="glass"
-                              size="sm"
-                              className="h-7 px-3 text-xs rounded-full gap-2 border-white/40 dark:border-white/10 hover:bg-white/40 dark:hover:bg-slate-700/40 shadow-sm"
-                              onClick={() => handleReplay(msg)}
-                              disabled={generatingAudioId === msg.id}
-                            >
-                              {generatingAudioId === msg.id ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <Volume2 className="w-3.5 h-3.5" />
-                              )}
-                              <span>{msg.audioUrl || msg.audio_url ? 'Play' : 'Read'}</span>
-                            </Button>
-                          </div>
-                        )}
+                          <span className="text-xs font-mono text-gray-500 dark:text-gray-400 min-w-[36px]">
+                            {formatTime(currentTime)}
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>
+
+                  {/* Actions Row (Positioned below the bubble) */}
+                  {!isLoading && (
+                    <div className={`flex items-center gap-1 transition-opacity duration-300 opacity-0 group-hover:opacity-100 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                      {/* Regenerate Action (Both) */}
+                      <button
+                        onClick={() => handleRetry(idx, msg)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-white/50 dark:hover:bg-white/10 transition-all"
+                        title="Regenerate/Retry"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Branch Action (Both) */}
+                      <button
+                        onClick={() => handleBranch(idx)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-white/50 dark:hover:bg-white/10 transition-all"
+                        title="Branch from here"
+                      >
+                        <GitBranch className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Edit Action (User Only) */}
+                      {msg.role === 'user' && (
+                        <button
+                          onClick={() => handleEdit(msg, idx)}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-white/50 dark:hover:bg-white/10 transition-all"
+                          title="Edit"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      {/* Copy Action (Both) */}
+                      <button
+                        onClick={() => handleCopy(typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content), msg.id || idx.toString())}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-white/50 dark:hover:bg-white/10 transition-all"
+                        title="Copy"
+                      >
+                        {copiedId === (msg.id || idx.toString()) ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+
+                      {/* Voice Read (Assistant Only) */}
+                      {msg.role === 'assistant' && (
+                        <button
+                          onClick={() => handleReplay(msg)}
+                          className={`p-1.5 rounded-lg transition-all ${generatingAudioId === msg.id ? 'text-primary' : 'text-gray-400 hover:text-primary hover:bg-white/50 dark:hover:bg-white/10'}`}
+                          title="Read aloud"
+                          disabled={generatingAudioId === msg.id}
+                        >
+                          {generatingAudioId === msg.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Volume2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      )}
+
+                      {/* Model Badge (Assistant Only) */}
+                      {msg.role === 'assistant' && msg.model && (
+                        <div className="ml-1 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/5 text-[10px] font-medium text-gray-500 dark:text-gray-400 select-none cursor-default">
+                          <Cpu className="w-3 h-3" />
+                          <span>{formatModelName(msg.model)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Credit Cost Display for User Messages */}
-                {msg.role === 'user' && settings.useSupabase && (
-                  <div className="flex justify-end">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 bg-gray-100/50 dark:bg-gray-800/30 rounded-full">
-                      {(() => {
-                        const costs = { 'zai-org/GLM-4.6': 1, 'moonshotai/Kimi-K2-Thinking': 3, 'deepseek-ai/DeepSeek-R1-0528': 3 };
-                        const cost = costs[settings.model as keyof typeof costs] || 1;
-                        return `Used ${cost} credit${cost !== 1 ? 's' : ''}`;
-                      })()}
-                    </div>
-                  </div>
-                )}
+
               </div>
             )}
           </div>
@@ -863,7 +1046,29 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
           </div>
         </div>
       </div>
-    </div>
+
+
+      {
+        editingMessage && (
+          <EditMessageModal
+            message={editingMessage.message}
+            isOpen={!!editingMessage}
+            onClose={() => setEditingMessage(null)}
+            onSave={handleSaveEdit}
+          />
+        )
+      }
+      {
+        branchingIndex !== null && (
+          <BranchModelModal
+            isOpen={branchingIndex !== null}
+            onClose={() => setBranchingIndex(null)}
+            onConfirm={confirmBranch}
+            currentModel={settings.model}
+          />
+        )
+      }
+    </div >
   );
 };
 
