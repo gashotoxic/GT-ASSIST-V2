@@ -60,7 +60,7 @@ export function AuthModal({ mode, isOpen, onClose, onModeChange }: AuthModalProp
       />
 
       {/* Main Container */}
-      <div className="relative w-[min(420px,calc(100vw-1.5rem))] animate-in zoom-in-95 slide-in-from-bottom-5 duration-500 overflow-y-auto max-h-[95vh] my-auto">
+      <div className="relative w-[min(420px,calc(100vw-1.5rem))] animate-in zoom-in-95 slide-in-from-bottom-5 duration-500 overflow-y-auto overflow-x-hidden max-h-[95vh] my-auto scrollbar-hide">
 
         {/* Glass Card */}
         <div className="relative bg-slate-900/95 backdrop-blur-xl rounded-[2rem] border border-white/10 shadow-2xl ring-1 ring-white/5">

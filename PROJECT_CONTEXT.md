@@ -15,8 +15,8 @@
 
 ### A. State Management & Persistence
 The app handles data storage in two distinct levels:
-*   **Level 1 (Guest Mode):** `localStorage` for text, ephemeral Blobs for media.
-*   **Level 2 (Cloud Mode):** Full Supabase persistence for messages and media assets (`media-assets` and `chat-audio` buckets).
+*   **Level 1 (Ephemeral Session):** Temporary in-memory state for non-critical local actions.
+*   **Level 2 (Cloud Persistence):** Mandatory Supabase persistence for all chat messages and generated media assets (`media-assets` and `chat-audio` buckets). Guest mode for media has been deprecated for superior security and history cross-sync.
 
 ### B. Monetization System (KES Focused)
 The app uses a **1-credit unified model** powered by Paystack.
@@ -27,7 +27,7 @@ The app uses a **1-credit unified model** powered by Paystack.
 ### C. UI/UX Design
 *   **Design Language**: Glassmorphism (High blur, transparency, gradients).
 *   **Custom UI Layer (`UI.tsx`)**: Optimized for mobile. Includes a custom viewport-aware `Select` component to handle long lists (like models) without screen overflow.
-*   **Mobile Ergonomics**: Navigation bar is positioned at `bottom-10` to avoid native system buttons.
+*   **Mobile Ergonomics**: Navigation bar is positioned at `bottom-10` to avoid native system buttons. Tabs and headers are optimized for ultra-narrow screens using adaptive spacing.
 
 ---
 
@@ -40,7 +40,7 @@ The app uses a **1-credit unified model** powered by Paystack.
 
 ### `services/supabase.ts` (Persistence)
 *   **Credits**: Uses RPC `add_user_credits` for atomic balance updates.
-*   **Media**: Automates the upload -> public URL -> DB insertion pipeline.
+*   **Media**: Automates the upload -> public URL -> DB insertion pipeline. Supports efficient bulk deletion and cloud-synced title editing.
 
 ### `services/search.ts` (Grounding)
 *   Integrates Tavily and Brave Search (via `corsproxy.io`) for real-time web grounding.
@@ -52,15 +52,15 @@ The app uses a **1-credit unified model** powered by Paystack.
 *   **Generator**: T2I using Hunyuan, Juggernaut, etc.
 *   **Magic Editor**: Natural language image editing.
 *   **Animator**: Wan 2.2 I2V and Wan 2.1 T2V with "Extend Video" frame-capture technology.
-*   **Gallery**: Full history with renaming and lightbox support.
+*   **Gallery**: Full history with renaming, multi-select bulk delete, and lightbox support. Mandatory cloud persistence.
 
 ---
 
 ## 5. Security & Configuration
-*   **Auth**: Clerk manages the identity layer.
+*   **Auth**: Clerk manages the identity layer. Mandatory for media persistence.
 *   **Webhooks**: Verified via `PAYSTACK_SECRET_KEY` in Supabase Secrets.
 *   **Storage**: RLS policies allow authenticated uploads to private buckets.
 
 ---
 
-**Last Updated**: December 29, 2025
+**Last Updated**: January 1, 2026

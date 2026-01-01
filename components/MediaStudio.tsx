@@ -639,7 +639,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
-                        className={`flex-1 min-w-[100px] py-4 sm:py-5 text-sm font-medium flex items-center justify-center gap-2.5 transition-all relative group overflow-hidden ${activeTab === tab.id
+                        className={`flex-1 min-w-0 sm:min-w-[100px] py-3 sm:py-5 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 sm:gap-2.5 transition-all relative group overflow-hidden ${activeTab === tab.id
                             ? 'text-primary bg-primary/5 dark:bg-primary/10'
                             : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/10 dark:hover:bg-white/5'
                             }`}
@@ -651,7 +651,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                 <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 rounded-full bg-primary animate-pulse border border-white dark:border-slate-900"></span>
                             )}
                         </div>
-                        <span className="tracking-wide hidden sm:inline">{tab.label}</span>
+                        <span className="tracking-wide">{tab.label}</span>
                         {activeTab === tab.id && (
                             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_0_15px_#1abc9c]" />
                         )}
@@ -793,7 +793,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-0">
 
                         {/* Controls Column */}
-                        <div className="lg:col-span-4 flex flex-col gap-6 animate-in slide-in-from-left-4 duration-500 delay-100 order-2 lg:order-1 pb-10 min-h-0">
+                        <div className="lg:col-span-4 flex flex-col gap-6 animate-in slide-in-from-left-4 duration-500 delay-100 pb-10 min-h-0">
                             {/* ... (Existing Image/Edit/Video Control Logic - No changes here, kept layout intact) ... */}
 
                             {/* Image Tab Controls */}
@@ -1056,7 +1056,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                         </div>
 
                         {/* Preview Column */}
-                        <div className="lg:col-span-8 flex flex-col min-h-[400px] animate-in slide-in-from-right-4 duration-500 delay-200 order-1 lg:order-2">
+                        <div className="lg:col-span-8 flex flex-col min-h-[400px] animate-in slide-in-from-right-4 duration-500 delay-200">
                             <div className="flex-1 rounded-2xl border border-white/40 dark:border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md shadow-inner flex items-center justify-center relative overflow-hidden group p-2 min-h-[400px]">
 
                                 {/* Only show overlay if this specific tab is generating */}

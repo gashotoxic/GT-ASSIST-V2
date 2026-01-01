@@ -34,7 +34,10 @@
 - ✅ **Image Editing**: Qwen-Image-Edit with quick actions
 - ✅ **Video Generation**: Wan 2.2 I2V and Wan 2.1 T2V
 - ✅ **Video Extension**: Frame capture from last frame
-- ✅ **Gallery System**: Filter by type, lightbox viewer, download, transfer workflows
+- ✅ **Gallery System**: 
+  - Filter by type, lightbox viewer, download, transfer workflows
+  - ✅ **Multi-Selection**: Bulk delete operations (Storage + DB)
+  - ✅ **Title Persistence**: Real-time cloud syncing on focus loss
 - ✅ **Watermarking**: "Gashotech" overlay on all generated images
 
 ### Monetization & Auth (Phase 1)
@@ -46,14 +49,16 @@
 ### Mobile & UI (Recent Polish)
 - ✅ **Custom Selects**: Resolved dropdown overflow issues on mobile (Week 5)
 - ✅ **Navbar Ergonomics**: Raised navigation for screen-button safety (Week 5)
+- ✅ **Auth Micro-Interactions**: Scrollbar-hide for distraction-free forms (Week 6)
+- ✅ **Media Studio Responsiveness**: Optimized tabs and grids for ultra-narrow screens (Week 6)
 - ✅ **Dynamic Viewport**: `h-[100dvh]` support for mobile browsers
 
 ## ❌ MISSING FEATURES (Add Without Breaking)
 
 ### P1 - HIGH PRIORITY (Message Experience)
-1. **Message Actions**: 🔄 Copy (Added), Delete (Added), Branch (Missing)
-2. **Message Edit & Resend**: ❌ Not implemented
-3. **Message Retry/Refresh**: ❌ Not implemented
+1. **Message Edit & Resend**: ❌ Not implemented
+2. **Message Retry/Refresh**: ❌ Not implemented
+3. **Message Branching**: ❌ Not implemented
 
 ### P2 - MEDIUM PRIORITY (Media Experience)
 9. **Image Cropping**: ❌ Not implemented
@@ -64,7 +69,6 @@
 
 | Feature | Status | Priority | Effort | Phase | Dependencies |
 |---------|--------|----------|--------|-------|--------------|
-| Message Copy | ✅ | **P1** | Low | 2 | None |
 | Message Edit | Missing | **P1** | Medium | 2 | None |
 | Message Retry | Missing | **P1** | Low | 2 | None |
 | Message Branching | Missing | **P1** | Medium | 2 | None |
@@ -78,7 +82,7 @@
 - ✅ **React hooks** properly used for state management
 - ✅ **Service layer** abstraction (chutes, search, supabase) is clean
 - ✅ **Mobile-first UI** with tailwind is very robust
-- ✅ **Security**: Webhooks verified via HMAC-SHA512
+- ✅ **Security**: Webhooks verified via HMAC-SHA512, strict auth for persistence.
 
 ### Areas for Improvement
 - ⚠️ **API keys exposed** in client - move more logic to edge functions
@@ -86,5 +90,5 @@
 
 ---
 
-**Last Updated**: December 29, 2025
-**Version**: 1.5
+**Last Updated**: January 1, 2026
+**Version**: 1.6
