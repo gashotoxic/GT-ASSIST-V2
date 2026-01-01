@@ -8,6 +8,7 @@ import { WatermarkService } from '../services/watermark';
 import { AVAILABLE_IMAGE_MODELS, AVAILABLE_VIDEO_MODELS, AVAILABLE_EDIT_MODELS, AppSettings, MediaItem } from '../types';
 import { getCreditCost } from '../services/creditCosts';
 import { useCredits } from '../context/CreditContext';
+import { summarizePrompt } from '../utils/stringUtils';
 
 interface MediaStudioProps {
     settings: AppSettings;
@@ -76,6 +77,8 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
     const [selectedMediaItem, setSelectedMediaItem] = useState<MediaItem | null>(null);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editTitleValue, setEditTitleValue] = useState('');
+    const [isSelectMode, setIsSelectMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const editInputRef = useRef<HTMLInputElement>(null);
@@ -115,65 +118,50 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         return getCreditCost(type, model || '');
     };
 
-    // Simplified: Skip pre-check, deduct directly and handle errors
     const checkCredits = async (type: 'image' | 'edit' | 'video', requireAuth: boolean = true): Promise<boolean> => {
-        if (!isAuthenticated && requireAuth) {
+        if (!isAuthenticated) {
             onRequestAuth();
             return false;
         }
-        // For authenticated users, assume they have credits (UI shows current balance)
-        // Deduction will fail if insufficient, showing proper error
-        return isAuthenticated || parseInt(localStorage.getItem('chutes_guest_credits') || '10') > 0;
+        return true;
     };
 
-    // Deduct credits function - ALWAYS use Supabase for auth users, no fallbacks
+    // Deduct credits function - STRICT Supabase usage
     const deductCredits = async (type: 'image' | 'edit' | 'video'): Promise<boolean> => {
         const model = type === 'image' ? selectedImageModel : type === 'video' ? selectedVideoModel : 'qwen-image-edit';
         const cost = getMediaCost(type, model);
 
-        if (isAuthenticated && userId) {
-            // Supabase mode for authenticated users - NO fallbacks
+        if (userId) {
             try {
                 const sessionId = localStorage.getItem('chutes_current_session_id') || localStorage.getItem('chutes_session_id') || '';
-                await supabaseService.useCredits(userId, cost, type, selectedImageModel || selectedVideoModel, sessionId);
-                // Refresh credits after deduction
+                await supabaseService.useCredits(userId, cost, type, model, sessionId);
                 refetch();
                 return true;
             } catch (error) {
                 console.error('Credit deduction failed:', error);
                 return false;
             }
-        } else {
-            // Guest mode - deduct from guest storage
-            const guestCredits = parseInt(localStorage.getItem('chutes_guest_credits') || '10');
-            localStorage.setItem('chutes_guest_credits', (guestCredits - cost).toString());
-            return true;
         }
+        onRequestAuth();
+        return false;
     };
 
     // Load Cloud Gallery on mount - use Supabase for auth users
     // Fetch ALL media for the user across all sessions (not just current session)
     useEffect(() => {
+        if (!userId || !isAuthenticated) {
+            setMediaHistory([]);
+            return;
+        }
+
         const loadGallery = async () => {
-            // For authenticated users, load ALL their media from Supabase
-            if (isAuthenticated && userId) {
-                console.log('[MediaStudio] Loading ALL media from Supabase for user:', userId);
-                try {
-                    const items = await supabaseService.getMediaHistoryByUser(userId);
-                    console.log('[MediaStudio] Loaded', items.length, 'total items from Supabase');
-                    if (items.length > 0) {
-                        setMediaHistory(prev => {
-                            // Merge to avoid duplicates if local generation happened
-                            const newIds = new Set(items.map(i => i.id));
-                            const filteredPrev = prev.filter(p => !newIds.has(p.id));
-                            return [...items, ...filteredPrev].sort((a, b) => b.createdAt - a.createdAt);
-                        });
-                    }
-                } catch (error) {
-                    console.error('[MediaStudio] Failed to load media history from Supabase:', error);
+            try {
+                const items = await supabaseService.getMediaHistoryByUser(userId);
+                if (items.length > 0) {
+                    setMediaHistory(items.sort((a, b) => b.createdAt - a.createdAt));
                 }
-            } else {
-                console.log('[MediaStudio] Guest mode - not loading from Supabase');
+            } catch (error) {
+                console.error('[MediaStudio] Failed to load media history from Supabase:', error);
             }
         };
         loadGallery();
@@ -329,43 +317,47 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
 
     const addToHistory = async (blob: Blob, type: 'image' | 'video', prompt: string) => {
         const url = URL.createObjectURL(blob);
+        const shortTitle = summarizePrompt(prompt);
+        const currentSessionId = localStorage.getItem('chutes_current_session_id') || localStorage.getItem('chutes_session_id');
+
         const newItem: MediaItem = {
             id: crypto.randomUUID(),
             type,
             url,
             prompt,
-            title: prompt, // Default title to prompt
-            createdAt: Date.now()
+            title: shortTitle,
+            createdAt: Date.now(),
+            sessionId: currentSessionId || undefined
         };
+
+        // UI Update
         setMediaHistory(prev => [newItem, ...prev]);
 
-        // For authenticated users, ALWAYS save to Supabase
-        if (isAuthenticated && userId) {
-            const currentSessionId = localStorage.getItem('chutes_current_session_id') || localStorage.getItem('chutes_session_id');
-            console.log('[MediaStudio] Saving media to Supabase:', { type, id: newItem.id, sessionId: currentSessionId, userId });
-            if (currentSessionId) {
-                try {
-                    await supabaseService.saveMediaItem(newItem, blob, currentSessionId, userId);
-                    console.log('[MediaStudio] Media saved successfully to Supabase');
-                } catch (error) {
-                    console.error('[MediaStudio] Failed to save media to Supabase:', error);
-                }
-            } else {
-                console.warn('[MediaStudio] No session ID found, media not saved to Supabase');
+        // Persistence
+        if (userId && currentSessionId) {
+            try {
+                await supabaseService.saveMediaItem(newItem, blob, currentSessionId, userId);
+            } catch (error) {
+                console.error('[MediaStudio] Failed to save media to Supabase:', error);
             }
-        } else {
-            console.log('[MediaStudio] Guest mode - media not saved to Supabase');
         }
     };
 
     const handleDeleteMedia = async (item: MediaItem) => {
         if (confirm("Are you sure you want to delete this?")) {
             setMediaHistory(prev => prev.filter(p => p.id !== item.id));
-            setSelectedMediaItem(null); // Close modal
+            setSelectedMediaItem(null);
 
-            // For authenticated users, delete from Supabase
-            if (isAuthenticated && userId) {
-                const currentSessionId = localStorage.getItem('chutes_current_session_id') || localStorage.getItem('chutes_session_id');
+            if (selectedIds.has(item.id)) {
+                setSelectedIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(item.id);
+                    return next;
+                });
+            }
+
+            if (userId) {
+                const currentSessionId = item.sessionId || localStorage.getItem('chutes_current_session_id') || localStorage.getItem('chutes_session_id');
                 if (currentSessionId) {
                     await supabaseService.deleteMediaItem(item, currentSessionId, userId);
                 }
@@ -373,11 +365,47 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         }
     };
 
-    const handleRenameMedia = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedMediaItem || !editTitleValue.trim()) return;
+    const handleBulkDelete = async () => {
+        if (selectedIds.size === 0) return;
+        if (confirm(`Are you sure you want to delete ${selectedIds.size} items?`)) {
+            const itemsToDelete = mediaHistory.filter(item => selectedIds.has(item.id));
+
+            setMediaHistory(prev => prev.filter(p => !selectedIds.has(p.id)));
+            setSelectedIds(new Set());
+            setIsSelectMode(false);
+
+            if (userId) {
+                try {
+                    await supabaseService.deleteMediaItems(itemsToDelete, userId);
+                } catch (e) {
+                    console.error("Bulk delete failure", e);
+                }
+            }
+        }
+    };
+
+    const toggleIdSelection = (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const handleRenameMedia = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!selectedMediaItem || !editTitleValue.trim()) {
+            setIsEditingTitle(false);
+            return;
+        }
 
         const newTitle = editTitleValue.trim();
+        if (newTitle === selectedMediaItem.title) {
+            setIsEditingTitle(false);
+            return;
+        }
 
         // Optimistic update
         setMediaHistory(prev => prev.map(item =>
@@ -386,9 +414,12 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         setSelectedMediaItem(prev => prev ? { ...prev, title: newTitle } : null);
         setIsEditingTitle(false);
 
-        // For authenticated users, update title in Supabase
-        if (isAuthenticated && userId) {
-            await supabaseService.updateMediaItemTitle(selectedMediaItem.id, newTitle);
+        if (userId) {
+            try {
+                await supabaseService.updateMediaItemTitle(selectedMediaItem.id, newTitle);
+            } catch (error) {
+                console.error('Failed to update title:', error);
+            }
         }
     };
 
@@ -638,19 +669,32 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                 <Grid className="w-5 h-5 text-primary" />
                                 Media History
                             </h3>
-                            <div className="flex bg-gray-100 dark:bg-white/5 rounded-lg p-1 border border-gray-200 dark:border-white/10">
-                                {(['all', 'image', 'video'] as const).map(f => (
-                                    <button
-                                        key={f}
-                                        onClick={() => setGalleryFilter(f)}
-                                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all capitalize ${galleryFilter === f
-                                            ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
-                                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                                            }`}
-                                    >
-                                        {f}
-                                    </button>
-                                ))}
+                            <div className="flex items-center gap-3">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        setIsSelectMode(!isSelectMode);
+                                        setSelectedIds(new Set());
+                                    }}
+                                    className={`h-8 text-xs font-semibold ${isSelectMode ? 'bg-primary/10 text-primary' : 'text-gray-500'}`}
+                                >
+                                    {isSelectMode ? 'Cancel Selection' : 'Select'}
+                                </Button>
+                                <div className="flex bg-gray-100 dark:bg-white/5 rounded-lg p-1 border border-gray-200 dark:border-white/10">
+                                    {(['all', 'image', 'video'] as const).map(f => (
+                                        <button
+                                            key={f}
+                                            onClick={() => setGalleryFilter(f)}
+                                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all capitalize ${galleryFilter === f
+                                                ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
+                                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                                                }`}
+                                        >
+                                            {f}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
 
@@ -665,9 +709,19 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                 {filteredHistory.map(item => (
                                     <div
                                         key={item.id}
-                                        onClick={() => setSelectedMediaItem(item)}
-                                        className="group relative rounded-xl overflow-hidden bg-gray-100 dark:bg-slate-800 aspect-square shadow-sm hover:shadow-lg transition-all border border-transparent hover:border-primary/30 cursor-pointer"
+                                        onClick={() => isSelectMode ? toggleIdSelection(item.id) : setSelectedMediaItem(item)}
+                                        className={`group relative rounded-xl overflow-hidden bg-gray-100 dark:bg-slate-800 aspect-square shadow-sm hover:shadow-lg transition-all border-2 cursor-pointer 
+                                            ${selectedIds.has(item.id) ? 'border-primary ring-2 ring-primary/20' : 'border-transparent hover:border-primary/30'}
+                                        `}
                                     >
+                                        {isSelectMode && (
+                                            <div
+                                                className={`absolute top-3 left-3 z-20 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all shadow-md ${selectedIds.has(item.id) ? 'bg-primary border-primary text-white scale-110' : 'bg-black/20 border-white/50 text-transparent'
+                                                    }`}
+                                            >
+                                                {selectedIds.has(item.id) && <Check className="w-4 h-4" />}
+                                            </div>
+                                        )}
                                         {item.type === 'video' ? (
                                             <>
                                                 <video src={item.url} className="w-full h-full object-cover pointer-events-none" />
@@ -697,6 +751,41 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {/* Bulk Action Bar */}
+                        {isSelectMode && selectedIds.size > 0 && (
+                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-10 duration-300 w-full max-w-sm px-4">
+                                <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl px-6 py-4 flex items-center gap-6 backdrop-blur-xl">
+                                    <div className="flex flex-col">
+                                        <span className="text-white font-bold text-sm">{selectedIds.size} Selected</span>
+                                        <span className="text-gray-400 text-[10px] uppercase font-bold tracking-widest">Media</span>
+                                    </div>
+                                    <div className="h-8 w-px bg-white/10 shrink-0"></div>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={handleBulkDelete}
+                                            className="h-9 px-3 rounded-xl flex items-center gap-2 shrink-0"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            <span className="hidden xs:inline">Delete</span>
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                setIsSelectMode(false);
+                                                setSelectedIds(new Set());
+                                            }}
+                                            className="h-9 px-3 rounded-xl text-white hover:bg-white/10 shrink-0"
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1078,12 +1167,14 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                     <form onSubmit={handleRenameMedia} className="flex items-center gap-2">
                                         <input
                                             autoFocus
-                                            className="bg-white/10 text-white rounded px-2 py-1 text-sm border border-white/30 focus:outline-none focus:border-primary"
+                                            className="bg-white/10 text-white rounded px-2 py-1 text-base border border-white/30 focus:outline-none focus:border-primary min-w-[200px]"
                                             value={editTitleValue}
                                             onChange={(e) => setEditTitleValue(e.target.value)}
-                                            onBlur={() => setIsEditingTitle(false)}
+                                            onBlur={() => handleRenameMedia()}
                                         />
-                                        <button type="submit" className="p-1 rounded-full bg-primary/20 hover:bg-primary/40 text-primary"><Check className="w-4 h-4" /></button>
+                                        <Button type="submit" size="icon" className="h-8 w-8 rounded-full bg-primary/20 hover:bg-primary/40 text-primary border-none">
+                                            <Check className="w-4 h-4" />
+                                        </Button>
                                     </form>
                                 ) : (
                                     <h3 className="text-white font-medium text-lg flex items-center gap-3">

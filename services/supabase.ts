@@ -321,10 +321,11 @@ export class SupabaseService {
       return data.map((row: any) => ({
         id: row.id,
         type: row.type,
-        title: row.title, // Retrieve title
+        title: row.title,
         url: row.url,
         prompt: row.prompt,
-        createdAt: new Date(row.created_at).getTime()
+        createdAt: new Date(row.created_at).getTime(),
+        sessionId: row.session_id
       }));
     } catch (e) {
       console.error("Error getting media history", e);
@@ -356,7 +357,8 @@ export class SupabaseService {
         title: row.title,
         url: row.url,
         prompt: row.prompt,
-        createdAt: new Date(row.created_at).getTime()
+        createdAt: new Date(row.created_at).getTime(),
+        sessionId: row.session_id
       }));
     } catch (e) {
       console.error("Error getting user media history", e);
@@ -369,13 +371,37 @@ export class SupabaseService {
     try {
       // 1. Delete from Storage
       const ext = item.type === 'video' ? 'mp4' : 'png';
-      const fileName = userId ? `${userId}/${sessionId}/${item.id}.${ext}` : `${sessionId}/${item.id}.${ext}`;
+      const sid = item.sessionId || sessionId;
+      const fileName = userId ? `${userId}/${sid}/${item.id}.${ext}` : `${sid}/${item.id}.${ext}`;
       await this.client.storage.from('media-assets').remove([fileName]);
 
       // 2. Delete from DB
       await this.client.from('media_history').delete().eq('id', item.id);
     } catch (e) {
       console.error("Error deleting media", e);
+    }
+  }
+
+  async deleteMediaItems(items: MediaItem[], userId: string): Promise<void> {
+    if (!this.client) return;
+    try {
+      // 1. Storage removal
+      const paths = items.map(item => {
+        const ext = item.type === 'video' ? 'mp4' : 'png';
+        const sid = item.sessionId;
+        if (!sid) return null;
+        return `${userId}/${sid}/${item.id}.${ext}`;
+      }).filter(Boolean) as string[];
+
+      if (paths.length > 0) {
+        await this.client.storage.from('media-assets').remove(paths);
+      }
+
+      // 2. DB removal
+      const ids = items.map(i => i.id);
+      await this.client.from('media_history').delete().in('id', ids);
+    } catch (e) {
+      console.error("Bulk delete failure", e);
     }
   }
 

@@ -33,6 +33,7 @@ export interface MediaItem {
   url: string;
   prompt: string;
   createdAt: number;
+  sessionId?: string;
 }
 
 export interface FileAttachment {

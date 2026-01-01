@@ -13,6 +13,7 @@ import { AppSettings, DEFAULT_SYSTEM_PROMPT, ChatSession } from './types';
 import { SupabaseService } from './services/supabase';
 import { useAuthContext } from './context/AuthContext';
 import { useCredits } from './context/CreditContext';
+import { summarizePrompt } from './utils/stringUtils';
 
 const DEFAULT_SETTINGS: AppSettings = {
   apiKey: 'internal', // Use internal default key
@@ -175,12 +176,13 @@ const App: React.FC = () => {
 
   const updateSessionPreview = async (id: string, preview: string) => {
     const timestamp = Date.now();
-    const sessionToSave = { id, title: preview.slice(0, 30), updatedAt: timestamp, preview } as ChatSession;
+    const shortTitle = summarizePrompt(preview);
+    const sessionToSave = { id, title: shortTitle, updatedAt: timestamp, preview } as ChatSession;
 
     // Functional update to ensure no race conditions
     setSessions(prevSessions => {
       const updatedSessions = prevSessions.map(s =>
-        s.id === id ? { ...s, title: s.title === 'New Conversation' ? (preview.slice(0, 30) || 'Conversation') : s.title, preview, updatedAt: timestamp } : s
+        s.id === id ? { ...s, title: s.title === 'New Conversation' ? (shortTitle || 'Conversation') : s.title, preview, updatedAt: timestamp } : s
       );
       updatedSessions.sort((a, b) => b.updatedAt - a.updatedAt);
 
@@ -343,12 +345,22 @@ const App: React.FC = () => {
         <header className="flex-none flex items-center justify-between px-2 sm:px-6 py-3 sm:py-4 z-20 gap-2 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-slate-900/40 backdrop-blur-xl">
 
           <div className="flex items-center gap-2 min-w-0">
-            {/* Sidebar Toggle - Only Desktop */}
+            {/* Sidebar Toggle - Hidden Desktop, Show Mobile Menu */}
+            <Button
+              variant="glass"
+              size="icon"
+              className="lg:hidden shrink-0 h-9 w-9 text-slate-500 dark:text-slate-400"
+              onClick={() => setIsSidebarOpen(true)}
+              title="History"
+            >
+              <PanelLeftOpen className="w-5 h-5" />
+            </Button>
+
             {!isSidebarOpen && (
               <Button
                 variant="glass"
                 size="icon"
-                className="hidden lg:flex shrink-0"
+                className="hidden lg:flex shrink-0 h-9 w-9"
                 onClick={() => setIsSidebarOpen(true)}
                 title="Open Sidebar"
               >
@@ -371,8 +383,8 @@ const App: React.FC = () => {
               <button
                 onClick={() => setCurrentView('chat')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${currentView === 'chat'
-                    ? 'bg-primary/10 text-primary shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  ? 'bg-primary/10 text-primary shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                   }`}
               >
                 <MessageSquare className="w-4 h-4" />
@@ -381,8 +393,8 @@ const App: React.FC = () => {
               <button
                 onClick={() => setCurrentView('media')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${currentView === 'media'
-                    ? 'bg-primary/10 text-primary shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  ? 'bg-primary/10 text-primary shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                   }`}
               >
                 <ImageIcon className="w-4 h-4" />
