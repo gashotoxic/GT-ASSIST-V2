@@ -67,7 +67,7 @@ export const UserProfile: React.FC = () => {
           </div>
         )}
 
-        <div className={`px-2 py-0.5 rounded-full text-[10px] font-black tracking-widest ${getTierColor(subscriptionTier)} shadow-sm`}>
+        <div className={`hidden sm:block px-2 py-0.5 rounded-full text-[10px] font-black tracking-widest ${getTierColor(subscriptionTier)} shadow-sm`}>
           {getTierLabel(subscriptionTier)}
         </div>
 

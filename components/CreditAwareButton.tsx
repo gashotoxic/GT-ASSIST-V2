@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from './UI';
 import { useCredits } from '../context/CreditContext';
 import { useAuthContext } from '../context/AuthContext';
+import { LogIn } from 'lucide-react';
 
 interface CreditAwareButtonProps {
   action: 'chat' | 'image' | 'video' | 'edit';
@@ -37,7 +38,7 @@ export function CreditAwareButton({
     return (
       <Button
         variant="primary"
-        size={size === 'icon' ? 'md' : (size || 'md')}
+        size={size === 'icon' ? 'icon' : (size || 'md')}
         onClick={() => {
           if (onRequestAuth) {
             onRequestAuth();
@@ -46,9 +47,13 @@ export function CreditAwareButton({
             window.dispatchEvent(new CustomEvent('request-auth', { detail: { mode: 'signin' } }));
           }
         }}
-        className={`whitespace-nowrap min-w-max px-4 font-bold uppercase tracking-tight text-[10px] h-8 rounded-full shadow-md shadow-primary/20 ${className}`}
+        className={size === 'icon'
+          ? `rounded-full shadow-md shadow-primary/20 ${className}`
+          : `whitespace-nowrap min-w-max px-4 font-bold uppercase tracking-tight text-[10px] h-8 rounded-full shadow-md shadow-primary/20 ${className}`
+        }
+        title="Sign In"
       >
-        Sign In
+        {size === 'icon' ? <LogIn className="w-4 h-4 ml-0.5" /> : "Sign In"}
       </Button>
     );
   }

@@ -431,14 +431,17 @@ const App: React.FC = () => {
               </button>
             )}
 
-            {/* Credit Display */}
-            <div
-              onClick={() => setCurrentView('pricing')}
-              className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 cursor-pointer transition-colors"
-            >
-              <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
-              <span className="text-xs sm:text-sm font-bold text-primary">{credits}</span>
-            </div>
+            {/* Credit Display - Hide for Guests to save space */}
+            {isSignedIn && (
+              <div
+                onClick={() => setCurrentView('pricing')}
+                className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 cursor-pointer transition-colors"
+                title="Current Credits"
+              >
+                <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
+                <span className="text-xs sm:text-sm font-bold text-primary">{credits}</span>
+              </div>
+            )}
 
             {/* User & Settings */}
             <div className="flex items-center gap-2">

@@ -631,8 +631,8 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
             {/* Header Tabs */}
             <div className="flex border-b border-gray-200/50 dark:border-white/10 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl overflow-x-auto shrink-0">
                 {[
-                    { id: 'image', label: 'Generator', icon: Image },
-                    { id: 'edit', label: 'Magic Edit', icon: Scissors },
+                    { id: 'image', label: 'Image', icon: Image },
+                    { id: 'edit', label: 'Editor', icon: Scissors },
                     { id: 'video', label: 'Animator', icon: Film },
                     { id: 'gallery', label: 'Gallery', icon: Grid }
                 ].map((tab) => (
