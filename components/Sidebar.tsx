@@ -1,8 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, MessageSquare, Trash2, X, Pencil, Check, PanelLeftClose, ChevronLeft, GitBranch } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, X, Pencil, Check, PanelLeftClose, ChevronLeft, GitBranch, Zap, ChevronRight } from 'lucide-react';
 import { ChatSession } from '../types';
 import { Button } from './UI';
+import { useCredits } from '../context/CreditContext';
+import { useUser } from '@clerk/clerk-react';
 
 interface SidebarProps {
     isOpen: boolean;
@@ -220,26 +222,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
 
                     {/* Sidebar Footer - Settings/Theme for Mobile */}
-                    {(toggleTheme || onOpenSettings) && (
-                        <div className="lg:hidden p-4 border-t border-white/20 dark:border-white/5 flex items-center justify-center bg-slate-50/50 dark:bg-slate-900/50 gap-4 shrink-0">
-                            <button
-                                onClick={toggleTheme}
-                                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-white/50 dark:bg-white/5 border border-white/20 dark:border-white/10"
-                            >
-                                {theme === 'dark' ? (
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-200">Light Mode</span>
-                                    </div>
-                                ) : (
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-600"></div>
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-700">Dark Mode</span>
-                                    </div>
-                                )}
-                            </button>
+                    <div className="p-4 border-t border-white/20 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+
+                        <div className="flex items-center gap-2">
+                            {toggleTheme && (
+                                <button
+                                    onClick={toggleTheme}
+                                    className="flex-1 flex items-center justify-center py-2.5 rounded-xl bg-white/50 dark:bg-white/5 border border-white/20 dark:border-white/10 hover:bg-white/80 dark:hover:bg-white/10 transition-all"
+                                >
+                                    {theme === 'dark' ? (
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-200">Light</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-slate-600"></div>
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-700">Dark</span>
+                                        </div>
+                                    )}
+                                </button>
+                            )}
+
+                            {onOpenSettings && (
+                                <button
+                                    onClick={onOpenSettings}
+                                    className="p-2.5 rounded-xl bg-white/50 dark:bg-white/5 border border-white/20 dark:border-white/10 hover:text-primary transition-all"
+                                >
+                                    <Zap className="w-4 h-4 text-gray-500" />
+                                </button>
+                            )}
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
         </>

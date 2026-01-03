@@ -29,7 +29,7 @@ type SettingsTab = 'general' | 'ai' | 'tts' | 'cloud' | 'api';
 
 export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOpen, onClose, settings, onSave }) => {
     const { user } = useUser();
-    const { subscriptionTier } = useCredits();
+    const { subscriptionTier, dailyCredits, credits } = useCredits();
     const [activeTab, setActiveTab] = useState<SettingsTab>('ai');
     const [formData, setFormData] = useState<AppSettings>(settings);
     const [isCustomModel, setIsCustomModel] = useState(!AVAILABLE_MODELS.some(m => m.id === settings.model));
@@ -106,10 +106,28 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
                             <Zap className="w-4 h-4 text-primary fill-primary" />
                             <span className="text-[10px] font-black uppercase tracking-widest text-primary">Member Status</span>
                         </div>
-                        <p className="text-xs font-bold text-gray-800 dark:text-white uppercase">{subscriptionTier} TIER</p>
+                        <p className="text-xs font-bold text-gray-800 dark:text-white uppercase mb-4">{subscriptionTier} TIER</p>
+
+                        <div className="space-y-3 pt-3 border-t border-primary/10">
+                            <div className="flex justify-between items-center">
+                                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Daily Allowance</span>
+                                <span className="text-sm font-black text-primary">{dailyCredits}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Permanent Credits</span>
+                                <span className="text-sm font-black text-gray-700 dark:text-gray-300">{credits}</span>
+                            </div>
+                        </div>
+
                         {!isPro && (
-                            <button className="mt-3 text-[10px] font-bold text-primary hover:underline flex items-center gap-1 uppercase tracking-tighter">
-                                Upgrade for API Control <ChevronRight className="w-3 h-3" />
+                            <button
+                                onClick={() => {
+                                    onClose();
+                                    const event = new CustomEvent('open-view', { detail: 'pricing' });
+                                    window.dispatchEvent(event);
+                                }}
+                                className="mt-4 w-full py-2 rounded-xl bg-primary text-[9px] font-bold text-white uppercase tracking-widest hover:opacity-90 transition-all flex items-center justify-center gap-1">
+                                Upgrade Plan <ChevronRight className="w-3 h-3" />
                             </button>
                         )}
                     </div>

@@ -5,6 +5,7 @@ import { DEFAULT_CREDITS, getCreditCost, CREDIT_COSTS } from '../services/credit
 
 interface CreditContextType {
   credits: number;
+  dailyCredits: number;
   subscriptionTier: 'free' | 'basic' | 'plus' | 'pro';
   loading: boolean;
   canAfford: (action: string, model: string) => boolean;
@@ -13,52 +14,51 @@ interface CreditContextType {
 
 export const CreditContext = createContext<CreditContextType>({
   credits: 0,
+  dailyCredits: 0,
   subscriptionTier: 'free',
   loading: true,
   canAfford: () => false,
-  refetch: async () => {},
+  refetch: async () => { },
 });
 
 export function CreditProvider({ children }: { children: React.ReactNode }) {
   const { userId, isSignedIn } = useAuthContext();
   const [credits, setCredits] = useState(0);
+  const [dailyCredits, setDailyCredits] = useState(0);
   const [tier, setTier] = useState<'free' | 'basic' | 'plus' | 'pro'>('free');
   const [loading, setLoading] = useState(true);
   const [supabaseService, setSupabaseService] = useState<SupabaseService | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
 
-  // Initialize Supabase service
+  // Initialize Supabase service when user is signed in
   useEffect(() => {
-    if (isSignedIn) {
+    if (isSignedIn && userId) {
       const supabaseUrl = import.meta.env.VITE_APP_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_APP_SUPABASE_KEY;
-      
+
       if (supabaseUrl && supabaseKey) {
-        const settings = {
+        const service = new SupabaseService({
+          apiKey: 'internal',
+          model: '',
+          systemPrompt: '',
+          ttsVoice: '',
+          ttsSpeed: 1,
           useSupabase: true,
           supabaseUrl,
           supabaseKey,
-          apiKey: '',
-          model: 'zai-org/GLM-4.6',
-          systemPrompt: '',
-          ttsVoice: 'af_heart',
-          ttsSpeed: 1.0,
-          searchProvider: 'tavily' as const
-        };
-        setSupabaseService(new SupabaseService(settings));
-      } else {
-        console.error('App Supabase configuration missing');
-        setSyncError('Supabase not configured - please contact support');
-        setLoading(false);
+          searchProvider: 'tavily',
+        });
+        setSupabaseService(service);
       }
     } else {
-      setLoading(false);
+      setSupabaseService(null);
     }
-  }, [isSignedIn]);
+  }, [isSignedIn, userId]);
 
   const fetchCredits = async () => {
     if (!isSignedIn || !userId) {
       setCredits(0);
+      setDailyCredits(0);
       setTier('free');
       setLoading(false);
       return;
@@ -74,6 +74,7 @@ export function CreditProvider({ children }: { children: React.ReactNode }) {
       const profile = await supabaseService.getUserProfile(userId);
       if (profile) {
         setCredits(profile.credits || 0);
+        setDailyCredits(profile.daily_credits || 0);
         setTier((profile.subscription_tier as 'free' | 'basic' | 'plus' | 'pro') || 'free');
         setSyncError(null);
       } else {
@@ -81,12 +82,14 @@ export function CreditProvider({ children }: { children: React.ReactNode }) {
         console.error('User profile not found in Supabase - sync may have failed');
         setSyncError('User not found in database - please sign out and sign in again');
         setCredits(0);
+        setDailyCredits(0);
         setTier('free');
       }
     } catch (error: any) {
       console.error('Failed to fetch credits from Supabase:', error);
       setSyncError(error.message || 'Failed to load credits');
       setCredits(0);
+      setDailyCredits(0);
       setTier('free');
     } finally {
       setLoading(false);
@@ -102,28 +105,40 @@ export function CreditProvider({ children }: { children: React.ReactNode }) {
     fetchCredits();
 
     // Set up real-time subscription to credit changes
-    const channel = supabaseService.subscribeToCredits(userId, (newCredits) => {
-      console.log('Real-time credit update:', newCredits);
-      setCredits(newCredits);
+    const channel = supabaseService.subscribeToUserUpdates(userId, {
+      onCreditChange: (newCredits) => {
+        console.log('Real-time credit update:', newCredits);
+        setCredits(newCredits);
+      },
+      onProfileUpdate: (profile) => {
+        if (profile.daily_credits !== undefined) {
+          setDailyCredits(profile.daily_credits);
+        }
+        if (profile.subscription_tier) {
+          setTier(profile.subscription_tier as 'free' | 'basic' | 'plus' | 'pro');
+        }
+      }
     });
 
     return () => {
-      if (channel && supabaseService) {
-        supabaseService.removeChannel(channel);
+      // Logic for multi-channel unsubscribe in supabaseService
+      if (Array.isArray(channel)) {
+        channel.forEach(c => supabaseService.removeChannel(c));
       }
     };
   }, [userId, supabaseService, isSignedIn]);
-const canAfford = (action: string, model: string) => {
-  if (tier === 'pro') return true; // Unlimited
+  const canAfford = (action: string, model: string) => {
+    if (tier === 'pro') return true; // Unlimited
 
-  const cost = getCreditCost(action as keyof typeof CREDIT_COSTS, model);
-  return credits >= cost;
-};
+    const cost = getCreditCost(action as keyof typeof CREDIT_COSTS, model);
+    return (credits + dailyCredits) >= cost;
+  };
 
   return (
     <CreditContext.Provider
       value={{
         credits,
+        dailyCredits,
         subscriptionTier: tier,
         loading,
         canAfford,

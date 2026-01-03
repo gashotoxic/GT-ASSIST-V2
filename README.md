@@ -5,6 +5,7 @@ A next-generation AI Assistant platform featuring real-time Chat, Voice, Image G
 ## 🚀 Key Features
 
 *   **Multi-Model Chat**: DeepSeek R1 (Thinking), GLM-4, Qwen VL, and more.
+*   **Conversation Intelligence**: Message editing, retrying, and branching.
 *   **Media Studio**:
     *   **Generator**: High-quality images (Hunyuan, Flux).
     *   **Magic Editor**: Edit images with simple text commands.
@@ -13,7 +14,7 @@ A next-generation AI Assistant platform featuring real-time Chat, Voice, Image G
 *   **Cloud Sync**: Persist your history and media via Supabase.
 *   **Voice Engine**: STT (Whisper) and TTS (Kokoro) with 28 premium voices.
 
-## 📊 Status: Phase 2 Started
+## 📊 Status: Phase 3 Started
 
 **Phase 1 (Monetization & Foundation): ✅ 100% COMPLETE**
 *   Clerk Auth 
@@ -21,9 +22,14 @@ A next-generation AI Assistant platform featuring real-time Chat, Voice, Image G
 *   Paystack Payment Gateway (Live)
 *   Unified Credit System
 
-**Phase 2 (Experience Enhancements): 🔄 IN PROGRESS**
-*   Message Actions (Copy/Delete)
+**Phase 2 (Experience Enhancements): ✅ 100% COMPLETE**
+*   Message Actions (Edit/Retry)
+*   Conversation Branching
+*   Gallery Polish & Multi-select
+
+**Phase 3 (Advanced Intelligence): 🔄 IN PROGRESS**
 *   Advanced Knowledge Grounding
+*   Media Studio Intelligence
 
 ## 🛠️ Setup
 
@@ -36,8 +42,8 @@ Detailed guide: [docs/SETUP.md](docs/SETUP.md)
 
 ## 📚 Resources
 
-*   [🏗️ Master Plan](react_implementation_plan.md)
 *   [🎯 Status Report](IMPLEMENTATION_STATUS.md)
+*   [🏗️ Tech Context](PROJECT_CONTEXT.md)
 *   [💳 Paystack Guide](docs/PAYSTACK_SETUP_GUIDE.md)
 *   [🗄️ Database Architecture](docs/DATABASE.md)
 

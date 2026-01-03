@@ -15,11 +15,19 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
     const { credits, subscriptionTier, refetch } = useCredits();
     const [loading, setLoading] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [showSuccess, setShowSuccess] = useState(false);
     const [config, setConfig] = useState<any>(null);
     const initializePayment = usePaystackPayment(config);
 
     const handlePaystackSuccess = (reference: any) => {
         console.log('Payment successful:', reference);
+        setLoading(null);
+        setShowSuccess(true);
+        setError(null);
+
+        // Hide success message after 5 seconds
+        setTimeout(() => setShowSuccess(false), 5000);
+
         // Refresh credits after a delay to allow webhook to process
         setTimeout(() => {
             refetch();
@@ -120,24 +128,39 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
                         </p>
                     </div>
 
-                    <div className="glass-card p-4 md:p-6 rounded-2xl border border-white/20 dark:border-white/5 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl w-full md:min-w-[280px] flex flex-col items-center shadow-lg">
+                    <div className="glass-card p-4 md:p-6 rounded-2xl border border-white/20 dark:border-white/5 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl w-full md:min-w-[320px] flex flex-col items-center shadow-lg">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-3">
                             <CreditCard className="w-5 h-5 text-primary" />
                         </div>
-                        <span className="text-slate-500 dark:text-slate-400 text-[10px] font-semibold uppercase tracking-wider">Current Balance</span>
-                        <div className="flex items-baseline gap-2 mt-1">
-                            <span className="text-3xl font-bold">{credits}</span>
-                            <span className="text-slate-400 text-xs font-medium">Credits</span>
+                        <span className="text-slate-500 dark:text-slate-400 text-[10px] font-semibold uppercase tracking-wider">Your Balance</span>
+
+                        <div className="grid grid-cols-2 gap-4 w-full mt-2">
+                            <div className="flex flex-col items-center border-r border-slate-200 dark:border-slate-800">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase">Daily</span>
+                                <span className="text-2xl font-bold">{useCredits().dailyCredits}</span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase">Permanent</span>
+                                <span className="text-2xl font-bold">{credits}</span>
+                            </div>
                         </div>
-                        <div className="mt-3 px-3 py-1 bg-primary/10 rounded-full text-[9px] font-bold uppercase tracking-wider text-primary">
+
+                        <div className="mt-4 px-3 py-1 bg-primary/10 rounded-full text-[9px] font-bold uppercase tracking-wider text-primary">
                             {subscriptionTier} tier
                         </div>
                     </div>
                 </div>
 
                 {error && (
-                    <div className="mb-8 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/20 text-red-600 dark:text-red-400 text-sm text-center">
+                    <div className="mb-8 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/20 text-red-600 dark:text-red-400 text-sm text-center animate-in fade-in slide-in-from-top-2">
                         {error}
+                    </div>
+                )}
+
+                {showSuccess && (
+                    <div className="mb-8 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/20 text-emerald-600 dark:text-emerald-400 text-sm text-center font-bold animate-in fade-in slide-in-from-top-2 flex items-center justify-center gap-2">
+                        <Check className="w-5 h-5" />
+                        Payment successful! Your credits will be updated shortly.
                     </div>
                 )}
 
@@ -237,7 +260,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
                                                     ? 'bg-primary text-white hover:bg-primary-dark shadow-lg shadow-primary/20'
                                                     : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-black dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                                     >
-                                        {loading === plan.id ? 'Loading...' : isCurrentPlan ? 'Current Plan' : `Join ${plan.name}`}
+                                        {loading === plan.id ? 'Processing...' : isCurrentPlan ? 'Current Plan' : `Join ${plan.name}`}
                                     </Button>
                                 </div>
                             );

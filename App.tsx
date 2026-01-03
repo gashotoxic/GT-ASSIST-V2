@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Settings, Sparkles, AlertCircle, Moon, Sun, MessageSquare, Image as ImageIcon, Menu, Database, Monitor, PanelLeftOpen, CreditCard, Bot, Zap } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import MediaStudio from './components/MediaStudio';
-import SettingsModal from './components/SettingsModal';
 import { AuthModal } from './components/AuthModal';
 import { UserProfile } from './components/UserProfile';
 import { Sidebar } from './components/Sidebar';
@@ -28,7 +27,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 const App: React.FC = () => {
   const { isSignedIn, isLoaded, userId } = useAuthContext();
-  const { credits } = useCredits();
+  const { credits, dailyCredits, subscriptionTier } = useCredits();
 
   const [showAuthModal, setShowAuthModal] = useState(false);
 
@@ -40,7 +39,6 @@ const App: React.FC = () => {
     return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
   });
 
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [currentView, setCurrentView] = useState<'chat' | 'media' | 'pricing'>('chat');
 
@@ -79,6 +77,19 @@ const App: React.FC = () => {
   }, [settings, isSignedIn]);
 
   // -- INIT / LOAD SESSIONS --
+  // Clear stale session IDs when user changes to prevent cross-user leakage
+  const [lastUserId, setLastUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (userId !== lastUserId) {
+      // User changed - clear any cached session to prevent cross-user leakage
+      localStorage.removeItem('chutes_current_session_id');
+      setCurrentSessionId('');
+      setSessions([]);
+      setLastUserId(userId || null);
+    }
+  }, [userId]);
+
   useEffect(() => {
     const loadSessions = async () => {
       // CLEAR current view while loading to prevent mixing
@@ -86,9 +97,9 @@ const App: React.FC = () => {
       let loadedSessions: ChatSession[] = [];
 
       // For authenticated users: ONLY use Supabase, NO fallbacks
-      if (isSignedIn) {
+      if (isSignedIn && userId) {
         try {
-          const testResult = await supabaseService.getSessions(userId || undefined);
+          const testResult = await supabaseService.getSessions(userId);
           loadedSessions = testResult;
         } catch (error) {
           console.error("Failed to load sessions from Supabase:", error);
@@ -97,7 +108,7 @@ const App: React.FC = () => {
           createNewSessionInternal();
           return;
         }
-      } else {
+      } else if (!isSignedIn) {
         // Guest users: use localStorage
         const saved = localStorage.getItem('chutes_chat_sessions');
         if (saved) {
@@ -108,20 +119,15 @@ const App: React.FC = () => {
       // If we have sessions, load them. If not, create a default one.
       if (loadedSessions.length > 0) {
         setSessions(loadedSessions);
-        // If current session ID isn't in list, select the first one
-        const lastId = localStorage.getItem('chutes_current_session_id');
-        if (lastId && loadedSessions.find(s => s.id === lastId)) {
-          setCurrentSessionId(lastId);
-        } else {
-          setCurrentSessionId(loadedSessions[0].id);
-        }
-      } else {
+        // Select the first one (don't trust localStorage for authenticated users)
+        setCurrentSessionId(loadedSessions[0].id);
+      } else if (isSignedIn || !isSignedIn) {
         // No sessions found, create the first one explicitly
         createNewSessionInternal();
       }
     };
     loadSessions();
-  }, [supabaseService, isSignedIn]);
+  }, [supabaseService, isSignedIn, userId]);
 
   // Helper to create session without triggering sidebar logic
   const createNewSessionInternal = () => {
@@ -337,7 +343,7 @@ const App: React.FC = () => {
         onRenameSession={handleRenameSession}
         theme={theme}
         toggleTheme={toggleTheme}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={() => setIsAccountSettingsOpen(true)}
       />
 
       {/* Main Layout */}
@@ -438,10 +444,12 @@ const App: React.FC = () => {
               <div
                 onClick={() => setCurrentView('pricing')}
                 className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 cursor-pointer transition-colors"
-                title="Current Credits"
+                title={subscriptionTier === 'pro' ? 'Pro Plan - Unlimited' : 'Total Credits (Daily + Permanent)'}
               >
                 <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
-                <span className="text-xs sm:text-sm font-bold text-primary">{credits}</span>
+                <span className="text-xs sm:text-sm font-bold text-primary">
+                  {subscriptionTier === 'pro' ? '∞' : (credits + (dailyCredits || 0))}
+                </span>
               </div>
             )}
 
@@ -522,16 +530,6 @@ const App: React.FC = () => {
 
         {/* Mobile Navigation Moved to Top Header - No Bottom Nav Needed */}
       </div>
-
-      {/* Settings Modal */}
-      {isSettingsOpen && (
-        <SettingsModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-          settings={settings}
-          onSave={setSettings}
-        />
-      )}
 
       {/* Account Settings Modal */}
       {isAccountSettingsOpen && (

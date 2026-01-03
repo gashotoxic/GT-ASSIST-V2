@@ -570,7 +570,7 @@ export class SupabaseService {
       .from('subscriptions')
       .insert({
         user_id: userId,
-        stripe_subscription_id: subscriptionData.stripe_subscription_id,
+        paystack_subscription_code: subscriptionData.stripe_subscription_id || subscriptionData.paystack_subscription_code, // Support both for transition
         tier: subscriptionData.tier,
         status: subscriptionData.status,
         price_amount: subscriptionData.price_amount,

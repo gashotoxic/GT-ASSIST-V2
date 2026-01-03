@@ -37,7 +37,7 @@ interface GenerationState {
 
 const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, onRequestAuth, userId }) => {
     const [activeTab, setActiveTab] = useState<GenType | 'gallery'>('image');
-    const { refetch, credits } = useCredits();
+    const { refetch, credits, dailyCredits, subscriptionTier, canAfford } = useCredits();
 
     // Independent state for each tab to allow parallel generation
     const [genStatus, setGenStatus] = useState<Record<GenType, GenerationState>>({
@@ -846,7 +846,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                     <div>
                                         <Button
                                             onClick={() => isAuthenticated ? handleImageGeneration() : onRequestAuth()}
-                                            disabled={genStatus.image.isGenerating || !imagePrompt || !isAuthenticated || credits < 1}
+                                            disabled={genStatus.image.isGenerating || !imagePrompt || !isAuthenticated || !canAfford('image', selectedImageModel)}
                                             className={`w-full h-14 text-lg font-semibold rounded-xl shadow-xl transition-all ${genStatus.image.isGenerating ? 'opacity-80' : 'hover:scale-[1.02] shadow-primary/20'}`}
                                         >
                                             {genStatus.image.isGenerating ? 'Generating...' : (isAuthenticated ? <><Sparkles className="w-5 h-5 mr-2" /> Generate Image</> : 'Sign In to Generate Image')}
@@ -918,7 +918,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                     <div>
                                         <Button
                                             onClick={() => isAuthenticated ? handleEditGeneration() : onRequestAuth()}
-                                            disabled={genStatus.edit.isGenerating || !editPrompt || !editSourceImage || !isAuthenticated || credits < 1}
+                                            disabled={genStatus.edit.isGenerating || !editPrompt || !editSourceImage || !isAuthenticated || !canAfford('edit', 'qwen-image-edit')}
                                             className={`w-full h-14 text-lg font-semibold rounded-xl shadow-xl transition-all ${genStatus.edit.isGenerating ? 'opacity-80' : 'hover:scale-[1.02] shadow-primary/20'}`}
                                         >
                                             {genStatus.edit.isGenerating ? 'Applying Magic...' : (isAuthenticated ? <><Scissors className="w-5 h-5 mr-2" /> Apply Edits</> : 'Sign In to Apply Edits')}
@@ -1019,7 +1019,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                     <div>
                                         <Button
                                             onClick={() => isAuthenticated ? handleVideoGeneration() : onRequestAuth()}
-                                            disabled={genStatus.video.isGenerating || !videoPrompt || (videoMode === 'i2v' && !sourceImage) || !isAuthenticated || credits < 1}
+                                            disabled={genStatus.video.isGenerating || !videoPrompt || (videoMode === 'i2v' && !sourceImage) || !isAuthenticated || !canAfford('video', selectedVideoModel)}
                                             className={`w-full h-14 text-lg font-semibold rounded-xl shadow-xl transition-all ${genStatus.video.isGenerating ? 'opacity-80' : 'hover:scale-[1.02] shadow-primary/20'}`}
                                         >
                                             {genStatus.video.isGenerating ? 'Animating...' : (isAuthenticated ? <><Film className="w-5 h-5 mr-2" /> Animate Video</> : 'Sign In to Animate Video')}
