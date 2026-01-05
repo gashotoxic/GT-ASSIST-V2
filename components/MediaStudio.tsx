@@ -1261,11 +1261,30 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                 <Maximize2 className="w-4 h-4 mr-2" /> Fullscreen
                             </Button>
 
-                            <a href={selectedMediaItem.url} download>
-                                <Button variant="glass" className="text-white border-white/20 hover:bg-white/10">
-                                    <Download className="w-4 h-4 mr-2" /> Download
-                                </Button>
-                            </a>
+                            <Button
+                                variant="glass"
+                                className="text-white border-white/20 hover:bg-white/10"
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                        const response = await fetch(selectedMediaItem.url);
+                                        const blob = await response.blob();
+                                        const blobUrl = window.URL.createObjectURL(blob);
+                                        const link = document.createElement('a');
+                                        link.href = blobUrl;
+                                        link.download = `${selectedMediaItem.title || 'download'}.${selectedMediaItem.type === 'video' ? 'mp4' : 'png'}`;
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                        window.URL.revokeObjectURL(blobUrl);
+                                    } catch (err) {
+                                        console.error('Download failed:', err);
+                                        window.open(selectedMediaItem.url, '_blank');
+                                    }
+                                }}
+                            >
+                                <Download className="w-4 h-4 mr-2" /> Download
+                            </Button>
 
                             {selectedMediaItem.type === 'image' && (
                                 <>
