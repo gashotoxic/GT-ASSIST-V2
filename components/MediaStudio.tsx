@@ -48,7 +48,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
 
     // Image Gen State
     const [imagePrompt, setImagePrompt] = useState('');
-    const [selectedImageModel, setSelectedImageModel] = useState('z-image-turbo');
+    const [selectedImageModel, setSelectedImageModel] = useState('qwen-image-2.5-12b');
     const [customImageModelUrl, setCustomImageModelUrl] = useState('');
     const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
 
@@ -1197,7 +1197,38 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                         </div>
 
                         {/* Center Content */}
-                        <div className="flex-1 flex items-center justify-center overflow-hidden p-4">
+                        <div className="flex-1 flex items-center justify-center overflow-hidden p-4 relative w-full group/lightbox">
+
+                            {/* Previous Button (Newer) */}
+                            {filteredHistory.findIndex(i => i.id === selectedMediaItem.id) > 0 && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const idx = filteredHistory.findIndex(i => i.id === selectedMediaItem.id);
+                                        if (idx > 0) setSelectedMediaItem(filteredHistory[idx - 1]);
+                                    }}
+                                    className="absolute left-4 z-20 p-3 rounded-full bg-black/50 text-white hover:bg-white/20 hover:scale-110 transition-all opacity-0 group-hover/lightbox:opacity-100"
+                                    title="Previous"
+                                >
+                                    <ArrowRight className="w-6 h-6 rotate-180" />
+                                </button>
+                            )}
+
+                            {/* Next Button (Older) */}
+                            {filteredHistory.findIndex(i => i.id === selectedMediaItem.id) < filteredHistory.length - 1 && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const idx = filteredHistory.findIndex(i => i.id === selectedMediaItem.id);
+                                        if (idx < filteredHistory.length - 1) setSelectedMediaItem(filteredHistory[idx + 1]);
+                                    }}
+                                    className="absolute right-4 z-20 p-3 rounded-full bg-black/50 text-white hover:bg-white/20 hover:scale-110 transition-all opacity-0 group-hover/lightbox:opacity-100"
+                                    title="Next"
+                                >
+                                    <ArrowRight className="w-6 h-6" />
+                                </button>
+                            )}
+
                             {selectedMediaItem.type === 'video' ? (
                                 <video
                                     src={selectedMediaItem.url}

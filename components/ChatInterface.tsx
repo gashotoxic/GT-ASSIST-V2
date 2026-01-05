@@ -1,14 +1,20 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Mic, Square, Loader2, Volume2, Bot, User, StopCircle, Paperclip, X, FileText, Play, Search, Globe, Pause, RotateCcw, BrainCircuit, Edit3, Cpu, Copy, GitBranch, Check } from 'lucide-react';
+import { Send, Mic, Square, Loader2, Volume2, Bot, User, StopCircle, Paperclip, X, FileText, Play, Search, Globe, Pause, RotateCcw, BrainCircuit, Edit3, Cpu, Copy, GitBranch, Check, Database, Lock } from 'lucide-react';
 import { Button } from './UI';
-import { Message, AppSettings, FileAttachment, ChatSession, AVAILABLE_MODELS } from '../types';
+import { Message, AppSettings, FileAttachment, ChatSession, AVAILABLE_MODELS, BASE_SYSTEM_CONTEXT, DEFAULT_SYSTEM_PROMPT } from '../types';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { ChutesService } from '../services/chutes';
 import { SupabaseService } from '../services/supabase';
+import { KnowledgeBaseService } from '../services/knowledgeBase';
+import { KnowledgeBaseModal } from './KnowledgeBaseModal';
+import { SearchResultsCard } from './SearchResultsCard';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { CreditAwareButton } from './CreditAwareButton';
 import { useCredits } from '../context/CreditContext';
 import { useAuthContext } from '../context/AuthContext';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import { getCreditCost } from '../services/creditCosts';
 import { EditMessageModal } from './EditMessageModal';
 import { BranchModelModal } from './BranchModelModal';
@@ -48,6 +54,8 @@ const formatModelName = (modelId: string) => {
 };
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSessionUpdate, onSwitchSession, onNewSession, isAuthenticated, onRequestAuth, userId }) => {
+  const { subscriptionTier } = useCredits();
+  const { getToken } = useAuthContext();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -57,6 +65,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
   const [attachment, setAttachment] = useState<FileAttachment | null>(null);
   const [generatingAudioId, setGeneratingAudioId] = useState<string | null>(null);
   const [isSearchEnabled, setIsSearchEnabled] = useState(false);
+  const [isKnowledgeEnabled, setIsKnowledgeEnabled] = useState(false);
+  const [showKnowledgeModal, setShowKnowledgeModal] = useState(false);
   const [editingMessage, setEditingMessage] = useState<{ message: Message; index: number } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [branchingIndex, setBranchingIndex] = useState<number | null>(null);
@@ -76,6 +86,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
   const { canAfford, refetch } = useCredits();
 
   const chutesService = new ChutesService(settings.apiKey);
+
+  // Knowledge Base service
+  const knowledgeService = React.useMemo(
+    () => new KnowledgeBaseService(settings),
+    [settings]
+  );
 
   // For authenticated users, ALWAYS use app's Supabase database (environment variables)
   // This ensures messages sync to Supabase, not localStorage
@@ -343,6 +359,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       let assistantMsg: Message = {
         role: 'assistant',
         content: '',
+        thinking: undefined,
         id: (Date.now() + 1).toString(),
         timestamp: Date.now() + 1,
         model: settings.model
@@ -350,6 +367,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       setMessages(prev => [...prev, assistantMsg]);
 
       let fullResponse = '';
+      let fullThinking = '';
 
       const searchConfig = {
         enabled: isSearchEnabled,
@@ -359,10 +377,44 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
         provider: settings.searchProvider
       };
 
+      // SYSTEM PROMPT CONSTRUCTION
+      const baseStats = `Current Date: ${new Date().toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short' })}`;
+
+      // Dynamic Search Context
+      const searchContext = isSearchEnabled
+        ? "You have access to a web search tool. Use it if the user asks about current events, news, or requires real-time information. You should proactively search if the answer requires external knowledge."
+        : "";
+
+      const userPrompt = settings.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+
+      // Combine: Base -> Search -> Stats -> RAG (if any) -> User
+      // We prepend the RAG context to the user instructions if it exists
+      let finalSystemPrompt = `${BASE_SYSTEM_CONTEXT}\n${searchContext}\n${baseStats}`;
+
+      if (isKnowledgeEnabled && isAuthenticated && userId) {
+        try {
+          setLoadingStatus('Searching knowledge base...');
+          const userQuery = typeof userContent === 'string' ? userContent : textInput;
+          const token = await getToken();
+          const relevantChunks = await knowledgeService.searchKnowledge(userQuery, userId, token || '', 5, 0.6);
+
+          if (relevantChunks.length > 0) {
+            const ragContext = knowledgeService.buildRAGContext(relevantChunks);
+            finalSystemPrompt += `\n\nKNOWLEDGE BASE CONTEXT:\n${ragContext}`;
+            setLoadingStatus(`Found ${relevantChunks.length} relevant documents`);
+          }
+        } catch (err) {
+          console.warn('Knowledge base search failed:', err);
+        }
+      }
+
+      // Add User Instructions last
+      finalSystemPrompt += `\n\nUser Instructions:\n${userPrompt}`;
+
       // Stream Chat Response with Tools support
       const stream = chutesService.streamChat(
         [...currentHistory, userMsg],
-        settings.systemPrompt,
+        finalSystemPrompt,
         settings.model,
         searchConfig,
         (status) => setLoadingStatus(status),
@@ -370,14 +422,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       );
 
       for await (const chunk of stream) {
-        fullResponse += chunk;
-        setMessages(prev =>
-          prev.map(msg => msg.id === assistantMsg.id ? { ...msg, content: fullResponse } : msg)
-        );
+        if (chunk.type === 'thinking') {
+          fullThinking += chunk.text;
+          setMessages(prev =>
+            prev.map(msg => msg.id === assistantMsg.id ? { ...msg, thinking: fullThinking } : msg)
+          );
+        } else if (chunk.type === 'content') {
+          fullResponse += chunk.text;
+          setMessages(prev =>
+            prev.map(msg => msg.id === assistantMsg.id ? { ...msg, content: fullResponse } : msg)
+          );
+        } else if (chunk.type === 'sources') {
+          // Store sources in the message
+          setMessages(prev =>
+            prev.map(msg => msg.id === assistantMsg.id ? { ...msg, sources: chunk.sources } : msg)
+          );
+        }
       }
 
-      // Update the message with full content
+      // Update the message with full content and thinking
       assistantMsg.content = fullResponse;
+      assistantMsg.thinking = fullThinking || undefined;
 
       let dbId: string | null = null;
       if (isAuthenticated && userId) {
@@ -695,49 +760,58 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
   const renderMessageContent = (content: any) => {
     if (typeof content === 'string') {
-      const thinkRegex = /<think>([\s\S]*?)<\/think>/g;
-      const parts = [];
-      let lastIndex = 0;
-      let match;
+      // Clean up thoughts but keep them in UI if desired
+      const cleanContent = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 
-      while ((match = thinkRegex.exec(content)) !== null) {
-        if (match.index > lastIndex) {
-          parts.push(
-            <span key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-              {content.substring(lastIndex, match.index)}
-            </span>
-          );
-        }
-        parts.push(
-          <details key={`think-${match.index}`} className="group mb-2 mt-1 animate-in fade-in zoom-in-95">
-            <summary className="cursor-pointer text-xs font-medium text-gray-500 dark:text-gray-400 select-none flex items-center gap-1.5 hover:text-primary transition-colors w-fit p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5">
-              <BrainCircuit className="w-3.5 h-3.5" />
-              <span>Thought Process</span>
-            </summary>
-            <div className="pl-3 border-l-2 border-gray-200 dark:border-white/10 mt-2 ml-1">
-              <p className="text-sm text-gray-500 dark:text-gray-400 italic font-mono leading-relaxed whitespace-pre-wrap">
-                {match[1].trim()}
-              </p>
-            </div>
-          </details>
-        );
-        lastIndex = match.index + match[0].length;
-      }
-
-      if (lastIndex < content.length) {
-        parts.push(
-          <span key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-            {content.substring(lastIndex)}
-          </span>
-        );
-      }
-
-      return parts.length > 0 ? parts : content;
+      // Return ReactMarkdown component
+      return (
+        <div className="prose dark:prose-invert prose-sm sm:prose-base max-w-none break-words leading-relaxed">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              // Custom Table styling for overflow handling
+              table: ({ node, ...props }) => (
+                <div className="overflow-x-auto my-4 rounded-lg border border-gray-200 dark:border-white/10">
+                  <table className="w-full border-collapse text-sm" {...props} />
+                </div>
+              ),
+              thead: ({ node, ...props }) => <thead className="bg-gray-50 dark:bg-white/5" {...props} />,
+              th: ({ node, ...props }) => <th className="p-2 text-left font-bold border-b border-gray-200 dark:border-white/10" {...props} />,
+              td: ({ node, ...props }) => <td className="p-2 border-b border-gray-100 dark:border-white/5 last:border-0" {...props} />,
+              // Links -> new tab
+              a: ({ node, ...props }) => <a target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" {...props} />,
+              // Code blocks
+              pre: ({ node, ...props }) => (
+                <pre className="not-prose bg-gray-900 text-gray-100 p-4 rounded-xl overflow-x-auto my-3 text-sm font-mono border border-white/10 shadow-inner whitespace-pre-wrap break-words" {...props} />
+              ),
+              code: ({ node, className, children, ...props }: any) => {
+                const match = /language-(\w+)/.exec(className || '');
+                const isInline = !match && !String(children).includes('\n');
+                return isInline ? (
+                  <code className="bg-gray-100 dark:bg-white/10 px-1 py-0.5 rounded text-xs sm:text-sm font-mono text-red-500 dark:text-red-400 break-all" {...props}>
+                    {children}
+                  </code>
+                ) : (
+                  <code className={`${className} break-words`} {...props}>
+                    {children}
+                  </code>
+                );
+              }
+            }}
+          >
+            {cleanContent || content}
+          </ReactMarkdown>
+        </div>
+      );
     }
 
     if (Array.isArray(content)) {
       return content.map((part: any, i: number) => {
-        if (part.type === 'text') return <span key={i}>{part.text}</span>;
+        if (part.type === 'text') return (
+          <span key={i} className="block prose dark:prose-invert max-w-none">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>
+          </span>
+        );
         if (part.type === 'image_url') return (
           <div key={i} className="my-2 rounded-lg overflow-hidden border border-white/20 shadow-lg">
             <img src={part.image_url.url} alt="User upload" className="max-w-full h-auto max-h-64 object-contain" />
@@ -747,6 +821,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       });
     }
     return '';
+  };
+
+  // Helper to render tool messages (Search Results)
+  const renderToolMessage = (msg: Message) => {
+    if (msg.sources && msg.sources.length > 0) {
+      return (
+        <div className="w-full max-w-2xl mx-auto my-2 animate-in fade-in slide-in-from-top-2">
+          <SearchResultsCard
+            sources={msg.sources}
+            isCollapsible={true}
+            defaultExpanded={false}
+          />
+        </div>
+      );
+    }
+    return null; // Don't render other tool messages or empty ones
   };
 
   return (
@@ -778,10 +868,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
           <div
             key={idx}
             className={`flex items-end gap-3 group animate-in slide-in-from-bottom-4 duration-500 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-              }`}
+              } ${msg.role === 'tool' ? 'w-full justify-center' : ''}`}
           >
-            {/* Avatar */}
-            {msg.role !== 'assistant' || msg.content !== '' ? (
+            {/* Tool Message (Hidden, now rendered in assistant message) */}
+            {/* {msg.role === 'tool' && renderToolMessage(msg)} */}
+
+            {/* Regular Avatar (Skip for tools) */}
+            {msg.role !== 'tool' && (msg.role !== 'assistant' || msg.content !== '') ? (
               <div className={`shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg transition-transform hover:scale-105 duration-300 ${msg.role === 'user'
                 ? 'bg-gradient-to-br from-primary to-primary-dark text-white border border-primary-light/30'
                 : msg.role === 'system'
@@ -793,7 +886,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
             ) : null}
 
             {/* Bubble Container */}
-            {msg.content && (
+            {msg.role !== 'tool' && msg.content && (
               <div className={`flex flex-col gap-1 max-w-[85%] sm:max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
 
                 <div className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
@@ -805,6 +898,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                         : 'bg-white/20 dark:bg-slate-800/20 text-slate-800 dark:text-slate-100 rounded-bl-sm backdrop-blur-2xl border border-white/40 dark:border-white/5 shadow-[0_4px_15px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] min-w-[100px]'
                       }`}
                   >
+                    {/* Header: Thinking & Sources */}
+                    {msg.role === 'assistant' && (
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        {/* Thinking Toggle */}
+                        {msg.thinking && (
+                          <details className="group animate-in fade-in zoom-in-95">
+                            <summary className="cursor-pointer text-xs font-medium text-gray-500 dark:text-gray-400 select-none flex items-center gap-1.5 hover:text-primary transition-colors w-fit p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5">
+                              <BrainCircuit className="w-3.5 h-3.5" />
+                              <span>Thought Process</span>
+                            </summary>
+                            <div className="pl-3 border-l-2 border-gray-200 dark:border-white/10 mt-2 ml-1">
+                              <p className="text-sm text-gray-500 dark:text-gray-400 italic font-mono leading-relaxed whitespace-pre-wrap">
+                                {msg.thinking}
+                              </p>
+                            </div>
+                          </details>
+                        )}
+
+                        {/* Sources Toggle */}
+                        {msg.sources && msg.sources.length > 0 && (
+                          <details className="group animate-in fade-in zoom-in-95">
+                            <summary className="cursor-pointer text-xs font-medium text-gray-500 dark:text-gray-400 select-none flex items-center gap-1.5 hover:text-blue-500 transition-colors w-fit p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5">
+                              <Search className="w-3.5 h-3.5" />
+                              <span>{msg.sources.length} Sources</span>
+                            </summary>
+                            <div className="mt-2 w-full max-w-md">
+                              <SearchResultsCard
+                                sources={msg.sources}
+                                isCollapsible={false}
+                              />
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    )}
+
                     {renderMessageContent(msg.content)}
 
                     {msg.role === 'assistant' && (
@@ -990,6 +1119,58 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
               </Button>
             )}
 
+            {/* Knowledge Base Toggle - For authenticated users (Paid Tiers Only) */}
+            {isAuthenticated && userId && (
+              <Tooltip.Provider>
+                <Tooltip.Root delayDuration={0}>
+                  <Tooltip.Trigger asChild>
+                    <div className="relative group/kb">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (subscriptionTier === 'free') return;
+                          setIsKnowledgeEnabled(!isKnowledgeEnabled);
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          if (subscriptionTier === 'free') return;
+                          setShowKnowledgeModal(true);
+                        }}
+                        className={`rounded-full h-10 w-10 shrink-0 transition-all duration-300 flex items-center justify-center relative ${isKnowledgeEnabled
+                          ? 'bg-violet-500/10 text-violet-500 hover:bg-violet-500/20'
+                          : subscriptionTier === 'free'
+                            ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed'
+                            : 'text-gray-500 hover:text-violet-500 hover:bg-violet-500/5 dark:hover:bg-white/5'
+                          }`}
+                      >
+                        <Database className={`w-5 h-5 ${isKnowledgeEnabled ? 'text-violet-500' : ''}`} />
+
+                        {/* Lock Badge for Free Users */}
+                        {subscriptionTier === 'free' && (
+                          <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900 z-10">
+                            <Lock className="w-2.5 h-2.5 text-white" />
+                          </div>
+                        )}
+                      </button>
+                    </div>
+                  </Tooltip.Trigger>
+                  <Tooltip.Portal>
+                    <Tooltip.Content
+                      className="z-50 px-3 py-1.5 text-xs font-medium text-white bg-slate-900 dark:bg-slate-800 rounded-lg shadow-xl animate-in fade-in zoom-in-95 border border-white/10"
+                      sideOffset={5}
+                    >
+                      {subscriptionTier === 'free'
+                        ? "Upgrade to Basic+ to unlock Knowledge Base"
+                        : isKnowledgeEnabled
+                          ? "Disable Knowledge Base"
+                          : "Enable Knowledge Base (Right-click to manage)"}
+                      <Tooltip.Arrow className="fill-slate-900 dark:fill-slate-800" />
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                </Tooltip.Root>
+              </Tooltip.Provider>
+            )}
+
             <textarea
               ref={textareaRef}
               value={inputValue}
@@ -1068,6 +1249,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
           />
         )
       }
+      {/* Knowledge Base Modal */}
+      {showKnowledgeModal && userId && (
+        <KnowledgeBaseModal
+          isOpen={showKnowledgeModal}
+          onClose={() => setShowKnowledgeModal(false)}
+          settings={settings}
+          userId={userId}
+        />
+      )}
     </div >
   );
 };

@@ -261,6 +261,10 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
                                         placeholder={DEFAULT_SYSTEM_PROMPT}
                                         className="h-32 text-sm italic"
                                     />
+                                    <p className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                                        <Sparkles className="w-3 h-3 text-primary" />
+                                        <span>This will be appended to the base assistant personality (Unfiltered, Truthful, Kenyan Context).</span>
+                                    </p>
                                 </div>
                             </div>
                         </div>

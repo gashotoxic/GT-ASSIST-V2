@@ -1,6 +1,6 @@
 
-import { Message, TTSRequest, STTRequest, ImageGenRequest, VideoGenRequest, ImageEditRequest } from '../types';
-import { SearchService } from './search';
+import { Message, TTSRequest, STTRequest, ImageGenRequest, VideoGenRequest, ImageEditRequest, SearchSource } from '../types';
+import { SearchAgent } from './searchAgent';
 
 const BASE_LLM_URL = 'https://llm.chutes.ai/v1/chat/completions';
 const BASE_TTS_URL = 'https://chutes-kokoro.chutes.ai/speak';
@@ -87,7 +87,9 @@ export class ChutesService {
     const stream = this.streamChat(messages, systemPrompt, 'NousResearch/DeepHermes-3-Mistral-24B-Preview');
 
     for await (const chunk of stream) {
-      fullResponse += chunk;
+      if (chunk.type === 'content') {
+        fullResponse += chunk.text;
+      }
     }
 
     return fullResponse.trim();
@@ -100,7 +102,7 @@ export class ChutesService {
     searchConfig?: { enabled: boolean; apiKey: string; provider: 'tavily' | 'brave' },
     onStatusChange?: (status: string | null) => void,
     signal?: AbortSignal
-  ): AsyncGenerator<string, void, unknown> {
+  ): AsyncGenerator<{ type: 'thinking' | 'content' | 'sources'; text?: string; sources?: SearchSource[] }, void, unknown> {
 
     // Setup Tools
     const tools = (searchConfig?.enabled && searchConfig?.apiKey && searchConfig.apiKey.length > 5) ? [
@@ -132,8 +134,8 @@ export class ChutesService {
       model: model,
       messages: allMessages,
       stream: true,
-      max_tokens: 8192,
-      temperature: 0.7,
+      max_tokens: 5000,
+      temperature: 1,
     };
 
     if (tools) {
@@ -178,8 +180,15 @@ export class ChutesService {
               const choice = data.choices[0];
               const delta = choice?.delta;
 
+              // Handle thinking/reasoning tokens
+              const reasoningText = delta?.reasoning_content || delta?.reasoning;
+              if (reasoningText) {
+                yield { type: 'thinking', text: reasoningText };
+              }
+
+              // Handle content tokens
               if (delta?.content) {
-                yield delta.content;
+                yield { type: 'content', text: delta.content };
               }
 
               if (delta?.tool_calls) {
@@ -203,9 +212,14 @@ export class ChutesService {
               }
 
               if (choice?.finish_reason === 'tool_calls' || (choice?.finish_reason === 'stop' && currentToolCalls.length > 0)) {
-                if (onStatusChange) onStatusChange('Searching web...');
+                if (onStatusChange) onStatusChange('🔍 Analyzing query...');
 
-                const searchService = new SearchService(searchConfig!.apiKey, searchConfig!.provider);
+                // Use intelligent SearchAgent instead of basic SearchService
+                const searchAgent = new SearchAgent({
+                  tavilyApiKey: searchConfig!.provider === 'tavily' ? searchConfig!.apiKey : undefined,
+                  braveApiKey: searchConfig!.provider === 'brave' ? searchConfig!.apiKey : undefined,
+                  preferredProvider: searchConfig!.provider,
+                });
 
                 const assistantMsg: Message = {
                   role: 'assistant',
@@ -218,13 +232,29 @@ export class ChutesService {
                 for (const call of currentToolCalls) {
                   if (call.function.name === 'web_search') {
                     const args = JSON.parse(call.function.arguments);
-                    const searchResult = await searchService.search(args.query);
+
+                    // Use SearchAgent for intelligent search
+                    if (onStatusChange) onStatusChange(`🔍 Searching: "${args.query.slice(0, 30)}${args.query.length > 30 ? '...' : ''}"`);
+                    const searchContext = await searchAgent.search(args.query);
+
+                    if (onStatusChange) {
+                      onStatusChange(SearchAgent.getStatusMessage(searchContext));
+                    }
+
+                    // Use synthesized context with citations
+                    const toolResponse = searchContext.synthesizedContext || 'No results found.';
+
+                    // Yield sources to UI
+                    if (searchContext.sources && searchContext.sources.length > 0) {
+                      yield { type: 'sources', sources: searchContext.sources };
+                    }
 
                     newMessages.push({
                       role: 'tool',
                       tool_call_id: call.id,
                       name: 'web_search',
-                      content: searchResult
+                      content: toolResponse,
+                      sources: searchContext.sources
                     });
                   }
                 }
@@ -305,7 +335,17 @@ export class ChutesService {
     let body: any = { prompt: request.prompt };
 
     // Model Specific Logic
-    if (request.modelId === 'qwen-image') {
+    if (request.modelId === 'qwen-image-2.5-12b') {
+      body = {
+        model: "Qwen-Image-2512",
+        prompt: request.prompt,
+        negative_prompt: "blur, distortion, low quality",
+        guidance_scale: 7.5,
+        width: 1024,
+        height: 1024,
+        num_inference_steps: 50
+      };
+    } else if (request.modelId === 'qwen-image') {
       body = {
         model: "qwen-image",
         prompt: request.prompt,
@@ -381,14 +421,14 @@ export class ChutesService {
     }
 
     const body = {
+      seed: null,
+      width: 1024,
+      height: 1024,
       prompt: request.prompt,
       image_b64s: [cleanImage],
       true_cfg_scale: 4,
-      num_inference_steps: 40,
-      width: 1024,
-      height: 1024,
-      seed: null,
-      negative_prompt: ""
+      negative_prompt: "",
+      num_inference_steps: 40
     };
 
     const response = await this.fetchWithRetry(request.modelUrl, {

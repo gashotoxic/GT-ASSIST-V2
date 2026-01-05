@@ -7,6 +7,7 @@ interface AuthContextType {
   user: any;
   isLoaded: boolean;
   isSignedIn: boolean;
+  getToken: (options?: any) => Promise<string | null>;
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -14,10 +15,11 @@ export const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoaded: false,
   isSignedIn: false,
+  getToken: async () => null,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { userId, isLoaded, isSignedIn } = useAuth();
+  const { userId, isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
   const { syncUser } = useUserSync();
 
@@ -28,14 +30,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const syncUserProfile = async () => {
         try {
           console.log('Syncing Clerk user to Supabase:', { userId, email: user.emailAddresses?.[0]?.emailAddress });
-          
+
           const result = await syncUser({
             id: userId,
             emailAddresses: user.emailAddresses || [],
             firstName: user.firstName,
             lastName: user.lastName,
           });
-          
+
           if (result.created) {
             console.log(`✅ New Supabase user created: ${userId} with 10 free credits`);
           } else if (result.success) {
@@ -53,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isLoaded, isSignedIn, user, userId, syncUser]);
 
   return (
-    <AuthContext.Provider value={{ userId, user, isLoaded, isSignedIn }}>
+    <AuthContext.Provider value={{ userId, user, isLoaded, isSignedIn, getToken }}>
       {children}
     </AuthContext.Provider>
   );
