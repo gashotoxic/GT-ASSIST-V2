@@ -605,25 +605,41 @@ export class SupabaseService {
     if (!this.client) throw new Error('Supabase client not initialized');
 
     try {
-      // Use upsert to handle existing users and ensure 10 credits for new users
-      const { data, error } = await this.client
+      // First, check if user already exists
+      const { data: existingUser } = await this.client
         .from('users')
-        .upsert({
+        .select('id, credits')
+        .eq('id', userId)
+        .single();
+
+      if (existingUser) {
+        // User already exists - just update the email if needed, DON'T reset credits
+        console.log('User already exists:', userId, 'with', existingUser.credits, 'credits - not resetting');
+        await this.client
+          .from('users')
+          .update({
+            email: email,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+        return true;
+      }
+
+      // New user - INSERT with 10 free credits
+      const { error } = await this.client
+        .from('users')
+        .insert({
           id: userId,
           email: email,
-          credits: 10, // Explicitly set 10 credits for new users
+          credits: 10, // 10 free credits for NEW users only
           subscription_tier: 'free',
           daily_credits: 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'id',
-          ignoreDuplicates: false
-        })
-        .select();
+        });
 
       if (error) throw error;
-      console.log('User profile created/updated:', userId, 'with 10 free credits');
+      console.log('New user profile created:', userId, 'with 10 free credits');
       return true;
     } catch (error) {
       console.error('Error creating user profile:', error);
@@ -967,16 +983,16 @@ export class SupabaseService {
       const profileChannel = this.client
         .channel(`public:users:id=${userId}`)
         .on('postgres_changes', {
-          event: 'UPDATE',
+          event: '*', // Listen to INSERT and UPDATE
           schema: 'public',
           table: 'users',
           filter: `id=eq.${userId}`,
-        }, (payload) => {
+        }, (payload: any) => {
           if (callbacks.onProfileUpdate) {
             callbacks.onProfileUpdate(payload.new);
           }
           if (callbacks.onCreditChange) {
-            callbacks.onCreditChange(payload.new.credits);
+            callbacks.onCreditChange(payload.new?.credits || 0);
           }
         })
         .subscribe();

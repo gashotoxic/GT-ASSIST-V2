@@ -1061,17 +1061,26 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
 
                                 {/* Only show overlay if this specific tab is generating */}
                                 {genStatus[activeTab as GenType]?.isGenerating && (
-                                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/80 dark:bg-slate-950/80 backdrop-blur-md transition-all duration-500">
-                                        <div className="relative mb-6">
-                                            <div className="w-20 h-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+                                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/80 dark:bg-slate-950/90 backdrop-blur-xl transition-all duration-500">
+                                        <div className="relative mb-8">
+                                            <div className="w-24 h-24 rounded-full border-2 border-primary/20 border-t-primary animate-spin"></div>
                                             <div className="absolute inset-0 flex items-center justify-center">
-                                                <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+                                                <div className="p-4 bg-primary/10 rounded-full animate-pulse">
+                                                    <Sparkles className="w-8 h-8 text-primary shadow-glow" />
+                                                </div>
                                             </div>
                                         </div>
-                                        <span className="text-lg font-medium text-gray-700 dark:text-gray-200 animate-pulse">
-                                            {activeTab === 'image' ? 'Dreaming up visuals...' : activeTab === 'edit' ? 'Applying magic...' : 'Rendering frames...'}
-                                        </span>
-                                        <span className="text-sm text-gray-500 dark:text-gray-400 mt-2">This may take a moment</span>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <span className="text-xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent animate-pulse">
+                                                {activeTab === 'image' ? 'Dreaming up visuals...' : activeTab === 'edit' ? 'Applying magic...' : 'Rendering cinematic frames...'}
+                                            </span>
+                                            <div className="flex gap-1.5 mt-1">
+                                                <span className="w-2 h-2 rounded-full bg-primary/40 animate-[bounce_1s_infinite_0ms]"></span>
+                                                <span className="w-2 h-2 rounded-full bg-primary/40 animate-[bounce_1s_infinite_200ms]"></span>
+                                                <span className="w-2 h-2 rounded-full bg-primary/40 animate-[bounce_1s_infinite_400ms]"></span>
+                                            </div>
+                                            <span className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-4 tracking-wide uppercase">AI is processing your request</span>
+                                        </div>
                                     </div>
                                 )}
 

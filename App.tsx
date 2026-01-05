@@ -16,7 +16,7 @@ import { summarizePrompt } from './utils/stringUtils';
 
 const DEFAULT_SETTINGS: AppSettings = {
   apiKey: 'internal', // Use internal default key
-  model: 'Moonshotai/Kimi-K2-Thinking-TEE',
+  model: 'moonshotai/Kimi-K2-Thinking-TEE',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   ttsVoice: 'af_heart',
   ttsSpeed: 1.0,

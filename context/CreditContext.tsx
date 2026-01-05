@@ -117,6 +117,11 @@ export function CreditProvider({ children }: { children: React.ReactNode }) {
         if (profile.subscription_tier) {
           setTier(profile.subscription_tier as 'free' | 'basic' | 'plus' | 'pro');
         }
+        // Also update credits from profile update events (covers INSERT)
+        if (profile.credits !== undefined) {
+          console.log('Profile update - setting credits:', profile.credits);
+          setCredits(profile.credits);
+        }
       }
     });
 
@@ -127,6 +132,24 @@ export function CreditProvider({ children }: { children: React.ReactNode }) {
       }
     };
   }, [userId, supabaseService, isSignedIn]);
+
+  // Listen for user-sync-complete event from AuthContext
+  // This ensures we refetch credits AFTER the user profile is confirmed to exist
+  useEffect(() => {
+    const handleSyncComplete = () => {
+      console.log('📡 Received user-sync-complete event, refetching credits...');
+      // Small delay to ensure database consistency
+      setTimeout(() => {
+        fetchCredits();
+      }, 100);
+    };
+
+    window.addEventListener('user-sync-complete', handleSyncComplete);
+    return () => {
+      window.removeEventListener('user-sync-complete', handleSyncComplete);
+    };
+  }, [supabaseService, userId, isSignedIn]);
+
   const canAfford = (action: string, model: string) => {
     if (tier === 'pro') return true; // Unlimited
 

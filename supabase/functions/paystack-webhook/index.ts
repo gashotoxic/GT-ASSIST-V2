@@ -65,9 +65,9 @@ serve(async (req) => {
         let dailyAmount = 0;
 
         // PLAN MAPPING - Pro uses bypass, so no daily credits needed
-        if (planCode === 'PLN_cnrp7b3t24r6h88') { tier = 'basic'; dailyAmount = 300; }
-        else if (planCode === 'PLN_wv1j2miyjn8ak05') { tier = 'plus'; dailyAmount = 500; }
-        else if (planCode === 'PLN_id88fbjhvfyjs1g') { tier = 'pro'; dailyAmount = 0; } // Pro bypasses deduction
+        if (planCode === 'PLN_x6kcyeqtmwqbeca') { tier = 'basic'; dailyAmount = 300; }
+        else if (planCode === 'PLN_qc1j9mcx0vv3hbf') { tier = 'plus'; dailyAmount = 500; }
+        else if (planCode === 'PLN_krcucsvyw6hucdo') { tier = 'pro'; dailyAmount = 0; } // Pro bypasses deduction
         else if (planCode.includes('basic')) { tier = 'basic'; dailyAmount = 300; }
         else if (planCode.includes('plus')) { tier = 'plus'; dailyAmount = 500; }
         else if (planCode.includes('pro')) { tier = 'pro'; dailyAmount = 0; } // Pro bypasses deduction

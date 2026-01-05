@@ -45,6 +45,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             console.error(`❌ Failed to sync user:`, result.error);
           }
+
+          // Dispatch event to notify CreditContext that user profile is ready
+          // This fixes the race condition where credits are fetched before user exists
+          if (result.success) {
+            console.log('📡 Dispatching user-sync-complete event');
+            window.dispatchEvent(new CustomEvent('user-sync-complete'));
+          }
         } catch (error) {
           console.error('❌ Failed to sync user profile:', error);
         }

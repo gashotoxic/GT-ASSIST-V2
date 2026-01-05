@@ -449,33 +449,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
         dbId = await supabaseService.saveMessage(assistantMsg, sessionId, userId);
       }
 
-      // Generate Audio automatically (cleaned)
-      const ttsText = chutesService.cleanTextForTTS(fullResponse);
-      if (ttsText && ttsText.length > 0) {
-        const { url, blob } = await generateTTS(ttsText);
+      // Automatic TTS disabled as per user request. 
+      // User must manually click the audio icon to read aloud.
 
-        if (url) {
-          setMessages(prev =>
-            prev.map(msg => msg.id === assistantMsg.id ? { ...msg, audioUrl: url } : msg)
-          );
-
-          // Auto play the generated audio
-          setPlayingMessageId(assistantMsg.id!);
-          playAudio(url);
-
-          // Upload to Supabase for authenticated users
-          if (isAuthenticated && userId && dbId && blob) {
-            const publicUrl = await supabaseService.uploadAudio(blob, dbId, sessionId);
-            if (publicUrl) {
-              await supabaseService.updateMessageAudio(dbId, publicUrl);
-              // Update state with remote url for persistence
-              setMessages(prev =>
-                prev.map(msg => msg.id === assistantMsg.id ? { ...msg, audio_url: publicUrl } : msg)
-              );
-            }
-          }
-        }
-      }
 
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -1041,21 +1017,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
         {isLoading && (
           <div className="flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 pl-2">
-            <div className="w-8 h-8 rounded-full bg-white/50 dark:bg-slate-800/50 flex items-center justify-center border border-white/20 shadow-sm">
-              <Bot className="w-4 h-4 text-primary animate-pulse" />
+            <div className="w-8 h-8 rounded-full bg-white/50 dark:bg-slate-800/50 flex items-center justify-center border border-white/20 shadow-sm relative overflow-hidden">
+              <div className="absolute inset-0 bg-primary/20 animate-pulse"></div>
+              <BrainCircuit className="w-4 h-4 text-primary relative z-10 animate-bounce transition-all duration-1000" />
             </div>
-            <div className="flex flex-col gap-1">
-              <div className="bg-white/40 dark:bg-slate-800/40 px-4 py-2 rounded-2xl rounded-bl-sm backdrop-blur-md border border-white/30 dark:border-white/5 flex items-center gap-3">
-                <span className="text-sm text-gray-600 dark:text-gray-300">
-                  {loadingStatus || 'Thinking...'}
+            <div className="flex flex-col gap-1.5">
+              <div className="bg-gradient-to-r from-white/40 to-white/60 dark:from-slate-800/40 dark:to-slate-900/40 px-5 py-2.5 rounded-2xl rounded-bl-sm backdrop-blur-md border border-white/30 dark:border-white/5 flex items-center gap-4 shadow-sm">
+                <div className="flex gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-[bounce_1s_infinite_0ms]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-[bounce_1s_infinite_200ms]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-[bounce_1s_infinite_400ms]"></span>
+                </div>
+                <span className="text-sm font-medium bg-gradient-to-r from-gray-700 to-gray-500 dark:from-gray-200 dark:to-gray-400 bg-clip-text text-transparent animate-pulse">
+                  {loadingStatus || 'Analyzing & Processing...'}
                 </span>
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary/80" />
               </div>
               <button
                 onClick={handleStop}
-                className="text-xs text-red-500 hover:text-red-600 flex items-center gap-1 pl-1 transition-colors"
+                className="text-[10px] font-semibold text-red-400 hover:text-red-500 flex items-center gap-1 pl-1 transition-colors uppercase tracking-wider"
               >
-                <StopCircle className="w-3 h-3" /> Stop generating
+                <StopCircle className="w-2.5 h-2.5" /> Cancel Generation
               </button>
             </div>
           </div>
