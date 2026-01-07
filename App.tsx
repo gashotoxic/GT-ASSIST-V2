@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Settings, Sparkles, AlertCircle, Moon, Sun, MessageSquare, Image as ImageIcon, Menu, Database, Monitor, PanelLeftOpen, CreditCard, Bot, Zap } from 'lucide-react';
+import { Send, Menu, PanelLeftOpen, PanelLeftClose, Plus, MessageSquare, ImageIcon, LayoutGrid, X, LogOut, User, Settings, CreditCard, ChevronDown, Monitor, Smartphone, Moon, Sun, Search, Zap, Check, Sparkles, Bot, LifeBuoy, Sliders } from 'lucide-react';
+import { OnboardingTour } from './components/OnboardingTour';
 import ChatInterface from './components/ChatInterface';
 import MediaStudio from './components/MediaStudio';
 import { AuthModal } from './components/AuthModal';
@@ -41,6 +42,7 @@ const App: React.FC = () => {
 
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
   const [currentView, setCurrentView] = useState<'chat' | 'media' | 'pricing'>('chat');
+  const [activeMediaTab, setActiveMediaTab] = useState<string>('image');
 
   // Sidebar State: Initialize based on screen width
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 1024);
@@ -178,9 +180,14 @@ const App: React.FC = () => {
     window.addEventListener('open-account-settings', handleOpenAccountSettings);
     window.addEventListener('open-view', handleOpenView);
 
+    // Close sidebar event for tour
+    const handleCloseSidebar = () => setIsSidebarOpen(false);
+    window.addEventListener('close-sidebar', handleCloseSidebar);
+
     return () => {
       window.removeEventListener('open-account-settings', handleOpenAccountSettings);
       window.removeEventListener('open-view', handleOpenView);
+      window.removeEventListener('close-sidebar', handleCloseSidebar);
     };
   }, [currentSessionId, sessions]);
 
@@ -355,6 +362,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2 min-w-0">
             {/* Sidebar Toggle - Hidden Desktop, Show Mobile Menu */}
             <Button
+              id="tour-sidebar-toggle"
               variant="glass"
               size="icon"
               className="lg:hidden shrink-0 h-9 w-9 text-slate-500 dark:text-slate-400"
@@ -399,6 +407,7 @@ const App: React.FC = () => {
                 <span className="hidden xs:inline">Chat</span>
               </button>
               <button
+                id="tour-media-nav"
                 onClick={() => setCurrentView('media')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${currentView === 'media'
                   ? 'bg-primary/10 text-primary shadow-sm'
@@ -432,6 +441,7 @@ const App: React.FC = () => {
             {/* Pricing for Guest Users on Mobile */}
             {!isSignedIn && (
               <button
+                id="tour-pricing-nav-mobile"
                 onClick={() => setCurrentView('pricing')}
                 className="md:hidden flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-primary hover:bg-primary/5 transition-all"
               >
@@ -447,7 +457,7 @@ const App: React.FC = () => {
                 title={subscriptionTier === 'pro' ? 'Pro Plan - Unlimited' : 'Total Credits (Daily + Permanent)'}
               >
                 <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
-                <span className="text-xs sm:text-sm font-bold text-primary">
+                <span id="tour-credit-balance" className="text-xs sm:text-sm font-bold text-primary">
                   {subscriptionTier === 'pro' ? '∞' : (credits + (dailyCredits || 0))}
                 </span>
               </div>
@@ -517,6 +527,7 @@ const App: React.FC = () => {
                   isAuthenticated={isSignedIn}
                   onRequestAuth={() => { setAuthMode('signin'); setShowAuthModal(true); }}
                   userId={isSignedIn ? userId : undefined}
+                  onTabChange={setActiveMediaTab}
                 />
               </div>
             )}
@@ -547,6 +558,16 @@ const App: React.FC = () => {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         onModeChange={setAuthMode}
+      />
+
+      {/* Onboarding Tour */}
+      <OnboardingTour
+        currentView={currentView}
+        setCurrentView={setCurrentView}
+        openSidebar={() => setIsSidebarOpen(true)}
+        theme={theme}
+        isSignedIn={isSignedIn}
+        activeMediaTab={activeMediaTab}
       />
     </div>
   );

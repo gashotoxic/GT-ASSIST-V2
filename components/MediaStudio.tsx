@@ -15,6 +15,7 @@ interface MediaStudioProps {
     isAuthenticated: boolean;
     onRequestAuth: () => void;
     userId?: string | null;
+    onTabChange?: (tab: string) => void;
 }
 
 // Simulated Progress Component
@@ -35,9 +36,16 @@ interface GenerationState {
     error: string | null;
 }
 
-const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, onRequestAuth, userId }) => {
+const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, onRequestAuth, userId, onTabChange }) => {
     const [activeTab, setActiveTab] = useState<GenType | 'gallery'>('image');
     const { refetch, credits, dailyCredits, subscriptionTier, canAfford } = useCredits();
+
+    // Notify parent when tab changes
+    useEffect(() => {
+        if (onTabChange && activeTab !== 'gallery') {
+            onTabChange(activeTab);
+        }
+    }, [activeTab, onTabChange]);
 
     // Independent state for each tab to allow parallel generation
     const [genStatus, setGenStatus] = useState<Record<GenType, GenerationState>>({
@@ -799,7 +807,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                             {/* Image Tab Controls */}
                             {activeTab === 'image' && (
                                 <div className="space-y-6">
-                                    <div className="bg-white/30 dark:bg-slate-800/30 p-4 rounded-2xl border border-white/40 dark:border-white/5 shadow-sm">
+                                    <div id="tour-image-model" className="bg-white/30 dark:bg-slate-800/30 p-4 rounded-2xl border border-white/40 dark:border-white/5 shadow-sm">
                                         <Label className="mb-2 block">Model</Label>
                                         <Select value={selectedImageModel} onChange={(e) => setSelectedImageModel(e.target.value)}>
                                             {AVAILABLE_IMAGE_MODELS.map(m => (
@@ -816,7 +824,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                         )}
                                     </div>
 
-                                    <div className="space-y-3 relative">
+                                    <div id="tour-image-prompt" className="space-y-3 relative">
                                         <div className="flex justify-between items-center">
                                             <Label>Prompt</Label>
                                             <Button
@@ -843,7 +851,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                         )}
                                     </div>
 
-                                    <div>
+                                    <div id="tour-image-generate">
                                         <Button
                                             onClick={() => isAuthenticated ? handleImageGeneration() : onRequestAuth()}
                                             disabled={genStatus.image.isGenerating || !imagePrompt || !isAuthenticated || !canAfford('image', selectedImageModel)}
@@ -859,7 +867,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                             {/* Edit Tab Controls */}
                             {activeTab === 'edit' && (
                                 <div className="space-y-6">
-                                    <div className="space-y-3">
+                                    <div id="tour-edit-input-image" className="space-y-3">
                                         <Label>Image to Edit</Label>
                                         <div
                                             className="relative h-56 w-full rounded-2xl border-2 border-dashed border-gray-300 dark:border-white/10 hover:border-primary/50 dark:hover:border-primary/50 transition-all flex flex-col items-center justify-center bg-gray-50/50 dark:bg-slate-900/50 overflow-hidden group shadow-inner"
@@ -894,7 +902,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                         </div>
                                     </div>
 
-                                    <div className="space-y-3">
+                                    <div id="tour-edit-instruction" className="space-y-3">
                                         <Label>Edit Instruction</Label>
                                         <Textarea
                                             value={editPrompt}
@@ -915,7 +923,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                         </div>
                                     </div>
 
-                                    <div>
+                                    <div id="tour-edit-apply">
                                         <Button
                                             onClick={() => isAuthenticated ? handleEditGeneration() : onRequestAuth()}
                                             disabled={genStatus.edit.isGenerating || !editPrompt || !editSourceImage || !isAuthenticated || !canAfford('edit', 'qwen-image-edit')}
@@ -931,7 +939,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                             {/* Video Tab Controls */}
                             {activeTab === 'video' && (
                                 <div className="space-y-6">
-                                    <div className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10">
+                                    <div id="tour-video-mode-selector" className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10">
                                         <button
                                             onClick={() => setVideoMode('i2v')}
                                             className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-all ${videoMode === 'i2v' ? 'bg-white dark:bg-slate-800 text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
@@ -948,7 +956,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                         </button>
                                     </div>
 
-                                    <div className="bg-white/30 dark:bg-slate-800/30 p-3 rounded-xl border border-white/40 dark:border-white/5">
+                                    <div id="tour-video-model" className="bg-white/30 dark:bg-slate-800/30 p-3 rounded-xl border border-white/40 dark:border-white/5">
                                         <Label className="mb-2 block text-xs uppercase text-gray-500 font-bold">Model Engine</Label>
                                         <Select value={selectedVideoModel} onChange={(e) => setSelectedVideoModel(e.target.value)}>
                                             {AVAILABLE_VIDEO_MODELS.filter(m => m.type === videoMode).map(m => (
@@ -958,7 +966,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                     </div>
 
                                     {videoMode === 'i2v' && (
-                                        <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2">
+                                        <div id="tour-video-input-frame" className="space-y-3 animate-in fade-in slide-in-from-bottom-2">
                                             <Label>Input Frame</Label>
                                             <div
                                                 className="relative h-56 w-full rounded-2xl border-2 border-dashed border-gray-300 dark:border-white/10 hover:border-primary/50 dark:hover:border-primary/50 transition-all flex flex-col items-center justify-center bg-gray-50/50 dark:bg-slate-900/50 overflow-hidden group shadow-inner"
@@ -994,7 +1002,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                         </div>
                                     )}
 
-                                    <div className="space-y-3 relative">
+                                    <div id="tour-video-prompt" className="space-y-3 relative">
                                         <div className="flex justify-between items-center">
                                             <Label>{videoMode === 'i2v' ? 'Motion Prompt' : 'Video Description'}</Label>
                                             <Button
@@ -1016,7 +1024,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                         />
                                     </div>
 
-                                    <div>
+                                    <div id="tour-video-generate">
                                         <Button
                                             onClick={() => isAuthenticated ? handleVideoGeneration() : onRequestAuth()}
                                             disabled={genStatus.video.isGenerating || !videoPrompt || (videoMode === 'i2v' && !sourceImage) || !isAuthenticated || !canAfford('video', selectedVideoModel)}
@@ -1057,7 +1065,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
 
                         {/* Preview Column */}
                         <div className="lg:col-span-8 flex flex-col min-h-[400px] animate-in slide-in-from-right-4 duration-500 delay-200">
-                            <div className="flex-1 rounded-2xl border border-white/40 dark:border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md shadow-inner flex items-center justify-center relative overflow-hidden group p-2 min-h-[400px]">
+                            <div id="tour-media-content" className="flex-1 rounded-2xl border border-white/40 dark:border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md shadow-inner flex items-center justify-center relative overflow-hidden group p-2 min-h-[400px]">
 
                                 {/* Only show overlay if this specific tab is generating */}
                                 {genStatus[activeTab as GenType]?.isGenerating && (

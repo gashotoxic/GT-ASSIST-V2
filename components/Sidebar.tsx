@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, MessageSquare, Trash2, X, Pencil, Check, PanelLeftClose, ChevronLeft, GitBranch, Zap, ChevronRight } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, X, Pencil, Check, PanelLeftClose, ChevronLeft, GitBranch, Zap, ChevronRight, Sliders, Settings } from 'lucide-react';
 import { ChatSession } from '../types';
 import { Button } from './UI';
 import { useCredits } from '../context/CreditContext';
@@ -222,7 +222,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
 
                     {/* Sidebar Footer - Settings/Theme for Mobile */}
-                    <div className="p-4 border-t border-white/20 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+                    <div id="tour-settings-trigger" className="p-4 border-t border-white/20 dark:border-white/5 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
 
                         <div className="flex items-center gap-2">
                             {toggleTheme && (
@@ -249,7 +249,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     onClick={onOpenSettings}
                                     className="p-2.5 rounded-xl bg-white/50 dark:bg-white/5 border border-white/20 dark:border-white/10 hover:text-primary transition-all"
                                 >
-                                    <Zap className="w-4 h-4 text-gray-500" />
+                                    <Settings className="w-4 h-4 text-gray-500" />
                                 </button>
                             )}
                         </div>

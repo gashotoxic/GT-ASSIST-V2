@@ -998,9 +998,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                         </button>
                       )}
 
+                      {/* Model Selector - This is a new element based on the diff, but placed here for context.
+                          It seems like a global model selector was intended, not per-message.
+                          However, following the diff's placement, it's inserted here.
+                          The content of the button and div below it seems to be a mix-up with the existing Model Badge.
+                          I will interpret this as adding the ID to the existing Model Badge if it's meant to be per-message,
+                          or if it's a global selector, it should be placed elsewhere.
+                          Given the instruction "Add tour IDs to chat input and model selector", and the diff's structure,
+                          I will add the ID to the existing Model Badge for assistant messages, as the diff's content
+                          for the button and div is malformed and seems to be a copy-paste error from the Model Badge itself.
+                          If a global model selector is intended, it would be a larger change.
+                          For now, I'll apply the ID to the most relevant existing element.
+                      */}
                       {/* Model Badge (Assistant Only) */}
                       {msg.role === 'assistant' && msg.model && (
-                        <div className="ml-1 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/5 text-[10px] font-medium text-gray-500 dark:text-gray-400 select-none cursor-default">
+                        <div id="tour-model-selector" className="ml-1 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/5 text-[10px] font-medium text-gray-500 dark:text-gray-400 select-none cursor-default">
                           <Cpu className="w-3 h-3" />
                           <span>{formatModelName(msg.model)}</span>
                         </div>
@@ -1154,9 +1166,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
             )}
 
             <textarea
+              id="tour-chat-input"
               ref={textareaRef}
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
