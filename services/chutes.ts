@@ -1,5 +1,5 @@
 
-import { Message, TTSRequest, STTRequest, ImageGenRequest, VideoGenRequest, ImageEditRequest, SearchSource } from '../types';
+import { Message, TTSRequest, STTRequest, ImageGenRequest, VideoGenRequest, ImageEditRequest, SearchSource, ImageAspectRatio } from '../types';
 import { SearchAgent } from './searchAgent';
 
 const BASE_LLM_URL = 'https://llm.chutes.ai/v1/chat/completions';
@@ -73,12 +73,44 @@ export class ChutesService {
       .trim();
   }
 
-  async enhancePrompt(basePrompt: string): Promise<string> {
-    if (!basePrompt.trim()) return "";
+  private detectImagesInPrompt(prompt: string): boolean {
+    const p = prompt || '';
+    if (!p.trim()) return false;
+    if (/data:image\/[a-zA-Z0-9.+-]+;base64,/i.test(p)) return true;
+    if (/!\[[^\]]*\]\([^)]+\)/.test(p)) return true;
+    if (/https?:\/\/\S+\.(png|jpe?g|webp|gif)(\?\S*)?/i.test(p)) return true;
+    return false;
+  }
 
-    const systemPrompt = "You are an expert prompt engineer for AI image and video generation models. Your task is to rewrite the user's simple prompt into a highly detailed, descriptive, and artistic prompt suitable for models like Midjourney, Stable Diffusion, or Wan Video. Focus on lighting, artistic style, camera angles, texture, and mood. Output ONLY the enhanced prompt text, without any explanations or conversational filler.";
+  private getImageDimensions(aspectRatio?: ImageAspectRatio): { width: number; height: number } {
+    switch (aspectRatio) {
+      case '16:9':
+        return { width: 1536, height: 864 };
+      case '9:16':
+        return { width: 864, height: 1536 };
+      case '4:3':
+        return { width: 1152, height: 864 };
+      case '1:1':
+      default:
+        return { width: 1024, height: 1024 };
+    }
+  }
 
-    const messages: Message[] = [{ role: 'user', content: basePrompt }];
+  async enhancePrompt(basePrompt: string, options?: { hasImage?: boolean }): Promise<string> {
+    const trimmed = (basePrompt || '').trim();
+    if (!trimmed) return '';
+
+    const cappedPrompt = trimmed.length > 1000 ? trimmed.slice(0, 1000) : trimmed;
+    const hasImage = Boolean(options?.hasImage) || this.detectImagesInPrompt(cappedPrompt);
+
+    const systemPromptBase =
+      "You are an expert prompt engineer for AI image and video generation models. Your task is to rewrite the user's simple prompt into a highly detailed, descriptive, and artistic prompt suitable for models like Midjourney, Stable Diffusion, or Wan Video. Focus on lighting, artistic style, camera angles, texture, and mood. Output ONLY the enhanced prompt text, without any explanations or conversational filler.";
+    const systemPromptAddendum = hasImage
+      ? " When an image is provided or referenced, default any depicted people to African American unless the user explicitly requests otherwise. Keep the output under 1000 characters."
+      : " Keep the output under 1000 characters.";
+    const systemPrompt = `${systemPromptBase}${systemPromptAddendum}`;
+
+    const messages: Message[] = [{ role: 'user', content: cappedPrompt }];
 
     // We use a non-streaming approach for simplicity here, 
     // but reusing streamChat is cleaner to keep the codebase consistent.
@@ -92,7 +124,8 @@ export class ChutesService {
       }
     }
 
-    return fullResponse.trim();
+    const finalPrompt = fullResponse.trim();
+    return finalPrompt.length > 1000 ? finalPrompt.slice(0, 1000).trim() : finalPrompt;
   }
 
   async *streamChat(
@@ -332,7 +365,8 @@ export class ChutesService {
   }
 
   async generateImage(request: ImageGenRequest, signal?: AbortSignal): Promise<Blob> {
-    let body: any = { prompt: request.prompt };
+    const { width, height } = this.getImageDimensions(request.aspectRatio);
+    let body: any = { prompt: request.prompt, width, height };
 
     // Model Specific Logic
     if (request.modelId === 'qwen-image-2.5-12b') {
@@ -341,8 +375,8 @@ export class ChutesService {
         prompt: request.prompt,
         negative_prompt: "blur, distortion, low quality",
         guidance_scale: 7.5,
-        width: 1024,
-        height: 1024,
+        width,
+        height,
         num_inference_steps: 50
       };
     } else if (request.modelId === 'qwen-image') {
@@ -351,8 +385,8 @@ export class ChutesService {
         prompt: request.prompt,
         negative_prompt: "blur, distortion, low quality, ugly, deformed",
         guidance_scale: 7.5,
-        width: 1024,
-        height: 1024,
+        width,
+        height,
         num_inference_steps: 50
       };
     } else if (request.modelId === 'juggernaut-xl') {
@@ -361,8 +395,8 @@ export class ChutesService {
         prompt: request.prompt,
         negative_prompt: "blur, distortion, low quality, ugly, deformed",
         guidance_scale: 7.5,
-        width: 1024,
-        height: 1024,
+        width,
+        height,
         num_inference_steps: 50
       };
     } else if (request.modelId === 'flux-schnell') {
@@ -371,15 +405,17 @@ export class ChutesService {
         prompt: request.prompt,
         negative_prompt: "blur, distortion, low quality, ugly, deformed",
         guidance_scale: 7.5,
-        width: 1024,
-        height: 1024,
+        width,
+        height,
         num_inference_steps: 50
       };
     } else if (request.modelId === 'hidream') {
       body = {
         seed: null,
         prompt: request.prompt,
-        resolution: "1024x1024",
+        width,
+        height,
+        resolution: `${width}x${height}`,
         guidance_scale: 5,
         num_inference_steps: 50
       };
@@ -390,9 +426,9 @@ export class ChutesService {
       body = {
         prompt: request.prompt,
         model: "custom", // Some APIs require this field to be present
-        width: 1024,
-        height: 1024,
-        resolution: "1024x1024",
+        width,
+        height,
+        resolution: `${width}x${height}`,
         guidance_scale: 7.5,
         num_inference_steps: 40,
         negative_prompt: "blur, low quality"
@@ -420,10 +456,11 @@ export class ChutesService {
       cleanImage = cleanImage.split('base64,')[1];
     }
 
+    const { width, height } = this.getImageDimensions(request.aspectRatio);
     const body = {
       seed: null,
-      width: 1024,
-      height: 1024,
+      width,
+      height,
       prompt: request.prompt,
       image_b64s: [cleanImage],
       true_cfg_scale: 4,

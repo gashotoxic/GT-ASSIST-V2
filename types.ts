@@ -144,12 +144,14 @@ export interface ImageGenRequest {
   prompt: string;
   modelUrl: string; // The full URL or mapped ID
   modelId?: string; // specific logic identifier
+  aspectRatio?: ImageAspectRatio;
 }
 
 export interface ImageEditRequest {
   prompt: string;
   image_b64: string;
   modelUrl: string;
+  aspectRatio?: ImageAspectRatio;
 }
 
 export interface VideoGenRequest {
@@ -158,3 +160,5 @@ export interface VideoGenRequest {
   modelUrl: string;
   modelId?: string;
 }
+
+export type ImageAspectRatio = '1:1' | '16:9' | '9:16' | '4:3';

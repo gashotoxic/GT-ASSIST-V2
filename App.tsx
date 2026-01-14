@@ -44,8 +44,8 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'chat' | 'media' | 'pricing'>('chat');
   const [activeMediaTab, setActiveMediaTab] = useState<string>('image');
 
-  // Sidebar State: Initialize based on screen width
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 1024);
+  // Sidebar State: Initialize closed by default
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string>('');
@@ -357,9 +357,9 @@ const App: React.FC = () => {
       <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10 w-full min-w-0">
 
         {/* Header - Mobile Optimized with Navigation */}
-        <header className="flex-none flex items-center justify-between px-2 sm:px-6 py-3 sm:py-4 z-20 gap-2 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-slate-900/40 backdrop-blur-xl">
+        <header className="flex-none flex flex-wrap sm:flex-nowrap items-center justify-between px-2 sm:px-6 py-3 sm:py-4 z-20 gap-x-2 gap-y-2 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-slate-900/40 backdrop-blur-xl">
 
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             {/* Sidebar Toggle - Hidden Desktop, Show Mobile Menu */}
             <Button
               id="tour-sidebar-toggle"
@@ -385,7 +385,7 @@ const App: React.FC = () => {
             )}
 
             {/* Logo - Compact on Mobile */}
-            <div className="flex items-center gap-2 px-2 py-1.5 sm:px-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 shadow-lg">
+            <div className="flex items-center gap-2 px-1.5 py-1 sm:px-3 sm:py-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 shadow-lg">
               <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
                 <Bot className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               </div>
@@ -398,7 +398,7 @@ const App: React.FC = () => {
             <div className="flex md:hidden items-center gap-1">
               <button
                 onClick={() => setCurrentView('chat')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${currentView === 'chat'
+                className={`flex items-center gap-1.5 px-2 xs:px-3 py-1 xs:py-1.5 rounded-xl text-xs font-semibold transition-all ${currentView === 'chat'
                   ? 'bg-primary/10 text-primary shadow-sm'
                   : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                   }`}
@@ -409,7 +409,7 @@ const App: React.FC = () => {
               <button
                 id="tour-media-nav"
                 onClick={() => setCurrentView('media')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${currentView === 'media'
+                className={`flex items-center gap-1.5 px-2 xs:px-3 py-1 xs:py-1.5 rounded-xl text-xs font-semibold transition-all ${currentView === 'media'
                   ? 'bg-primary/10 text-primary shadow-sm'
                   : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                   }`}
@@ -437,7 +437,7 @@ const App: React.FC = () => {
             ))}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
             {/* Pricing for Guest Users on Mobile */}
             {!isSignedIn && (
               <button
@@ -453,11 +453,11 @@ const App: React.FC = () => {
             {isSignedIn && (
               <div
                 onClick={() => setCurrentView('pricing')}
-                className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 cursor-pointer transition-colors"
+                className="flex items-center gap-1 px-1.5 xs:px-2 sm:px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 cursor-pointer transition-colors whitespace-nowrap"
                 title={subscriptionTier === 'pro' ? 'Pro Plan - Unlimited' : 'Total Credits (Daily + Permanent)'}
               >
-                <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
-                <span id="tour-credit-balance" className="text-xs sm:text-sm font-bold text-primary">
+                <Zap className="w-3 h-3 xs:w-3.5 xs:h-3.5 sm:w-4 sm:h-4 text-primary" />
+                <span id="tour-credit-balance" className="text-[11px] xs:text-xs sm:text-sm font-bold text-primary">
                   {subscriptionTier === 'pro' ? '∞' : (credits + (dailyCredits || 0))}
                 </span>
               </div>
@@ -503,7 +503,7 @@ const App: React.FC = () => {
         </header>
 
         {/* Main Content Area - Scrollable Container */}
-        <main className="flex-1 w-full overflow-hidden relative z-10 px-0 sm:px-4 pb-0 md:pb-4 pt-4 sm:pt-6 flex flex-col items-center min-h-0">
+        <main className="flex-1 w-full overflow-hidden relative z-10 px-2 sm:px-4 pb-0 md:pb-4 pt-4 sm:pt-6 flex flex-col items-center min-h-0">
           <div className="w-full h-full max-w-[1920px] mx-auto relative">
             {currentView === 'chat' && (
               <div className="h-full w-full transition-all duration-500 animate-in fade-in zoom-in-95">

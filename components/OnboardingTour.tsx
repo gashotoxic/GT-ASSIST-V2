@@ -189,21 +189,37 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
         options: {
             primaryColor: '#10b981',
             textColor: theme === 'dark' ? '#f8fafc' : '#1e293b',
-            backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
-            arrowColor: theme === 'dark' ? '#1e293b' : '#ffffff',
-            overlayColor: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: theme === 'dark' ? 'rgba(30, 41, 59, 0.90)' : 'rgba(255, 255, 255, 0.90)',
+            arrowColor: theme === 'dark' ? 'rgba(30, 41, 59, 0.90)' : 'rgba(255, 255, 255, 0.90)',
+            overlayColor: 'rgba(0, 0, 0, 0.65)',
             zIndex: 10000,
         },
         tooltip: {
-            borderRadius: '12px',
-            padding: '16px',
+            borderRadius: '24px',
+            padding: '24px',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.5)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
         },
         buttonNext: {
             backgroundColor: '#10b981',
-            borderRadius: '8px',
+            borderRadius: '12px',
+            padding: '10px 20px',
+            fontSize: '14px',
+            fontWeight: 600,
+            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+            border: 'none',
         },
         buttonBack: {
             color: theme === 'dark' ? '#94a3b8' : '#64748b',
+            marginRight: '10px',
+            fontWeight: 500,
+        },
+        buttonSkip: {
+            color: theme === 'dark' ? '#94a3b8' : '#64748b',
+            fontWeight: 500,
+            fontSize: '14px',
         }
     };
 

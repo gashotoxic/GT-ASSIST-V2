@@ -5,7 +5,7 @@ import { Button, Input, Textarea, Select, Label } from './UI';
 import { ChutesService } from '../services/chutes';
 import { SupabaseService } from '../services/supabase';
 import { WatermarkService } from '../services/watermark';
-import { AVAILABLE_IMAGE_MODELS, AVAILABLE_VIDEO_MODELS, AVAILABLE_EDIT_MODELS, AppSettings, MediaItem } from '../types';
+import { AVAILABLE_IMAGE_MODELS, AVAILABLE_VIDEO_MODELS, AVAILABLE_EDIT_MODELS, AppSettings, MediaItem, ImageAspectRatio } from '../types';
 import { getCreditCost } from '../services/creditCosts';
 import { useCredits } from '../context/CreditContext';
 import { summarizePrompt } from '../utils/stringUtils';
@@ -58,11 +58,13 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
     const [imagePrompt, setImagePrompt] = useState('');
     const [selectedImageModel, setSelectedImageModel] = useState('qwen-image-2.5-12b');
     const [customImageModelUrl, setCustomImageModelUrl] = useState('');
+    const [imageAspectRatio, setImageAspectRatio] = useState<ImageAspectRatio>('1:1');
     const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
 
     // Image Edit State
     const [editPrompt, setEditPrompt] = useState('');
     const [editSourceImage, setEditSourceImage] = useState<string | null>(null);
+    const [editAspectRatio, setEditAspectRatio] = useState<ImageAspectRatio>('1:1');
     const [editedImageUrl, setEditedImageUrl] = useState<string | null>(null);
 
     // Video Gen State
@@ -431,11 +433,11 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         }
     };
 
-    const handleEnhancePrompt = async (currentPrompt: string, setter: (val: string) => void) => {
+    const handleEnhancePrompt = async (currentPrompt: string, setter: (val: string) => void, options?: { hasImage?: boolean }) => {
         if (!currentPrompt.trim()) return;
         setIsEnhancing(true);
         try {
-            const enhanced = await chutesService.enhancePrompt(currentPrompt);
+            const enhanced = await chutesService.enhancePrompt(currentPrompt, options);
             if (enhanced) setter(enhanced);
         } catch (e) {
             console.error("Failed to enhance", e);
@@ -474,7 +476,8 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
             const rawBlob = await chutesService.generateImage({
                 prompt: imagePrompt,
                 modelUrl,
-                modelId
+                modelId,
+                aspectRatio: imageAspectRatio
             }, signal);
 
             const watermarkedBlob = await WatermarkService.addWatermarkToImage(rawBlob);
@@ -507,7 +510,8 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
             const rawBlob = await chutesService.editImage({
                 prompt: editPrompt,
                 image_b64: editSourceImage,
-                modelUrl
+                modelUrl,
+                aspectRatio: editAspectRatio
             }, signal);
 
             const watermarkedBlob = await WatermarkService.addWatermarkToImage(rawBlob);
@@ -824,6 +828,16 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                         )}
                                     </div>
 
+                                    <div className="bg-white/30 dark:bg-slate-800/30 p-4 rounded-2xl border border-white/40 dark:border-white/5 shadow-sm">
+                                        <Label className="mb-2 block">Aspect Ratio</Label>
+                                        <Select value={imageAspectRatio} onChange={(e) => setImageAspectRatio(e.target.value as ImageAspectRatio)}>
+                                            <option value="1:1">1:1</option>
+                                            <option value="16:9">16:9</option>
+                                            <option value="9:16">9:16</option>
+                                            <option value="4:3">4:3</option>
+                                        </Select>
+                                    </div>
+
                                     <div id="tour-image-prompt" className="space-y-3 relative">
                                         <div className="flex justify-between items-center">
                                             <Label>Prompt</Label>
@@ -900,6 +914,16 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                             )}
                                             <input ref={editInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setEditSourceImage)} />
                                         </div>
+                                    </div>
+
+                                    <div className="bg-white/30 dark:bg-slate-800/30 p-4 rounded-2xl border border-white/40 dark:border-white/5 shadow-sm">
+                                        <Label className="mb-2 block">Aspect Ratio</Label>
+                                        <Select value={editAspectRatio} onChange={(e) => setEditAspectRatio(e.target.value as ImageAspectRatio)}>
+                                            <option value="1:1">1:1</option>
+                                            <option value="16:9">16:9</option>
+                                            <option value="9:16">9:16</option>
+                                            <option value="4:3">4:3</option>
+                                        </Select>
                                     </div>
 
                                     <div id="tour-edit-instruction" className="space-y-3">
@@ -1008,7 +1032,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() => handleEnhancePrompt(videoPrompt, setVideoPrompt)}
+                                                onClick={() => handleEnhancePrompt(videoPrompt, setVideoPrompt, { hasImage: videoMode === 'i2v' && Boolean(sourceImage) })}
                                                 disabled={isEnhancing || !videoPrompt}
                                                 className="h-6 text-xs text-primary hover:text-primary-dark px-2 gap-1.5"
                                             >

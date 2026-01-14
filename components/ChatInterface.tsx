@@ -741,7 +741,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
       // Return ReactMarkdown component
       return (
-        <div className="prose dark:prose-invert prose-sm sm:prose-base max-w-none break-words leading-relaxed">
+        <div className="prose dark:prose-invert prose-sm max-w-none break-words leading-relaxed">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
@@ -784,7 +784,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     if (Array.isArray(content)) {
       return content.map((part: any, i: number) => {
         if (part.type === 'text') return (
-          <span key={i} className="block prose dark:prose-invert max-w-none">
+          <span key={i} className="block prose prose-sm dark:prose-invert max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>
           </span>
         );
@@ -820,7 +820,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       <audio ref={audioRef} className="hidden" />
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-8 scroll-smooth custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-1 xs:p-2 sm:p-6 space-y-3 xs:space-y-4 sm:space-y-8 scroll-smooth custom-scrollbar">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-8 animate-fade-in pb-20">
             <div className="relative group">
@@ -843,7 +843,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`flex items-end gap-3 group animate-in slide-in-from-bottom-4 duration-500 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+            className={`flex items-end gap-1 xs:gap-2 min-w-0 group animate-in slide-in-from-bottom-4 duration-500 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
               } ${msg.role === 'tool' ? 'w-full justify-center' : ''}`}
           >
             {/* Tool Message (Hidden, now rendered in assistant message) */}
@@ -851,27 +851,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
             {/* Regular Avatar (Skip for tools) */}
             {msg.role !== 'tool' && (msg.role !== 'assistant' || msg.content !== '') ? (
-              <div className={`shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg transition-transform hover:scale-105 duration-300 ${msg.role === 'user'
+              <div className={`shrink-0 w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shadow-lg transition-transform hover:scale-105 duration-300 ${msg.role === 'user'
                 ? 'bg-gradient-to-br from-primary to-primary-dark text-white border border-primary-light/30'
                 : msg.role === 'system'
                   ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-300'
                   : 'bg-white/50 dark:bg-slate-800/40 text-primary dark:text-primary-light border border-white/50 dark:border-white/10 backdrop-blur-md'
                 }`}>
-                {msg.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+                {msg.role === 'user' ? <User className="w-3.5 h-3.5 xs:w-4 xs:h-4" /> : <Bot className="w-3.5 h-3.5 xs:w-4 xs:h-4" />}
               </div>
             ) : null}
 
             {/* Bubble Container */}
             {msg.role !== 'tool' && msg.content && (
-              <div className={`flex flex-col gap-1 max-w-[85%] sm:max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+              <div className={`flex flex-col gap-1 min-w-0 max-w-[85%] xs:max-w-[90%] sm:max-w-[75%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
 
                 <div className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <div
-                    className={`relative px-4 py-3 sm:px-6 sm:py-4 rounded-2xl text-sm sm:text-base leading-relaxed shadow-md ${msg.role === 'user'
-                      ? 'bg-gradient-to-br from-primary to-primary-dark text-white rounded-br-sm shadow-primary/20'
+                    className={`relative px-3 py-2 sm:px-5 sm:py-3 rounded-[1.5rem] text-sm leading-relaxed break-words shadow-sm transition-all duration-300 hover:shadow-md ${msg.role === 'user'
+                      ? 'bg-gradient-to-tr from-primary to-emerald-600 text-white rounded-br-sm shadow-primary/20'
                       : msg.role === 'system'
                         ? 'bg-rose-50/60 dark:bg-rose-900/20 text-rose-600 dark:text-rose-200 border border-rose-100 dark:border-rose-900/30 backdrop-blur-md w-full'
-                        : 'bg-white/20 dark:bg-slate-800/20 text-slate-800 dark:text-slate-100 rounded-bl-sm backdrop-blur-2xl border border-white/40 dark:border-white/5 shadow-[0_4px_15px_rgba(0,0,0,0.05)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.2)] min-w-[100px]'
+                        : 'bg-white/40 dark:bg-[#0f172a]/40 text-slate-800 dark:text-slate-100 rounded-bl-sm backdrop-blur-2xl border border-white/60 dark:border-white/5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.2)] min-w-[72px] xs:min-w-[100px]'
                       }`}
                   >
                     {/* Header: Thinking & Sources */}
@@ -1058,7 +1058,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       </div>
 
       {/* Input Area */}
-      <div className="p-3 pb-4 sm:p-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-t border-white/50 dark:border-white/5 z-20">
+      <div className="p-2 sm:p-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-t border-white/50 dark:border-white/5 z-20">
         <div className="max-w-4xl mx-auto flex flex-col gap-3">
           {attachment && (
             <div className="flex items-center gap-3 p-2 bg-white/50 dark:bg-slate-800/50 rounded-lg w-fit border border-primary/20 animate-in slide-in-from-bottom-2">
@@ -1079,7 +1079,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
             </div>
           )}
 
-          <div className="flex items-end gap-2 bg-white/80 dark:bg-slate-950/50 p-1.5 sm:p-2 rounded-[1.5rem] border border-gray-200/50 dark:border-white/10 shadow-lg focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+          <div className="flex items-end gap-1 sm:gap-2 bg-white/80 dark:bg-slate-950/50 p-1.5 sm:p-2 rounded-[1.5rem] border border-gray-200/50 dark:border-white/10 shadow-lg focus-within:ring-2 focus-within:ring-primary/20 transition-all">
             <input
               type="file"
               ref={fileInputRef}
@@ -1090,11 +1090,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full h-10 w-10 text-gray-500 hover:text-primary hover:bg-primary/5 shrink-0"
+              className="rounded-full h-8 w-8 sm:h-10 sm:w-10 text-gray-500 hover:text-primary hover:bg-primary/5 shrink-0"
               onClick={() => fileInputRef.current?.click()}
               title="Attach file"
             >
-              <Paperclip className="w-5 h-5" />
+              <Paperclip className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
 
             {/* Web Search Toggle - Themed */}
@@ -1102,14 +1102,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
               <Button
                 variant="ghost"
                 size="icon"
-                className={`rounded-full h-10 w-10 shrink-0 transition-all duration-300 ${isSearchEnabled
+                className={`rounded-full h-8 w-8 sm:h-10 sm:w-10 shrink-0 transition-all duration-300 ${isSearchEnabled
                   ? 'bg-primary/10 text-primary hover:bg-primary/20'
                   : 'text-gray-500 hover:text-primary hover:bg-primary/5 dark:hover:bg-white/5'
                   }`}
                 onClick={() => setIsSearchEnabled(!isSearchEnabled)}
                 title={isSearchEnabled ? "Web Search Enabled" : "Enable Web Search"}
               >
-                <Globe className={`w-5 h-5 ${isSearchEnabled ? 'text-primary' : 'text-gray-500 dark:text-gray-400'}`} />
+                <Globe className={`w-4 h-4 sm:w-5 sm:h-5 ${isSearchEnabled ? 'text-primary' : 'text-gray-500 dark:text-gray-400'}`} />
               </Button>
             )}
 
@@ -1130,19 +1130,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                           if (subscriptionTier === 'free') return;
                           setShowKnowledgeModal(true);
                         }}
-                        className={`rounded-full h-10 w-10 shrink-0 transition-all duration-300 flex items-center justify-center relative ${isKnowledgeEnabled
+                        className={`rounded-full h-8 w-8 sm:h-10 sm:w-10 shrink-0 transition-all duration-300 flex items-center justify-center relative ${isKnowledgeEnabled
                           ? 'bg-violet-500/10 text-violet-500 hover:bg-violet-500/20'
                           : subscriptionTier === 'free'
                             ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed'
                             : 'text-gray-500 hover:text-violet-500 hover:bg-violet-500/5 dark:hover:bg-white/5'
                           }`}
                       >
-                        <Database className={`w-5 h-5 ${isKnowledgeEnabled ? 'text-violet-500' : ''}`} />
+                        <Database className={`w-4 h-4 sm:w-5 sm:h-5 ${isKnowledgeEnabled ? 'text-violet-500' : ''}`} />
 
                         {/* Lock Badge for Free Users */}
                         {subscriptionTier === 'free' && (
-                          <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900 z-10">
-                            <Lock className="w-2.5 h-2.5 text-white" />
+                          <div className="absolute -top-1 -right-1 flex h-3 w-3 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900 z-10">
+                            <Lock className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />
                           </div>
                         )}
                       </button>
@@ -1188,21 +1188,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                   }
                 }
               }}
-              placeholder="Message GT Assistant..."
-              className="flex-1 bg-transparent border-none focus:ring-0 resize-none max-h-32 py-2.5 px-2 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 text-sm sm:text-base scrollbar-hide focus:outline-none"
+              placeholder="Message GT..."
+              className="flex-1 min-w-[60px] bg-transparent border-none focus:ring-0 resize-none max-h-32 py-2.5 px-1 sm:px-2 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 text-sm sm:text-base scrollbar-hide focus:outline-none"
               rows={1}
             />
 
-            <div className="flex items-center gap-1 pb-0.5">
+            <div className="flex items-center gap-0.5 sm:gap-1 pb-0.5">
               <Button
                 variant={isRecording ? "destructive" : "ghost"}
                 size="icon"
                 onClick={() => isAuthenticated ? handleVoiceInput() : onRequestAuth()}
                 disabled={!isAuthenticated}
-                className={`rounded-full h-9 w-9 transition-all ${isRecording ? 'animate-pulse' : 'text-gray-500 hover:text-primary disabled:opacity-50'}`}
+                className={`rounded-full h-8 w-8 sm:h-9 sm:w-9 transition-all ${isRecording ? 'animate-pulse' : 'text-gray-500 hover:text-primary disabled:opacity-50'}`}
                 title={isAuthenticated ? "Voice Input" : "Sign in to use voice input"}
               >
-                {isRecording ? <Square className="w-4 h-4 fill-current" /> : <Mic className="w-5 h-5" />}
+                {isRecording ? <Square className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" /> : <Mic className="w-4 h-4 sm:w-5 sm:h-5" />}
               </Button>
 
               <CreditAwareButton
@@ -1212,9 +1212,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                 onRequestAuth={onRequestAuth}
                 disabled={isLoading || (!inputValue.trim() && !attachment)}
                 size="icon"
-                className="rounded-full h-9 w-9 shadow-md shadow-primary/20"
+                className="rounded-full h-8 w-8 sm:h-9 sm:w-9 shadow-md shadow-primary/20"
               >
-                <Send className="w-4 h-4 ml-0.5" />
+                <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5" />
               </CreditAwareButton>
             </div>
           </div>
