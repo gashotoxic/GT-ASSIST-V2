@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Joyride, { CallBackProps, STATUS, Step } from 'react-joyride';
 
 interface OnboardingTourProps {
@@ -15,6 +15,73 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
     const [runImageTour, setRunImageTour] = useState(false);
     const [runEditTour, setRunEditTour] = useState(false);
     const [runVideoTour, setRunVideoTour] = useState(false);
+    const [tourBanner, setTourBanner] = useState<{ isOpen: boolean; tour: 'chat' | 'image' | 'edit' | 'video' | null }>({
+        isOpen: false,
+        tour: null,
+    });
+    const bannerTimerRef = useRef<number | null>(null);
+
+    const hideBanner = useCallback(() => {
+        setTourBanner({ isOpen: false, tour: null });
+        if (bannerTimerRef.current) {
+            window.clearTimeout(bannerTimerRef.current);
+            bannerTimerRef.current = null;
+        }
+    }, []);
+
+    const showBanner = useCallback((tour: 'chat' | 'image' | 'edit' | 'video') => {
+        setTourBanner({ isOpen: true, tour });
+        if (bannerTimerRef.current) window.clearTimeout(bannerTimerRef.current);
+        bannerTimerRef.current = window.setTimeout(() => {
+            setTourBanner({ isOpen: false, tour: null });
+            bannerTimerRef.current = null;
+        }, 7000);
+    }, []);
+
+    const triggerTour = useCallback((tour: 'chat' | 'image' | 'edit' | 'video') => {
+        setRunChatTour(false);
+        setRunImageTour(false);
+        setRunEditTour(false);
+        setRunVideoTour(false);
+
+        window.setTimeout(() => {
+            if (tour === 'chat') setRunChatTour(true);
+            if (tour === 'image') setRunImageTour(true);
+            if (tour === 'edit') setRunEditTour(true);
+            if (tour === 'video') setRunVideoTour(true);
+        }, 60);
+    }, []);
+
+    const triggerCurrentTour = useCallback(() => {
+        if (!isSignedIn) return;
+
+        if (currentView !== 'chat' && currentView !== 'media') {
+            setCurrentView('chat');
+            triggerTour('chat');
+            return;
+        }
+
+        if (currentView === 'media') {
+            const mediaTour: 'image' | 'edit' | 'video' = activeMediaTab === 'edit' ? 'edit' : activeMediaTab === 'video' ? 'video' : 'image';
+            triggerTour(mediaTour);
+            return;
+        }
+
+        triggerTour('chat');
+    }, [activeMediaTab, currentView, isSignedIn, setCurrentView, triggerTour]);
+
+    useEffect(() => {
+        const handler = (event: Event) => {
+            const detail = (event as CustomEvent).detail as { tour?: 'chat' | 'image' | 'edit' | 'video' | 'current' } | undefined;
+            if (detail?.tour && detail.tour !== 'current') {
+                triggerTour(detail.tour);
+                return;
+            }
+            triggerCurrentTour();
+        };
+        window.addEventListener('start-tour', handler as EventListener);
+        return () => window.removeEventListener('start-tour', handler as EventListener);
+    }, [triggerCurrentTour, triggerTour]);
 
     // Chat Tour - runs on first login
     useEffect(() => {
@@ -73,30 +140,43 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
         if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status as any)) {
             setRunChatTour(false);
             localStorage.setItem('has_seen_chat_tour', 'true');
+            window.dispatchEvent(new CustomEvent('close-sidebar'));
+            if (status === STATUS.SKIPPED || action === 'close') {
+                showBanner('chat');
+            }
         }
     };
 
     const handleImageCallback = (data: CallBackProps) => {
-        const { status } = data;
+        const { status, action } = data;
         if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status as any)) {
             setRunImageTour(false);
             localStorage.setItem('has_seen_image_tour', 'true');
+            if (status === STATUS.SKIPPED || action === 'close') {
+                showBanner('image');
+            }
         }
     };
 
     const handleEditCallback = (data: CallBackProps) => {
-        const { status } = data;
+        const { status, action } = data;
         if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status as any)) {
             setRunEditTour(false);
             localStorage.setItem('has_seen_edit_tour', 'true');
+            if (status === STATUS.SKIPPED || action === 'close') {
+                showBanner('edit');
+            }
         }
     };
 
     const handleVideoCallback = (data: CallBackProps) => {
-        const { status } = data;
+        const { status, action } = data;
         if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status as any)) {
             setRunVideoTour(false);
             localStorage.setItem('has_seen_video_tour', 'true');
+            if (status === STATUS.SKIPPED || action === 'close') {
+                showBanner('video');
+            }
         }
     };
 
@@ -106,8 +186,8 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
             target: 'body',
             content: (
                 <div className="space-y-2">
-                    <h3 className="font-bold text-lg text-gray-900 dark:text-white">Welcome to GashoChat! 👋</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">Your AI assistant for chat and creative content.</p>
+                    <h3 className="font-bold text-lg text-gray-900 dark:text-white">Welcome to GashoChat</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">Here’s a quick tour to help you find the important buttons.</p>
                 </div>
             ),
             placement: 'center',
@@ -115,12 +195,12 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
         },
         {
             target: '#tour-settings-trigger',
-            content: 'Change AI model & view your profile.',
+            content: 'Open settings to change your model, theme, and account options.',
             placement: 'right',
         },
         {
             target: '#tour-media-nav',
-            content: 'Click here to generate images and videos.',
+            content: 'Go to Media to generate images, edit photos, and animate videos.',
             placement: 'bottom',
         },
     ];
@@ -129,18 +209,18 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
     const imageSteps: Step[] = [
         {
             target: '#tour-image-model',
-            content: 'Select an image model (Qwen, FLUX, etc.).',
+            content: 'Pick an image model (different models have different styles).',
             placement: 'right',
             disableBeacon: true,
         },
         {
             target: '#tour-image-prompt',
-            content: 'Describe what you want to create.',
+            content: 'Describe what you want to create (be specific for best results).',
             placement: 'right',
         },
         {
             target: '#tour-image-generate',
-            content: 'Click Generate to create your image!',
+            content: 'Tap Generate and your image will appear on the right.',
             placement: 'right',
         },
     ];
@@ -149,18 +229,18 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
     const editSteps: Step[] = [
         {
             target: '#tour-edit-input-image',
-            content: 'Upload an image to transform.',
+            content: 'Upload an image you want to change.',
             placement: 'right',
             disableBeacon: true,
         },
         {
             target: '#tour-edit-instruction',
-            content: 'Describe your edit (e.g., "Make it sunset").',
+            content: 'Describe the change (example: “make it sunset”).',
             placement: 'right',
         },
         {
             target: '#tour-edit-apply',
-            content: 'Click Apply to see the magic!',
+            content: 'Tap Apply to generate the edited version.',
             placement: 'right',
         },
     ];
@@ -175,12 +255,12 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
         },
         {
             target: '#tour-video-prompt',
-            content: 'Describe the motion you want.',
+            content: 'Describe the motion you want (camera + action).',
             placement: 'right',
         },
         {
             target: '#tour-video-generate',
-            content: 'Click Animate to bring it to life!',
+            content: 'Tap Animate to generate your video preview.',
             placement: 'right',
         },
     ];
@@ -223,6 +303,23 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
         }
     };
 
+    const commonLocale = {
+        back: 'Back',
+        close: 'Close',
+        last: 'Done',
+        next: 'Next',
+        skip: 'Not now',
+    };
+
+    const bannerMessage =
+        tourBanner.tour === 'image'
+            ? 'Guide closed. Want to try the Image guide again?'
+            : tourBanner.tour === 'edit'
+              ? 'Guide closed. Want to try the Edit guide again?'
+              : tourBanner.tour === 'video'
+                ? 'Guide closed. Want to try the Video guide again?'
+                : 'Guide closed. Want to try the Chat guide again?';
+
     return (
         <>
             <Joyride
@@ -233,6 +330,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
                 showSkipButton
                 callback={handleChatCallback}
                 styles={commonStyles}
+                locale={commonLocale}
                 floaterProps={{ disableAnimation: true }}
             />
             <Joyride
@@ -243,6 +341,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
                 showSkipButton
                 callback={handleImageCallback}
                 styles={commonStyles}
+                locale={commonLocale}
                 floaterProps={{ disableAnimation: true }}
             />
             <Joyride
@@ -253,6 +352,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
                 showSkipButton
                 callback={handleEditCallback}
                 styles={commonStyles}
+                locale={commonLocale}
                 floaterProps={{ disableAnimation: true }}
             />
             <Joyride
@@ -263,8 +363,39 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({ currentView, set
                 showSkipButton
                 callback={handleVideoCallback}
                 styles={commonStyles}
+                locale={commonLocale}
                 floaterProps={{ disableAnimation: true }}
             />
+            {tourBanner.isOpen && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10001] w-[min(560px,calc(100vw-24px))]">
+                    <div className="rounded-2xl bg-white/20 dark:bg-slate-900/30 backdrop-blur-2xl border border-white/40 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.25)] px-4 py-3 flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {bannerMessage}
+                            <div className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-0.5">
+                                You can also restart anytime from the Guide button in Settings.
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                            <button
+                                onClick={() => {
+                                    const tour = tourBanner.tour || 'chat';
+                                    hideBanner();
+                                    triggerTour(tour);
+                                }}
+                                className="h-9 px-3 rounded-xl bg-primary text-white text-xs font-bold hover:bg-[#16a085] transition-colors"
+                            >
+                                Restart
+                            </button>
+                            <button
+                                onClick={hideBanner}
+                                className="h-9 px-3 rounded-xl bg-white/20 dark:bg-white/10 border border-white/40 dark:border-white/10 text-slate-900 dark:text-white text-xs font-bold hover:bg-white/30 dark:hover:bg-white/15 transition-colors"
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

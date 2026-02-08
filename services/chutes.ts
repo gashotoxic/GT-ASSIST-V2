@@ -1,10 +1,12 @@
 
-import { Message, TTSRequest, STTRequest, ImageGenRequest, VideoGenRequest, ImageEditRequest, SearchSource, ImageAspectRatio } from '../types';
+import { Message, TTSRequest, STTRequest, ImageGenRequest, VideoGenRequest, ImageEditRequest, MuseTalkLipSyncRequest, SearchSource, ImageAspectRatio } from '../types';
 import { SearchAgent } from './searchAgent';
+import { isLtx2Model, buildLtx2GenerationInput } from './chutesLtx2';
 
 const BASE_LLM_URL = 'https://llm.chutes.ai/v1/chat/completions';
 const BASE_TTS_URL = 'https://chutes-kokoro.chutes.ai/speak';
 const BASE_STT_URL = 'https://chutes-whisper-large-v3.chutes.ai/transcribe';
+const BASE_MUSETALK_URL = 'https://chutes-musetalk.chutes.ai/generate';
 
 export class ChutesService {
   private apiKey: string;
@@ -82,6 +84,20 @@ export class ChutesService {
     return false;
   }
 
+  private detectExplicitEthnicity(prompt: string): boolean {
+    const p = (prompt || '').toLowerCase();
+    return /(african american|afro-american|black (person|people|man|woman|model|models)?|white (person|people|man|woman|model|models)?|caucasian|asian|east asian|south asian|latino|latina|hispanic|middle eastern|arab|indian|nigerian|kenyan|ethiopian|somali)/.test(
+      p
+    );
+  }
+
+  private detectPeopleInPrompt(prompt: string): boolean {
+    const p = (prompt || '').toLowerCase();
+    return /(person|people|man|woman|boy|girl|child|children|kid|kids|friends?|family|couple|group|crowd|portrait|selfie|model|models|character|characters|face|faces|smile|standing|sitting)/.test(
+      p
+    );
+  }
+
   private getImageDimensions(aspectRatio?: ImageAspectRatio): { width: number; height: number } {
     switch (aspectRatio) {
       case '16:9':
@@ -102,11 +118,14 @@ export class ChutesService {
 
     const cappedPrompt = trimmed.length > 1000 ? trimmed.slice(0, 1000) : trimmed;
     const hasImage = Boolean(options?.hasImage) || this.detectImagesInPrompt(cappedPrompt);
+    const hasPeople = this.detectPeopleInPrompt(cappedPrompt);
+    const hasExplicitEthnicity = this.detectExplicitEthnicity(cappedPrompt);
+    const shouldDefaultToAfricanAmerican = (hasImage || hasPeople) && !hasExplicitEthnicity;
 
     const systemPromptBase =
       "You are an expert prompt engineer for AI image and video generation models. Your task is to rewrite the user's simple prompt into a highly detailed, descriptive, and artistic prompt suitable for models like Midjourney, Stable Diffusion, or Wan Video. Focus on lighting, artistic style, camera angles, texture, and mood. Output ONLY the enhanced prompt text, without any explanations or conversational filler.";
-    const systemPromptAddendum = hasImage
-      ? " When an image is provided or referenced, default any depicted people to African American unless the user explicitly requests otherwise. Keep the output under 1000 characters."
+    const systemPromptAddendum = shouldDefaultToAfricanAmerican
+      ? " If the prompt includes people and the user does not specify ethnicity, default the people to African American. Do not override explicit user ethnicity. Keep the output under 1000 characters."
       : " Keep the output under 1000 characters.";
     const systemPrompt = `${systemPromptBase}${systemPromptAddendum}`;
 
@@ -133,13 +152,17 @@ export class ChutesService {
     systemPrompt: string,
     model: string,
     searchConfig?: { enabled: boolean; apiKey: string; provider: 'tavily' | 'brave' },
+    toolRuntime?: { executeTool: (name: string, args: any) => Promise<any> } | null,
+    onToolResult?: (payload: { tool: string; result: any }) => void,
     onStatusChange?: (status: string | null) => void,
     signal?: AbortSignal
-  ): AsyncGenerator<{ type: 'thinking' | 'content' | 'sources'; text?: string; sources?: SearchSource[] }, void, unknown> {
+  ): AsyncGenerator<{ type: 'thinking' | 'content' | 'sources' | 'tool_result'; text?: string; sources?: SearchSource[]; tool?: string; result?: any }, void, unknown> {
 
     // Setup Tools
-    const tools = (searchConfig?.enabled && searchConfig?.apiKey && searchConfig.apiKey.length > 5) ? [
-      {
+    const tools: any[] = [];
+
+    if (searchConfig?.enabled && searchConfig?.apiKey && searchConfig.apiKey.length > 5) {
+      tools.push({
         type: "function",
         function: {
           name: "web_search",
@@ -155,8 +178,46 @@ export class ChutesService {
             required: ["query"]
           }
         }
-      }
-    ] : undefined;
+      });
+    }
+
+    if (toolRuntime) {
+      tools.push(
+        {
+          type: "function",
+          function: {
+            name: "generate_image",
+            description: "Generate a marketing image from a prompt. Use when the user explicitly requests generating an image now.",
+            parameters: {
+              type: "object",
+              properties: {
+                prompt: { type: "string", description: "The image prompt to generate." },
+                aspectRatio: { type: "string", enum: ["1:1", "16:9", "9:16", "4:3"], description: "Optional aspect ratio." }
+              },
+              required: ["prompt"]
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "edit_image",
+            description: "Edit an existing image using an instruction prompt and base64 image. Use when the user explicitly requests editing now.",
+            parameters: {
+              type: "object",
+              properties: {
+                prompt: { type: "string", description: "The edit instruction." },
+                image_b64: { type: "string", description: "The input image as data URL or raw base64." },
+                aspectRatio: { type: "string", enum: ["1:1", "16:9", "9:16", "4:3"], description: "Optional aspect ratio." }
+              },
+              required: ["prompt", "image_b64"]
+            }
+          }
+        }
+      );
+    }
+
+    const toolsPayload = tools.length > 0 ? tools : undefined;
 
     const allMessages = [
       { role: 'system', content: systemPrompt },
@@ -171,8 +232,8 @@ export class ChutesService {
       temperature: 1,
     };
 
-    if (tools) {
-      body.tools = tools;
+    if (toolsPayload) {
+      body.tools = toolsPayload;
     }
 
     const response = await this.fetchWithRetry(BASE_LLM_URL, {
@@ -245,15 +306,6 @@ export class ChutesService {
               }
 
               if (choice?.finish_reason === 'tool_calls' || (choice?.finish_reason === 'stop' && currentToolCalls.length > 0)) {
-                if (onStatusChange) onStatusChange('🔍 Analyzing query...');
-
-                // Use intelligent SearchAgent instead of basic SearchService
-                const searchAgent = new SearchAgent({
-                  tavilyApiKey: searchConfig!.provider === 'tavily' ? searchConfig!.apiKey : undefined,
-                  braveApiKey: searchConfig!.provider === 'brave' ? searchConfig!.apiKey : undefined,
-                  preferredProvider: searchConfig!.provider,
-                });
-
                 const assistantMsg: Message = {
                   role: 'assistant',
                   content: '',
@@ -263,21 +315,39 @@ export class ChutesService {
                 const newMessages = [...messages, assistantMsg];
 
                 for (const call of currentToolCalls) {
-                  if (call.function.name === 'web_search') {
-                    const args = JSON.parse(call.function.arguments);
+                  const toolName = call.function.name;
+                  const rawArgs = call.function.arguments || '{}';
 
-                    // Use SearchAgent for intelligent search
-                    if (onStatusChange) onStatusChange(`🔍 Searching: "${args.query.slice(0, 30)}${args.query.length > 30 ? '...' : ''}"`);
+                  if (toolName === 'web_search') {
+                    if (!searchConfig?.enabled || !searchConfig.apiKey || searchConfig.apiKey.length <= 5) {
+                      newMessages.push({
+                        role: 'tool',
+                        tool_call_id: call.id,
+                        name: 'web_search',
+                        content: 'Web search is not enabled.'
+                      });
+                      continue;
+                    }
+
+                    const args = JSON.parse(rawArgs);
+
+                    if (onStatusChange) onStatusChange('🔍 Analyzing query...');
+
+                    const searchAgent = new SearchAgent({
+                      tavilyApiKey: searchConfig.provider === 'tavily' ? searchConfig.apiKey : undefined,
+                      braveApiKey: searchConfig.provider === 'brave' ? searchConfig.apiKey : undefined,
+                      preferredProvider: searchConfig.provider,
+                    });
+
+                    if (onStatusChange) onStatusChange(`🔍 Searching: "${String(args.query || '').slice(0, 30)}${String(args.query || '').length > 30 ? '...' : ''}"`);
                     const searchContext = await searchAgent.search(args.query);
 
                     if (onStatusChange) {
                       onStatusChange(SearchAgent.getStatusMessage(searchContext));
                     }
 
-                    // Use synthesized context with citations
                     const toolResponse = searchContext.synthesizedContext || 'No results found.';
 
-                    // Yield sources to UI
                     if (searchContext.sources && searchContext.sources.length > 0) {
                       yield { type: 'sources', sources: searchContext.sources };
                     }
@@ -289,12 +359,53 @@ export class ChutesService {
                       content: toolResponse,
                       sources: searchContext.sources
                     });
+                    continue;
                   }
+
+                  if (toolName === 'generate_image' || toolName === 'edit_image') {
+                    if (!toolRuntime) {
+                      newMessages.push({
+                        role: 'tool',
+                        tool_call_id: call.id,
+                        name: toolName,
+                        content: 'Tool not available.'
+                      });
+                      continue;
+                    }
+
+                    const args = JSON.parse(rawArgs);
+                    if (onStatusChange) {
+                      onStatusChange(toolName === 'generate_image' ? '🎨 Generating image...' : '✨ Editing image...');
+                    }
+
+                    const result = await toolRuntime.executeTool(toolName, args);
+
+                    if (onToolResult) {
+                      onToolResult({ tool: toolName, result });
+                    } else {
+                      yield { type: 'tool_result', tool: toolName, result };
+                    }
+
+                    newMessages.push({
+                      role: 'tool',
+                      tool_call_id: call.id,
+                      name: toolName,
+                      content: typeof result === 'string' ? result : JSON.stringify(result)
+                    });
+                    continue;
+                  }
+
+                  newMessages.push({
+                    role: 'tool',
+                    tool_call_id: call.id,
+                    name: toolName,
+                    content: `Unsupported tool: ${toolName}`
+                  });
                 }
 
                 if (onStatusChange) onStatusChange(null);
 
-                yield* this.streamChat(newMessages, systemPrompt, model, searchConfig, onStatusChange, signal);
+                yield* this.streamChat(newMessages, systemPrompt, model, searchConfig, toolRuntime, onToolResult, onStatusChange, signal);
                 return;
               }
 
@@ -485,8 +596,25 @@ export class ChutesService {
 
   async generateVideo(request: VideoGenRequest, signal?: AbortSignal): Promise<Blob> {
     let body: any = {};
+    let isLtx2 = false;
+    let ltx2GenInput: any = null;
 
-    if (request.modelId === 'wan-2.1-t2v') {
+    if (isLtx2Model(request.modelId)) {
+      isLtx2 = true;
+      if (!request.ltx2Params) {
+        throw new Error("LTX-2 model selected but no LTX-2 settings provided");
+      }
+      const { settings, videoUrl, keyframeStart, keyframeEnd } = request.ltx2Params;
+      ltx2GenInput = buildLtx2GenerationInput(
+        request.prompt,
+        settings,
+        request.image,
+        videoUrl,
+        keyframeStart,
+        keyframeEnd
+      );
+      body = ltx2GenInput;
+    } else if (request.modelId === 'wan-2.1-t2v') {
       // Text to Video Logic
       body = {
         prompt: request.prompt,
@@ -513,16 +641,102 @@ export class ChutesService {
       };
     }
 
-    const response = await this.fetchWithRetry(request.modelUrl, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(body),
-      signal
-    });
+    const doRequest = async (payload: any) => {
+      return this.fetchWithRetry(request.modelUrl, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(payload),
+        signal
+      });
+    };
+
+    const shouldRetryWithDifferentWrapper = (status: number, errorText: string) => {
+      if (status === 400 || status === 404 || status === 422) return true;
+      return /invalid input parameters|input_args|args|wrapper/i.test(errorText);
+    };
+
+    if (isLtx2) {
+      const candidates = [
+        ltx2GenInput,
+        { args: ltx2GenInput },
+        { input_args: ltx2GenInput }
+      ];
+
+      let lastStatus = 0;
+      let lastErrorText = '';
+
+      for (let i = 0; i < candidates.length; i++) {
+        const response = await doRequest(candidates[i]);
+        if (response.ok) {
+          return await response.blob();
+        }
+
+        lastStatus = response.status;
+        lastErrorText = await response.text().catch(() => '');
+
+        if (!shouldRetryWithDifferentWrapper(lastStatus, lastErrorText)) {
+          break;
+        }
+      }
+
+      throw new Error(`Video Gen Error: ${lastStatus} - ${lastErrorText}`);
+    }
+
+    const response = await doRequest(body);
 
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Video Gen Error: ${response.status} - ${errorText}`);
+    }
+
+    return await response.blob();
+  }
+
+  async generateLipSync(request: MuseTalkLipSyncRequest, signal?: AbortSignal): Promise<Blob> {
+    const cleanInput = (value: string): string => {
+      if (!value) return value;
+      if (/^https?:\/\//i.test(value)) return value;
+      if (value.includes('base64,')) return value.split('base64,')[1] || '';
+      return value;
+    };
+
+    const payload = {
+      fps: request.fps ?? 25,
+      batch_size: request.batch_size ?? 8,
+      audio_input: cleanInput(request.audio_input),
+      video_input: cleanInput(request.video_input),
+      extra_margin: request.extra_margin ?? 10,
+      parsing_mode: request.parsing_mode ?? 'jaw',
+      left_cheek_width: request.left_cheek_width ?? 90,
+      right_cheek_width: request.right_cheek_width ?? 90
+    };
+
+    const doRequest = async (body: unknown) => {
+      return this.fetchWithRetry(request.modelUrl || BASE_MUSETALK_URL, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(body),
+        signal
+      });
+    };
+
+    let response = await doRequest(payload);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      const shouldRetryWithWrappedArgs =
+        response.status === 400 || response.status === 404 || response.status === 422 || /input_args/i.test(errorText);
+
+      if (shouldRetryWithWrappedArgs) {
+        response = await doRequest({ input_args: payload });
+      } else {
+        throw new Error(`Lip Sync Error: ${response.status} - ${errorText}`);
+      }
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Lip Sync Error: ${response.status} - ${errorText}`);
     }
 
     return await response.blob();

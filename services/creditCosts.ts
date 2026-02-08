@@ -8,6 +8,7 @@ export const CREDIT_COSTS = {
   chat: {
     'zai-org/GLM-4.6': 1,
     'moonshotai/Kimi-K2-Thinking': 1,
+    'moonshotai/Kimi-K2.5': 1,
     'deepseek-ai/DeepSeek-R1-0528': 1,
     // Default cost for unknown models
     default: 1
@@ -24,6 +25,9 @@ export const CREDIT_COSTS = {
   video: {
     'wan-2.2-i2v': 1,
     'wan-2.1-t2v': 1,
+    'ltx-2-i2v': 1,
+    'ltx-2-t2v': 1,
+    musetalk: 1,
     default: 1
   },
   edit: {

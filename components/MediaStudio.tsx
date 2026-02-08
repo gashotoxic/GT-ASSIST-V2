@@ -4,11 +4,13 @@ import { Image, Film, Loader2, Download, Wand2, Upload, AlertCircle, Play, Sciss
 import { Button, Input, Textarea, Select, Label } from './UI';
 import { ChutesService } from '../services/chutes';
 import { SupabaseService } from '../services/supabase';
-import { WatermarkService } from '../services/watermark';
-import { AVAILABLE_IMAGE_MODELS, AVAILABLE_VIDEO_MODELS, AVAILABLE_EDIT_MODELS, AppSettings, MediaItem, ImageAspectRatio } from '../types';
+import { AVAILABLE_IMAGE_MODELS, AVAILABLE_VIDEO_MODELS, AVAILABLE_EDIT_MODELS, AppSettings, MediaItem, ImageAspectRatio, MuseTalkLipSyncRequest, Ltx2AdvancedSettings } from '../types';
 import { getCreditCost } from '../services/creditCosts';
 import { useCredits } from '../context/CreditContext';
 import { summarizePrompt } from '../utils/stringUtils';
+import { VideoAnimatorPanel } from './media/VideoAnimatorPanel';
+import { LipSyncPanel } from './media/LipSyncPanel';
+import { MediaPickerModal } from './media/MediaPickerModal';
 
 interface MediaStudioProps {
     settings: AppSettings;
@@ -60,19 +62,59 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
     const [customImageModelUrl, setCustomImageModelUrl] = useState('');
     const [imageAspectRatio, setImageAspectRatio] = useState<ImageAspectRatio>('1:1');
     const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+    const [generatedImageItem, setGeneratedImageItem] = useState<MediaItem | null>(null);
 
     // Image Edit State
     const [editPrompt, setEditPrompt] = useState('');
     const [editSourceImage, setEditSourceImage] = useState<string | null>(null);
     const [editAspectRatio, setEditAspectRatio] = useState<ImageAspectRatio>('1:1');
     const [editedImageUrl, setEditedImageUrl] = useState<string | null>(null);
+    const [editedImageItem, setEditedImageItem] = useState<MediaItem | null>(null);
 
     // Video Gen State
+    const [videoTool, setVideoTool] = useState<'animate' | 'lipsync'>('animate');
     const [videoMode, setVideoMode] = useState<'i2v' | 't2v'>('i2v');
     const [selectedVideoModel, setSelectedVideoModel] = useState(AVAILABLE_VIDEO_MODELS.find(m => m.type === 'i2v')?.id || AVAILABLE_VIDEO_MODELS[0].id);
     const [videoPrompt, setVideoPrompt] = useState('');
     const [sourceImage, setSourceImage] = useState<string | null>(null);
     const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+    const [generatedVideoItem, setGeneratedVideoItem] = useState<MediaItem | null>(null);
+
+    // LTX-2 State
+    const [ltx2Settings, setLtx2Settings] = useState<Ltx2AdvancedSettings>({
+        pipeline: 'distilled',
+        conditioning: 'auto',
+        width: 768,
+        height: 512,
+        frame_rate: 25,
+        num_frames: 121,
+        image_strength: 1,
+        video_strength: 1,
+        cfg_guidance_scale: 3,
+        num_inference_steps: 40,
+        negative_prompt: 'low-res, morphing, distortion, warping, flicker, jitter, stutter, shaky camera, erratic motion, temporal artifacts, frame blending, low quality, jpeg artifacts',
+        enhance_prompt: false,
+        json_override: ''
+    });
+    const [ltx2VideoUrl, setLtx2VideoUrl] = useState('');
+    const [ltx2KeyframeStart, setLtx2KeyframeStart] = useState<string | null>(null);
+    const [ltx2KeyframeEnd, setLtx2KeyframeEnd] = useState<string | null>(null);
+
+    // Lip Sync State
+    const [lipsyncVideoInput, setLipsyncVideoInput] = useState('');
+    const [lipsyncAudioInput, setLipsyncAudioInput] = useState('');
+    const [lipsyncVideoPreviewUrl, setLipsyncVideoPreviewUrl] = useState<string | null>(null);
+    const [lipsyncVideoPreviewKind, setLipsyncVideoPreviewKind] = useState<'video' | null>(null);
+    const [lipsyncAudioPreviewUrl, setLipsyncAudioPreviewUrl] = useState<string | null>(null);
+    const [lipsyncAdvancedOpen, setLipsyncAdvancedOpen] = useState(false);
+    const [lipsyncVideoUrl, setLipsyncVideoUrl] = useState('');
+    const [lipsyncAudioUrl, setLipsyncAudioUrl] = useState('');
+    const [lipsyncFps, setLipsyncFps] = useState(25);
+    const [lipsyncBatchSize, setLipsyncBatchSize] = useState(8);
+    const [lipsyncExtraMargin, setLipsyncExtraMargin] = useState(10);
+    const [lipsyncParsingMode, setLipsyncParsingMode] = useState<'jaw' | 'raw'>('jaw');
+    const [lipsyncLeftCheekWidth, setLipsyncLeftCheekWidth] = useState(90);
+    const [lipsyncRightCheekWidth, setLipsyncRightCheekWidth] = useState(90);
 
     // Frame Capture State
     const [capturedFrame, setCapturedFrame] = useState<string | null>(null);
@@ -89,11 +131,40 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
     const [editTitleValue, setEditTitleValue] = useState('');
     const [isSelectMode, setIsSelectMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isSmallScreen, setIsSmallScreen] = useState(false);
+    const [lightboxFitMode, setLightboxFitMode] = useState<'fit' | 'width'>('fit');
+    const [lightboxZoom, setLightboxZoom] = useState(1);
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    // Cross-feature Modals
+    const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
+
     const editInputRef = useRef<HTMLInputElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const lightboxRef = useRef<HTMLDivElement>(null);
+    const lightboxVideoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(max-width: 640px)');
+        const apply = () => setIsSmallScreen(mediaQuery.matches);
+        apply();
+
+        if (typeof mediaQuery.addEventListener === 'function') {
+            mediaQuery.addEventListener('change', apply);
+            return () => mediaQuery.removeEventListener('change', apply);
+        }
+
+        mediaQuery.addListener(apply);
+        return () => mediaQuery.removeListener(apply);
+    }, []);
+
+    useEffect(() => {
+        if (!selectedMediaItem || selectedMediaItem.type !== 'image') return;
+        setLightboxZoom(1);
+        setLightboxFitMode(isSmallScreen ? 'width' : 'fit');
+    }, [selectedMediaItem?.id, selectedMediaItem?.type, isSmallScreen]);
+
+    const lightboxZoomStep = 0.25;
+    const clampLightboxZoom = (value: number) => Math.min(4, Math.max(1, value));
 
     // Separate controllers for each process
     const abortControllers = useRef<Record<GenType, AbortController | null>>({
@@ -137,8 +208,8 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
     };
 
     // Deduct credits function - STRICT Supabase usage
-    const deductCredits = async (type: 'image' | 'edit' | 'video'): Promise<boolean> => {
-        const model = type === 'image' ? selectedImageModel : type === 'video' ? selectedVideoModel : 'qwen-image-edit';
+    const deductCredits = async (type: 'image' | 'edit' | 'video', modelOverride?: string): Promise<boolean> => {
+        const model = modelOverride || (type === 'image' ? selectedImageModel : type === 'video' ? selectedVideoModel : 'qwen-image-edit');
         const cost = getMediaCost(type, model);
 
         if (userId) {
@@ -181,6 +252,11 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
     useEffect(() => {
         const compatibleModels = AVAILABLE_VIDEO_MODELS.filter(m => m.type === videoMode);
         if (compatibleModels.length > 0) {
+            if (videoMode === 't2v') {
+                const ltx2T2v = compatibleModels.find(m => m.id === 'ltx-2-t2v');
+                setSelectedVideoModel(ltx2T2v?.id || compatibleModels[0].id);
+                return;
+            }
             setSelectedVideoModel(compatibleModels[0].id);
         }
     }, [videoMode]);
@@ -279,6 +355,37 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         }
     };
 
+    const captureFrameFromVideoElement = (video: HTMLVideoElement): string => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            throw new Error("Failed to create canvas context");
+        }
+        ctx.drawImage(video, 0, 0);
+        return canvas.toDataURL('image/png');
+    };
+
+    const handleCaptureLightboxFrame = async () => {
+        const video = lightboxVideoRef.current;
+        if (!video) return;
+
+        try {
+            const dataUrl = captureFrameFromVideoElement(video);
+            setCapturedFrame(dataUrl);
+            setIsCaptureModalOpen(true);
+        } catch (e) {
+            try {
+                const dataUrl = await extractFrameFromVideo(video.currentSrc || video.src, video.currentTime);
+                setCapturedFrame(dataUrl);
+                setIsCaptureModalOpen(true);
+            } catch (err) {
+                console.error("Failed to capture frame from video", e, err);
+            }
+        }
+    };
+
     const updateGenStatus = (type: GenType, updates: Partial<GenerationState>) => {
         setGenStatus(prev => ({
             ...prev,
@@ -325,7 +432,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         }
     };
 
-    const addToHistory = async (blob: Blob, type: 'image' | 'video', prompt: string) => {
+    const addToHistory = async (blob: Blob, type: 'image' | 'video', prompt: string): Promise<MediaItem> => {
         const url = URL.createObjectURL(blob);
         const shortTitle = summarizePrompt(prompt);
         const currentSessionId = localStorage.getItem('chutes_current_session_id') || localStorage.getItem('chutes_session_id');
@@ -351,6 +458,8 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                 console.error('[MediaStudio] Failed to save media to Supabase:', error);
             }
         }
+
+        return newItem;
     };
 
     const handleDeleteMedia = async (item: MediaItem) => {
@@ -459,6 +568,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
 
         const signal = startGeneration('image');
         setGeneratedImageUrl(null);
+        setGeneratedImageItem(null);
 
         try {
             let modelUrl = '';
@@ -480,10 +590,9 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                 aspectRatio: imageAspectRatio
             }, signal);
 
-            const watermarkedBlob = await WatermarkService.addWatermarkToImage(rawBlob);
-            const url = URL.createObjectURL(watermarkedBlob);
-            setGeneratedImageUrl(url);
-            addToHistory(watermarkedBlob, 'image', imagePrompt);
+            const item = await addToHistory(rawBlob, 'image', imagePrompt);
+            setGeneratedImageUrl(item.url);
+            setGeneratedImageItem(item);
 
         } catch (err: any) {
             if (err.name !== 'AbortError') updateGenStatus('image', { error: err.message });
@@ -503,6 +612,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
 
         const signal = startGeneration('edit');
         setEditedImageUrl(null);
+        setEditedImageItem(null);
 
         try {
             const modelUrl = AVAILABLE_EDIT_MODELS[0].url;
@@ -514,10 +624,9 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                 aspectRatio: editAspectRatio
             }, signal);
 
-            const watermarkedBlob = await WatermarkService.addWatermarkToImage(rawBlob);
-            const url = URL.createObjectURL(watermarkedBlob);
-            setEditedImageUrl(url);
-            addToHistory(watermarkedBlob, 'image', editPrompt + " (Edited)");
+            const item = await addToHistory(rawBlob, 'image', editPrompt + " (Edited)");
+            setEditedImageUrl(item.url);
+            setEditedImageItem(item);
 
         } catch (err: any) {
             if (err.name !== 'AbortError') updateGenStatus('edit', { error: err.message });
@@ -539,6 +648,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
 
         const signal = startGeneration('video');
         setGeneratedVideoUrl(null);
+        setGeneratedVideoItem(null);
 
         try {
             const model = AVAILABLE_VIDEO_MODELS.find(m => m.id === selectedVideoModel);
@@ -549,13 +659,50 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                 prompt: videoPrompt,
                 image: videoMode === 'i2v' ? sourceImage! : undefined,
                 modelUrl,
-                modelId: selectedVideoModel
+                modelId: selectedVideoModel,
+                ltx2Params: model.id.includes('ltx-2') ? {
+                    settings: ltx2Settings,
+                    videoUrl: ltx2VideoUrl,
+                    keyframeStart: ltx2KeyframeStart,
+                    keyframeEnd: ltx2KeyframeEnd
+                } : undefined
             }, signal);
 
-            const url = URL.createObjectURL(blob);
-            setGeneratedVideoUrl(url);
-            addToHistory(blob, 'video', videoPrompt);
+            const item = await addToHistory(blob, 'video', videoPrompt);
+            setGeneratedVideoUrl(item.url);
+            setGeneratedVideoItem(item);
 
+        } catch (err: any) {
+            if (err.name !== 'AbortError') updateGenStatus('video', { error: err.message });
+        } finally {
+            if (!signal.aborted) updateGenStatus('video', { isGenerating: false, progress: 100 });
+        }
+    };
+
+    const handleLipSyncGeneration = async (request: MuseTalkLipSyncRequest) => {
+        if (!request.video_input?.trim() || !request.audio_input?.trim()) return;
+
+        if (!await deductCredits('video', 'musetalk')) {
+            alert('Insufficient credits. Please add more credits to continue.');
+            return;
+        }
+
+        const signal = startGeneration('video');
+        setGeneratedVideoUrl(null);
+        setGeneratedVideoItem(null);
+
+        try {
+            const blob = await chutesService.generateLipSync(request, signal);
+
+            const descParts = [
+                `fps=${request.fps ?? 25}`,
+                `batch=${request.batch_size ?? 8}`,
+                `mode=${request.parsing_mode ?? 'jaw'}`
+            ];
+
+            const item = await addToHistory(blob, 'video', `Lip Sync (${descParts.join(', ')})`);
+            setGeneratedVideoUrl(item.url);
+            setGeneratedVideoItem(item);
         } catch (err: any) {
             if (err.name !== 'AbortError') updateGenStatus('video', { error: err.message });
         } finally {
@@ -605,12 +752,45 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
             const b64 = isBase64 ? imageUrl : await convertUrlToBase64(imageUrl);
             setSourceImage(b64);
             setVideoMode('i2v'); // Force I2V mode when transferring an image
+            setVideoTool('animate');
             setActiveTab('video');
             updateGenStatus('video', { error: null });
             setIsCaptureModalOpen(false);
             setSelectedMediaItem(null);
         } catch (e) {
             updateGenStatus('video', { error: "Failed to load image for animation." });
+        }
+    };
+
+    const setLipSyncVideoPreview = (kind: 'video' | null, url: string | null) => {
+        setLipsyncVideoPreviewKind(kind);
+        setLipsyncVideoPreviewUrl(url);
+    };
+
+    const handlePickLipSyncFromGallery = () => {
+        setIsMediaPickerOpen(true);
+    };
+
+    const transferToLipSyncFromVideo = async (videoUrl: string) => {
+        try {
+            const input = /^https?:\/\//i.test(videoUrl) ? videoUrl : await convertUrlToBase64(videoUrl);
+            setVideoTool('lipsync');
+            setActiveTab('video');
+            setLipsyncVideoInput(input);
+            setLipSyncVideoPreview('video', input);
+            setLipsyncVideoUrl('');
+            updateGenStatus('video', { error: null });
+        } catch (e) {
+            updateGenStatus('video', { error: "Failed to load video for lip sync." });
+        }
+    };
+
+    const handleUsePreviewVideoForLipSync = async () => {
+        if (!generatedVideoUrl) return;
+        try {
+            await transferToLipSyncFromVideo(generatedVideoUrl);
+        } catch (e) {
+            updateGenStatus('video', { error: "Failed to load preview video for lip sync." });
         }
     };
 
@@ -637,8 +817,13 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         return item.type === galleryFilter;
     });
 
+    const lightboxItems =
+        selectedMediaItem && filteredHistory.some(i => i.id === selectedMediaItem.id)
+            ? filteredHistory
+            : mediaHistory;
+
     return (
-        <div className="flex flex-col h-full w-full max-w-7xl mx-auto glass-card md:rounded-[2rem] overflow-hidden shadow-2xl animate-in fade-in duration-500 ring-1 ring-white/20 dark:ring-white/5 relative border border-white/40 dark:border-white/10">
+        <div className="flex flex-col w-full flex-1 min-h-0 max-w-7xl mx-auto glass-card md:rounded-[2rem] overflow-hidden shadow-2xl animate-in fade-in duration-500 ring-1 ring-white/20 dark:ring-white/5 relative border border-white/40 dark:border-white/10">
 
             {/* Header Tabs */}
             <div className="flex border-b border-gray-200/50 dark:border-white/10 bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl overflow-x-auto shrink-0">
@@ -671,9 +856,9 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                 ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar min-h-0">
                 {activeTab === 'gallery' ? (
-                    <div className="h-full animate-in slide-in-from-bottom-4 flex flex-col">
+                    <div className="animate-in slide-in-from-bottom-4 flex flex-col">
 
                         {/* Gallery Filter Bar */}
                         <div className="flex items-center justify-between mb-6 shrink-0">
@@ -736,14 +921,14 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                         )}
                                         {item.type === 'video' ? (
                                             <>
-                                                <video src={item.url} className="w-full h-full object-cover pointer-events-none" />
+                                                <video src={item.url} className="w-full h-full object-contain pointer-events-none bg-black/30" />
                                                 <div className="absolute top-2 right-2 bg-black/60 text-white p-1 rounded-md backdrop-blur-sm z-10">
                                                     <Video className="w-3.5 h-3.5" />
                                                 </div>
                                             </>
                                         ) : (
                                             <>
-                                                <img src={item.url} alt={item.prompt} className="w-full h-full object-cover" loading="lazy" />
+                                                <img src={item.url} alt={item.prompt} className="w-full h-full object-contain bg-black/10 dark:bg-black/30" loading="lazy" />
                                                 <div className="absolute top-2 right-2 bg-black/40 text-white p-1 rounded-md backdrop-blur-sm z-10">
                                                     <Image className="w-3.5 h-3.5" />
                                                 </div>
@@ -963,102 +1148,98 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                             {/* Video Tab Controls */}
                             {activeTab === 'video' && (
                                 <div className="space-y-6">
-                                    <div id="tour-video-mode-selector" className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10">
+                                    <div className="flex bg-gray-100 dark:bg-white/5 p-1 rounded-xl border border-gray-200 dark:border-white/10">
                                         <button
-                                            onClick={() => setVideoMode('i2v')}
-                                            className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-all ${videoMode === 'i2v' ? 'bg-white dark:bg-slate-800 text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                            onClick={() => setVideoTool('animate')}
+                                            className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-all ${videoTool === 'animate' ? 'bg-white dark:bg-slate-800 text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                                                 }`}
                                         >
-                                            <FileImage className="w-4 h-4" /> Image-to-Video
+                                            <Film className="w-4 h-4" /> Animate
                                         </button>
                                         <button
-                                            onClick={() => setVideoMode('t2v')}
-                                            className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-all ${videoMode === 't2v' ? 'bg-white dark:bg-slate-800 text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                                            onClick={() => setVideoTool('lipsync')}
+                                            className={`flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-all ${videoTool === 'lipsync' ? 'bg-white dark:bg-slate-800 text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                                                 }`}
                                         >
-                                            <Type className="w-4 h-4" /> Text-to-Video
+                                            <Play className="w-4 h-4" /> Lip Sync
                                         </button>
                                     </div>
 
-                                    <div id="tour-video-model" className="bg-white/30 dark:bg-slate-800/30 p-3 rounded-xl border border-white/40 dark:border-white/5">
-                                        <Label className="mb-2 block text-xs uppercase text-gray-500 font-bold">Model Engine</Label>
-                                        <Select value={selectedVideoModel} onChange={(e) => setSelectedVideoModel(e.target.value)}>
-                                            {AVAILABLE_VIDEO_MODELS.filter(m => m.type === videoMode).map(m => (
-                                                <option key={m.id} value={m.id}>{m.name}</option>
-                                            ))}
-                                        </Select>
-                                    </div>
-
-                                    {videoMode === 'i2v' && (
-                                        <div id="tour-video-input-frame" className="space-y-3 animate-in fade-in slide-in-from-bottom-2">
-                                            <Label>Input Frame</Label>
-                                            <div
-                                                className="relative h-56 w-full rounded-2xl border-2 border-dashed border-gray-300 dark:border-white/10 hover:border-primary/50 dark:hover:border-primary/50 transition-all flex flex-col items-center justify-center bg-gray-50/50 dark:bg-slate-900/50 overflow-hidden group shadow-inner"
-                                            >
-                                                {sourceImage ? (
-                                                    <>
-                                                        <img src={sourceImage} alt="Source" className="w-full h-full object-contain cursor-pointer" onClick={() => fileInputRef.current?.click()} />
-                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-2 items-center justify-center backdrop-blur-sm pointer-events-none">
-                                                            <span className="text-white font-medium flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full border border-white/20"><Upload className="w-4 h-4" /> Change Frame</span>
-                                                        </div>
-                                                        <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto">
-                                                            <Button
-                                                                variant="glass"
-                                                                size="icon"
-                                                                onClick={(e) => { e.stopPropagation(); downloadBase64(sourceImage, 'source-frame.png'); }}
-                                                                title="Download Source Frame"
-                                                                className="h-8 w-8 bg-black/50 text-white border-none hover:bg-black/70"
-                                                            >
-                                                                <Download className="w-4 h-4" />
-                                                            </Button>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <div className="text-center p-6 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                                        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                                                            <Video className="w-8 h-8 text-primary/60" />
-                                                        </div>
-                                                        <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Click to Upload Frame</span>
-                                                    </div>
-                                                )}
-                                                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, setSourceImage)} />
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div id="tour-video-prompt" className="space-y-3 relative">
-                                        <div className="flex justify-between items-center">
-                                            <Label>{videoMode === 'i2v' ? 'Motion Prompt' : 'Video Description'}</Label>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleEnhancePrompt(videoPrompt, setVideoPrompt, { hasImage: videoMode === 'i2v' && Boolean(sourceImage) })}
-                                                disabled={isEnhancing || !videoPrompt}
-                                                className="h-6 text-xs text-primary hover:text-primary-dark px-2 gap-1.5"
-                                            >
-                                                {isEnhancing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-                                                Magic Enhance
-                                            </Button>
-                                        </div>
-                                        <Textarea
-                                            value={videoPrompt}
-                                            onChange={(e) => setVideoPrompt(e.target.value)}
-                                            placeholder={videoMode === 'i2v' ? "Camera pans right, the leaves are blowing..." : "A cinematic drone shot of a cyberpunk city at night, raining..."}
-                                            className="h-32 text-base"
+                                    {videoTool === 'animate' ? (
+                                        <VideoAnimatorPanel
+                                            isAuthenticated={isAuthenticated}
+                                            onRequestAuth={onRequestAuth}
+                                            canAfford={canAfford}
+                                            isGenerating={genStatus.video.isGenerating}
+                                            videoMode={videoMode}
+                                            setVideoMode={setVideoMode}
+                                            selectedVideoModel={selectedVideoModel}
+                                            setSelectedVideoModel={setSelectedVideoModel}
+                                            sourceImage={sourceImage}
+                                            setSourceImage={setSourceImage}
+                                            videoPrompt={videoPrompt}
+                                            setVideoPrompt={setVideoPrompt}
+                                            isEnhancing={isEnhancing}
+                                            onEnhancePrompt={() => handleEnhancePrompt(videoPrompt, setVideoPrompt, { hasImage: videoMode === 'i2v' && Boolean(sourceImage) })}
+                                            onGenerate={handleVideoGeneration}
+                                            onDownloadBase64={downloadBase64}
+                                            // LTX-2 Props
+                                            ltx2Settings={ltx2Settings}
+                                            setLtx2Settings={setLtx2Settings}
+                                            ltx2VideoUrl={ltx2VideoUrl}
+                                            setLtx2VideoUrl={setLtx2VideoUrl}
+                                            ltx2KeyframeStart={ltx2KeyframeStart}
+                                            setLtx2KeyframeStart={setLtx2KeyframeStart}
+                                            ltx2KeyframeEnd={ltx2KeyframeEnd}
+                                            setLtx2KeyframeEnd={setLtx2KeyframeEnd}
+                                            onPickVideoFromGallery={() => {
+                                                setIsMediaPickerOpen(true);
+                                                // We'll need to know we are picking for LTX-2 video URL, but for now just open picker
+                                                // The picker logic needs a bit of tweak or a separate handler if we want to distinguish
+                                                // between Lip Sync and LTX-2 video pick.
+                                                // For now, let's reuse the picker but we might need a state to track "what are we picking for"
+                                            }}
                                         />
-                                    </div>
-
-                                    <div id="tour-video-generate">
-                                        <Button
-                                            onClick={() => isAuthenticated ? handleVideoGeneration() : onRequestAuth()}
-                                            disabled={genStatus.video.isGenerating || !videoPrompt || (videoMode === 'i2v' && !sourceImage) || !isAuthenticated || !canAfford('video', selectedVideoModel)}
-                                            className={`w-full h-14 text-lg font-semibold rounded-xl shadow-xl transition-all ${genStatus.video.isGenerating ? 'opacity-80' : 'hover:scale-[1.02] shadow-primary/20'}`}
-                                        >
-                                            {genStatus.video.isGenerating ? 'Animating...' : (isAuthenticated ? <><Film className="w-5 h-5 mr-2" /> Animate Video</> : 'Sign In to Animate Video')}
-                                        </Button>
-                                        <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-2">Video generation typically takes 60-90 seconds.</p>
-                                        {genStatus.video.isGenerating && <Progress value={genStatus.video.progress} />}
-                                    </div>
+                                    ) : (
+                                        <LipSyncPanel
+                                            isAuthenticated={isAuthenticated}
+                                            onRequestAuth={onRequestAuth}
+                                            canAfford={canAfford}
+                                            isGenerating={genStatus.video.isGenerating}
+                                            onPickFromGallery={handlePickLipSyncFromGallery}
+                                            onUsePreviewVideo={handleUsePreviewVideoForLipSync}
+                                            canUsePreviewVideo={Boolean(generatedVideoUrl)}
+                                            videoInput={lipsyncVideoInput}
+                                            setVideoInput={setLipsyncVideoInput}
+                                            audioInput={lipsyncAudioInput}
+                                            setAudioInput={setLipsyncAudioInput}
+                                            videoPreviewUrl={lipsyncVideoPreviewUrl}
+                                            videoPreviewKind={lipsyncVideoPreviewKind}
+                                            setVideoPreview={setLipSyncVideoPreview}
+                                            audioPreviewUrl={lipsyncAudioPreviewUrl}
+                                            setAudioPreviewUrl={setLipsyncAudioPreviewUrl}
+                                            advancedOpen={lipsyncAdvancedOpen}
+                                            setAdvancedOpen={setLipsyncAdvancedOpen}
+                                            videoUrl={lipsyncVideoUrl}
+                                            setVideoUrl={setLipsyncVideoUrl}
+                                            audioUrl={lipsyncAudioUrl}
+                                            setAudioUrl={setLipsyncAudioUrl}
+                                            fps={lipsyncFps}
+                                            setFps={setLipsyncFps}
+                                            batchSize={lipsyncBatchSize}
+                                            setBatchSize={setLipsyncBatchSize}
+                                            extraMargin={lipsyncExtraMargin}
+                                            setExtraMargin={setLipsyncExtraMargin}
+                                            parsingMode={lipsyncParsingMode}
+                                            setParsingMode={setLipsyncParsingMode}
+                                            leftCheekWidth={lipsyncLeftCheekWidth}
+                                            setLeftCheekWidth={setLipsyncLeftCheekWidth}
+                                            rightCheekWidth={lipsyncRightCheekWidth}
+                                            setRightCheekWidth={setLipsyncRightCheekWidth}
+                                            onGenerate={handleLipSyncGeneration}
+                                        />
+                                    )}
+                                    {genStatus.video.isGenerating && <Progress value={genStatus.video.progress} />}
                                 </div>
                             )}
 
@@ -1088,8 +1269,12 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                         </div>
 
                         {/* Preview Column */}
-                        <div className="lg:col-span-8 flex flex-col min-h-[400px] animate-in slide-in-from-right-4 duration-500 delay-200">
-                            <div id="tour-media-content" className="flex-1 rounded-2xl border border-white/40 dark:border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md shadow-inner flex items-center justify-center relative overflow-hidden group p-2 min-h-[400px]">
+                        <div className="lg:col-span-8 flex flex-col min-h-0 sm:min-h-[400px] animate-in slide-in-from-right-4 duration-500 delay-200">
+                            <div
+                                id="tour-media-content"
+                                className="flex-1 h-[55dvh] sm:h-auto rounded-2xl border border-white/40 dark:border-white/10 bg-white/20 dark:bg-slate-900/20 backdrop-blur-md shadow-inner flex items-start sm:items-center justify-center relative overflow-auto overscroll-contain touch-pan-y custom-scrollbar group p-2 min-h-0 sm:min-h-[400px]"
+                                style={{ WebkitOverflowScrolling: 'touch' }}
+                            >
 
                                 {/* Only show overlay if this specific tab is generating */}
                                 {genStatus[activeTab as GenType]?.isGenerating && (
@@ -1118,9 +1303,29 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
 
                                 {/* Content Render Logic */}
                                 {activeTab === 'image' && generatedImageUrl ? (
-                                    <img src={generatedImageUrl} alt="Generated" className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" />
+                                    <button
+                                        type="button"
+                                        onClick={() => generatedImageItem && setSelectedMediaItem(generatedImageItem)}
+                                        className="w-full sm:h-full flex items-start sm:items-center justify-center"
+                                    >
+                                        <img
+                                            src={generatedImageUrl}
+                                            alt="Generated"
+                                            className="w-full h-auto sm:w-auto sm:max-w-full sm:max-h-full object-contain shadow-2xl rounded-lg cursor-zoom-in"
+                                        />
+                                    </button>
                                 ) : activeTab === 'edit' && editedImageUrl ? (
-                                    <img src={editedImageUrl} alt="Edited" className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" />
+                                    <button
+                                        type="button"
+                                        onClick={() => editedImageItem && setSelectedMediaItem(editedImageItem)}
+                                        className="w-full sm:h-full flex items-start sm:items-center justify-center"
+                                    >
+                                        <img
+                                            src={editedImageUrl}
+                                            alt="Edited"
+                                            className="w-full h-auto sm:w-auto sm:max-w-full sm:max-h-full object-contain shadow-2xl rounded-lg cursor-zoom-in"
+                                        />
+                                    </button>
                                 ) : activeTab === 'video' && generatedVideoUrl ? (
                                     <div className="relative w-full h-full flex items-center justify-center bg-black/40 rounded-lg overflow-hidden group/video">
                                         <video
@@ -1155,7 +1360,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                             </div>
 
                             {/* Footer Actions */}
-                            <div className="mt-6 flex flex-wrap justify-end gap-3 pb-8 lg:pb-0">
+                            <div className="mt-6 flex flex-col xs:flex-row xs:flex-wrap items-stretch xs:items-center justify-end gap-2 xs:gap-3 pb-8 lg:pb-0">
                                 {activeTab === 'image' && generatedImageUrl && (
                                     <>
                                         <Button variant="glass" onClick={() => transferToEdit(generatedImageUrl)}>
@@ -1164,7 +1369,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                         <Button variant="glass" onClick={() => transferToVideo(generatedImageUrl)}>
                                             <Film className="w-4 h-4 mr-2 text-blue-500" /> Animate
                                         </Button>
-                                        <a href={generatedImageUrl} download={`generated-image-${Date.now()}.png`}>
+                                        <a className="w-full xs:w-auto" href={generatedImageUrl} download={`generated-image-${Date.now()}.png`}>
                                             <Button variant="primary"><Download className="w-4 h-4 mr-2" />Download</Button>
                                         </a>
                                     </>
@@ -1175,17 +1380,23 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                         <Button variant="glass" onClick={() => transferToVideo(editedImageUrl)}>
                                             <Film className="w-4 h-4 mr-2 text-blue-500" /> Animate
                                         </Button>
-                                        <a href={editedImageUrl} download={`edited-image-${Date.now()}.png`}>
+                                        <a className="w-full xs:w-auto" href={editedImageUrl} download={`edited-image-${Date.now()}.png`}>
                                             <Button variant="primary"><Download className="w-4 h-4 mr-2" />Download</Button>
                                         </a>
                                     </>
                                 )}
                                 {activeTab === 'video' && generatedVideoUrl && (
                                     <>
+                                        <Button variant="glass" onClick={handleCaptureCurrentFrame}>
+                                            <Camera className="w-4 h-4 mr-2 text-primary" /> Capture Frame
+                                        </Button>
                                         <Button variant="glass" onClick={() => handleExtendVideo()}>
                                             <ArrowRight className="w-4 h-4 mr-2 text-green-500" /> Extend Video (Last Frame)
                                         </Button>
-                                        <a href={generatedVideoUrl} download={`generated-video-${Date.now()}.mp4`}>
+                                        <Button variant="glass" onClick={handleUsePreviewVideoForLipSync}>
+                                            <Play className="w-4 h-4 mr-2 text-blue-500" /> Lip Sync
+                                        </Button>
+                                        <a className="w-full xs:w-auto" href={generatedVideoUrl} download={`generated-video-${Date.now()}.mp4`}>
                                             <Button variant="primary"><Download className="w-4 h-4 mr-2" />Download</Button>
                                         </a>
                                     </>
@@ -1232,21 +1443,76 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                     </h3>
                                 )}
                             </div>
-                            <button onClick={() => setSelectedMediaItem(null)} className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors">
-                                <X className="w-6 h-6" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                {selectedMediaItem.type === 'image' && (
+                                    <div className="flex items-center gap-2 rounded-full bg-white/10 border border-white/10 px-2 py-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setLightboxFitMode('width');
+                                                setLightboxZoom((z) => clampLightboxZoom(z - lightboxZoomStep));
+                                            }}
+                                            disabled={lightboxZoom <= 1}
+                                            className="h-9 px-3 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-white/10 text-white text-sm font-semibold transition-colors"
+                                            title="Zoom out"
+                                        >
+                                            -
+                                        </button>
+                                        <div className="min-w-[64px] text-center text-white/90 text-xs font-semibold tabular-nums">
+                                            {Math.round(lightboxZoom * 100)}%
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setLightboxFitMode('width');
+                                                setLightboxZoom((z) => clampLightboxZoom(z + lightboxZoomStep));
+                                            }}
+                                            disabled={lightboxZoom >= 4}
+                                            className="h-9 px-3 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:hover:bg-white/10 text-white text-sm font-semibold transition-colors"
+                                            title="Zoom in"
+                                        >
+                                            +
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setLightboxZoom(1);
+                                                setLightboxFitMode(isSmallScreen ? 'width' : 'fit');
+                                            }}
+                                            className="h-9 px-3 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors"
+                                            title="Reset zoom"
+                                        >
+                                            Reset
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setLightboxZoom(1);
+                                                setLightboxFitMode((mode) => (mode === 'fit' ? 'width' : 'fit'));
+                                            }}
+                                            className="h-9 px-3 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors"
+                                            title={lightboxFitMode === 'fit' ? 'Fit to width' : 'Fit to screen'}
+                                        >
+                                            {lightboxFitMode === 'fit' ? 'Fit' : 'Width'}
+                                        </button>
+                                    </div>
+                                )}
+                                <button onClick={() => setSelectedMediaItem(null)} className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Center Content */}
-                        <div className="flex-1 flex items-center justify-center overflow-hidden p-4 relative w-full group/lightbox">
+                        <div className="flex-1 relative w-full overflow-hidden group/lightbox">
 
                             {/* Previous Button (Newer) */}
-                            {filteredHistory.findIndex(i => i.id === selectedMediaItem.id) > 0 && (
+                            {lightboxItems.findIndex(i => i.id === selectedMediaItem.id) > 0 && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        const idx = filteredHistory.findIndex(i => i.id === selectedMediaItem.id);
-                                        if (idx > 0) setSelectedMediaItem(filteredHistory[idx - 1]);
+                                        const idx = lightboxItems.findIndex(i => i.id === selectedMediaItem.id);
+                                        if (idx > 0) setSelectedMediaItem(lightboxItems[idx - 1]);
                                     }}
                                     className="absolute left-4 z-20 p-3 rounded-full bg-black/50 text-white hover:bg-white/20 hover:scale-110 transition-all opacity-0 group-hover/lightbox:opacity-100"
                                     title="Previous"
@@ -1256,12 +1522,12 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                             )}
 
                             {/* Next Button (Older) */}
-                            {filteredHistory.findIndex(i => i.id === selectedMediaItem.id) < filteredHistory.length - 1 && (
+                            {lightboxItems.findIndex(i => i.id === selectedMediaItem.id) < lightboxItems.length - 1 && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        const idx = filteredHistory.findIndex(i => i.id === selectedMediaItem.id);
-                                        if (idx < filteredHistory.length - 1) setSelectedMediaItem(filteredHistory[idx + 1]);
+                                        const idx = lightboxItems.findIndex(i => i.id === selectedMediaItem.id);
+                                        if (idx < lightboxItems.length - 1) setSelectedMediaItem(lightboxItems[idx + 1]);
                                     }}
                                     className="absolute right-4 z-20 p-3 rounded-full bg-black/50 text-white hover:bg-white/20 hover:scale-110 transition-all opacity-0 group-hover/lightbox:opacity-100"
                                     title="Next"
@@ -1271,19 +1537,47 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                             )}
 
                             {selectedMediaItem.type === 'video' ? (
-                                <video
-                                    src={selectedMediaItem.url}
-                                    controls
-                                    autoPlay
-                                    loop
-                                    className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                                />
+                                <div className="absolute inset-0 p-4 flex items-center justify-center">
+                                    <video
+                                        ref={lightboxVideoRef}
+                                        src={selectedMediaItem.url}
+                                        controls
+                                        autoPlay
+                                        loop
+                                        playsInline
+                                        crossOrigin="anonymous"
+                                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                                    />
+                                </div>
                             ) : (
-                                <img
-                                    src={selectedMediaItem.url}
-                                    alt={selectedMediaItem.title}
-                                    className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                                />
+                                <div
+                                    className="absolute inset-0 p-4 overflow-auto overscroll-contain custom-scrollbar"
+                                    onWheel={(e) => {
+                                        if (!(e.ctrlKey || e.metaKey)) return;
+                                        e.preventDefault();
+                                        setLightboxFitMode('width');
+                                        const direction = e.deltaY < 0 ? 1 : -1;
+                                        setLightboxZoom((z) => clampLightboxZoom(z + direction * lightboxZoomStep));
+                                    }}
+                                >
+                                    <div className={lightboxFitMode === 'fit' ? 'w-full h-full flex items-center justify-center' : 'w-full flex justify-center'}>
+                                        <img
+                                            src={selectedMediaItem.url}
+                                            alt={selectedMediaItem.title}
+                                            onDoubleClick={() => {
+                                                if (lightboxFitMode === 'fit') {
+                                                    setLightboxFitMode('width');
+                                                    setLightboxZoom(2);
+                                                    return;
+                                                }
+                                                setLightboxZoom(1);
+                                                setLightboxFitMode(isSmallScreen ? 'width' : 'fit');
+                                            }}
+                                            className={lightboxFitMode === 'fit' ? 'max-w-full max-h-full object-contain rounded-lg shadow-2xl' : 'h-auto max-w-none object-contain rounded-lg shadow-2xl'}
+                                            style={lightboxFitMode === 'width' ? { width: `${Math.round(lightboxZoom * 100)}%` } : undefined}
+                                        />
+                                    </div>
+                                </div>
                             )}
                         </div>
 
@@ -1329,16 +1623,30 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                 </>
                             )}
                             {selectedMediaItem.type === 'video' && (
-                                <Button variant="glass" className="text-green-300 border-green-500/30 hover:bg-green-500/20" onClick={() => {
-                                    setSelectedMediaItem(null);
-                                    // Need to extract frame logic here or pass URL
-                                    // Simplified: just set URL to generatedVideoUrl to trigger logic
-                                    setGeneratedVideoUrl(selectedMediaItem.url);
-                                    setTimeout(() => handleExtendVideo(), 100);
-                                    setActiveTab('video');
-                                }}>
-                                    <ArrowRight className="w-4 h-4 mr-2" /> Extend
-                                </Button>
+                                <>
+                                    <Button variant="glass" className="text-white border-white/20 hover:bg-white/10" onClick={handleCaptureLightboxFrame}>
+                                        <Camera className="w-4 h-4 mr-2" /> Capture Frame
+                                    </Button>
+                                    <Button
+                                        variant="glass"
+                                        className="text-blue-300 border-blue-500/30 hover:bg-blue-500/20"
+                                        onClick={() => {
+                                            const url = selectedMediaItem.url;
+                                            setSelectedMediaItem(null);
+                                            void transferToLipSyncFromVideo(url);
+                                        }}
+                                    >
+                                        <Play className="w-4 h-4 mr-2" /> Lip Sync
+                                    </Button>
+                                    <Button variant="glass" className="text-green-300 border-green-500/30 hover:bg-green-500/20" onClick={() => {
+                                        setSelectedMediaItem(null);
+                                        setGeneratedVideoUrl(selectedMediaItem.url);
+                                        setTimeout(() => handleExtendVideo(), 100);
+                                        setActiveTab('video');
+                                    }}>
+                                        <ArrowRight className="w-4 h-4 mr-2" /> Extend
+                                    </Button>
+                                </>
                             )}
 
                             <div className="w-px h-10 bg-white/10 mx-2"></div>
@@ -1398,6 +1706,18 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                     </div>
                 </div>
             )}
+
+            <MediaPickerModal
+                title="Select from Gallery"
+                isOpen={isMediaPickerOpen}
+                items={mediaHistory}
+                filter="video"
+                onClose={() => setIsMediaPickerOpen(false)}
+                onSelect={async (item) => {
+                    setIsMediaPickerOpen(false);
+                    await transferToLipSyncFromVideo(item.url);
+                }}
+            />
 
         </div>
     );

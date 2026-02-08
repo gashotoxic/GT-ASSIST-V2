@@ -2,11 +2,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Mic, Square, Loader2, Volume2, Bot, User, StopCircle, Paperclip, X, FileText, Play, Search, Globe, Pause, RotateCcw, BrainCircuit, Edit3, Cpu, Copy, GitBranch, Check, Database, Lock } from 'lucide-react';
 import { Button } from './UI';
-import { Message, AppSettings, FileAttachment, ChatSession, AVAILABLE_MODELS, BASE_SYSTEM_CONTEXT, DEFAULT_SYSTEM_PROMPT } from '../types';
+import { Message, AppSettings, FileAttachment, ChatSession, AVAILABLE_MODELS, BASE_SYSTEM_CONTEXT, DEFAULT_SYSTEM_PROMPT, BRAND_STUDIO_MODEL_ID, NORMAL_CHAT_APP_FEATURES_CONTEXT, MediaItem } from '../types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChutesService } from '../services/chutes';
 import { SupabaseService } from '../services/supabase';
+import { createBrandStudioToolRuntime } from '../services/brandStudioToolRuntime';
 import { KnowledgeBaseService } from '../services/knowledgeBase';
 import { KnowledgeBaseModal } from './KnowledgeBaseModal';
 import { SearchResultsCard } from './SearchResultsCard';
@@ -53,6 +54,14 @@ const formatModelName = (modelId: string) => {
   return name.trim();
 };
 
+const extractNodeText = (node: React.ReactNode): string => {
+  if (node === null || node === undefined) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(extractNodeText).join('');
+  if (React.isValidElement(node)) return extractNodeText((node.props as any).children);
+  return '';
+};
+
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSessionUpdate, onSwitchSession, onNewSession, isAuthenticated, onRequestAuth, userId }) => {
   const { subscriptionTier } = useCredits();
   const { getToken } = useAuthContext();
@@ -70,6 +79,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
   const [editingMessage, setEditingMessage] = useState<{ message: Message; index: number } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [branchingIndex, setBranchingIndex] = useState<number | null>(null);
+  const [chatMode, setChatMode] = useState<'chat' | 'brand'>('chat');
+  const [brandToolsEnabled, setBrandToolsEnabled] = useState(false);
+  const [brandPromptText, setBrandPromptText] = useState('');
 
   // Audio State
   const [currentTime, setCurrentTime] = useState(0);
@@ -86,6 +98,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
   const { canAfford, refetch } = useCredits();
 
   const chutesService = new ChutesService(settings.apiKey);
+
+  useEffect(() => {
+    const url = new URL('../brandPrompt.txt', import.meta.url);
+    fetch(url)
+      .then(r => r.text())
+      .then(setBrandPromptText)
+      .catch(() => setBrandPromptText(''));
+  }, []);
 
   // Knowledge Base service
   const knowledgeService = React.useMemo(
@@ -111,6 +131,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     }
     return new SupabaseService(settings);
   }, [settings, isAuthenticated]);
+
+  const getSessionPrefsKey = (sid: string) => `chutes_chat_prefs_${sid}`;
+  const setSessionPrefs = (sid: string, prefs: { chatMode: 'chat' | 'brand'; brandToolsEnabled: boolean }) => {
+    localStorage.setItem(getSessionPrefsKey(sid), JSON.stringify(prefs));
+  };
+
+  useEffect(() => {
+    const raw = localStorage.getItem(getSessionPrefsKey(sessionId));
+    if (!raw) {
+      setChatMode('chat');
+      setBrandToolsEnabled(false);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      setChatMode(parsed?.chatMode === 'brand' ? 'brand' : 'chat');
+      setBrandToolsEnabled(Boolean(parsed?.brandToolsEnabled));
+    } catch {
+      setChatMode('chat');
+      setBrandToolsEnabled(false);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    localStorage.setItem(getSessionPrefsKey(sessionId), JSON.stringify({ chatMode, brandToolsEnabled }));
+  }, [sessionId, chatMode, brandToolsEnabled]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -291,14 +337,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
     if (!textInput.trim() && !activeAttachment) return;
 
-    const cost = getCreditCost('chat', settings.model);
+    const activeModel = chatMode === 'brand' ? BRAND_STUDIO_MODEL_ID : settings.model;
+    const cost = getCreditCost('chat', activeModel);
 
     // For authenticated users, ALWAYS use Supabase (enforced by App.tsx)
     // For guests, use local storage
     if (isAuthenticated && userId) {
       // Supabase mode for authenticated users - NO fallbacks
       try {
-        await supabaseService.useCredits(userId, cost, 'chat', settings.model, sessionId);
+        await supabaseService.useCredits(userId, cost, 'chat', activeModel, sessionId);
         // Refresh credits after deduction
         refetch();
       } catch (error: any) {
@@ -335,7 +382,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       content: userContent,
       id: Date.now().toString(),
       timestamp: Date.now(),
-      model: settings.model // Track user intent model
+      model: activeModel // Track user intent model
     };
 
     // Determine the history context to use
@@ -362,7 +409,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
         thinking: undefined,
         id: (Date.now() + 1).toString(),
         timestamp: Date.now() + 1,
-        model: settings.model
+        model: activeModel
       };
       setMessages(prev => [...prev, assistantMsg]);
 
@@ -389,7 +436,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
       // Combine: Base -> Search -> Stats -> RAG (if any) -> User
       // We prepend the RAG context to the user instructions if it exists
-      let finalSystemPrompt = `${BASE_SYSTEM_CONTEXT}\n${searchContext}\n${baseStats}`;
+      const brandToolsAllowed =
+        chatMode === 'brand' &&
+        brandToolsEnabled &&
+        (subscriptionTier === 'plus' || subscriptionTier === 'pro') &&
+        Boolean(isAuthenticated && userId);
+
+      const brandWrapper = `MODE: BRAND_STUDIO\nTOOLS_ENABLED: ${brandToolsAllowed ? 'true' : 'false'}\n\nIf TOOLS_ENABLED is true, you may call:\n- generate_image({prompt, aspectRatio?}) to generate a marketing image now.\n- edit_image({prompt, image_b64, aspectRatio?}) to edit an uploaded image now.\nOnly call tools when the user explicitly asks to generate/edit now. If TOOLS_ENABLED is false, provide prompts and step-by-step UI instructions only.`;
+
+      let finalSystemPrompt =
+        chatMode === 'brand'
+          ? `${brandWrapper}\n\n${BASE_SYSTEM_CONTEXT}\n${searchContext}\n${baseStats}\n\n${brandPromptText || ''}`
+          : `${BASE_SYSTEM_CONTEXT}\n${searchContext}\n${baseStats}\n\n${NORMAL_CHAT_APP_FEATURES_CONTEXT}`;
 
       if (isKnowledgeEnabled && isAuthenticated && userId) {
         try {
@@ -411,12 +469,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       // Add User Instructions last
       finalSystemPrompt += `\n\nUser Instructions:\n${userPrompt}`;
 
+      const toolRuntime = brandToolsAllowed
+        ? createBrandStudioToolRuntime({
+          chutesService,
+          supabaseService,
+          subscriptionTier,
+          userId,
+          sessionId
+        })
+        : null;
+
       // Stream Chat Response with Tools support
       const stream = chutesService.streamChat(
         [...currentHistory, userMsg],
         finalSystemPrompt,
-        settings.model,
+        activeModel,
         searchConfig,
+        toolRuntime ? { executeTool: toolRuntime.executeTool } : null,
+        null,
         (status) => setLoadingStatus(status),
         abortControllerRef.current.signal
       );
@@ -437,6 +507,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
           setMessages(prev =>
             prev.map(msg => msg.id === assistantMsg.id ? { ...msg, sources: chunk.sources } : msg)
           );
+        } else if (chunk.type === 'tool_result') {
+          const result: any = (chunk as any).result;
+          if (result?.type === 'image') {
+            const media: MediaItem = {
+              id: result.mediaItemId || `${Date.now()}`,
+              type: 'image',
+              url: result.url,
+              prompt: result.prompt || '',
+              createdAt: Date.now(),
+              sessionId
+            };
+            setMessages(prev =>
+              prev.map(msg => msg.id === assistantMsg.id ? { ...msg, media: [...(msg.media || []), media] } : msg)
+            );
+          } else if (result?.type === 'error') {
+            fullResponse += `\n\n${result.message}`;
+            setMessages(prev =>
+              prev.map(msg => msg.id === assistantMsg.id ? { ...msg, content: fullResponse } : msg)
+            );
+          }
         }
       }
 
@@ -617,6 +707,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       localStorage.setItem('chutes_chat_sessions', JSON.stringify([newSession, ...currentStored]));
     }
 
+    setSessionPrefs(newSessionId, { chatMode, brandToolsEnabled });
+
     // 3. Update App State
     onNewSession(newSession);
     onSwitchSession(newSessionId);
@@ -745,6 +837,51 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
+              pre: ({ node, ...props }) => {
+                const [isCopied, setIsCopied] = React.useState(false);
+                const codeText = extractNodeText(props.children).replace(/\n$/, '');
+
+                const copy = async () => {
+                  try {
+                    if (navigator?.clipboard?.writeText) {
+                      await navigator.clipboard.writeText(codeText);
+                    } else {
+                      const textarea = document.createElement('textarea');
+                      textarea.value = codeText;
+                      textarea.style.position = 'fixed';
+                      textarea.style.left = '-9999px';
+                      textarea.style.top = '-9999px';
+                      document.body.appendChild(textarea);
+                      textarea.focus();
+                      textarea.select();
+                      document.execCommand('copy');
+                      document.body.removeChild(textarea);
+                    }
+                    setIsCopied(true);
+                    window.setTimeout(() => setIsCopied(false), 1200);
+                  } catch {
+                    setIsCopied(false);
+                  }
+                };
+
+                return (
+                  <div className="not-prose relative my-3 group w-full max-w-full min-w-0 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={copy}
+                      className="absolute top-2.5 right-2.5 z-10 h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white flex items-center justify-center transition-all opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                      title={isCopied ? 'Copied' : 'Copy'}
+                    >
+                      {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                    <pre
+                      className="w-full max-w-full min-w-0 box-border bg-slate-600 text-slate-100 dark:bg-slate-800 dark:text-slate-100 p-4 rounded-xl overflow-x-auto text-sm font-mono border border-black/10 dark:border-white/10 shadow-inner whitespace-pre-wrap break-words"
+                      style={{ WebkitOverflowScrolling: 'touch' }}
+                      {...props}
+                    />
+                  </div>
+                );
+              },
               // Custom Table styling for overflow handling
               table: ({ node, ...props }) => (
                 <div className="overflow-x-auto my-4 rounded-lg border border-gray-200 dark:border-white/10">
@@ -756,10 +893,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
               td: ({ node, ...props }) => <td className="p-2 border-b border-gray-100 dark:border-white/5 last:border-0" {...props} />,
               // Links -> new tab
               a: ({ node, ...props }) => <a target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" {...props} />,
-              // Code blocks
-              pre: ({ node, ...props }) => (
-                <pre className="not-prose bg-gray-900 text-gray-100 p-4 rounded-xl overflow-x-auto my-3 text-sm font-mono border border-white/10 shadow-inner whitespace-pre-wrap break-words" {...props} />
-              ),
               code: ({ node, className, children, ...props }: any) => {
                 const match = /language-(\w+)/.exec(className || '');
                 const isInline = !match && !String(children).includes('\n');
@@ -816,7 +949,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
   };
 
   return (
-    <div key={sessionId} className="flex flex-col h-full w-full max-w-5xl mx-auto relative glass-card md:rounded-[2rem] overflow-hidden shadow-2xl transition-all duration-300 animate-in fade-in border border-white/40 dark:border-white/10">
+    <div key={sessionId} className="flex flex-col h-full w-full max-w-5xl mx-auto relative glass-card md:rounded-[2rem] overflow-hidden shadow-2xl transition-all duration-300 animate-in fade-in border border-white/40 dark:border-white/10 min-h-0">
       <audio ref={audioRef} className="hidden" />
 
       {/* Messages Area */}
@@ -835,6 +968,31 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
               <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-white/30 dark:bg-slate-800/30 px-4 py-2 rounded-full w-fit mx-auto border border-white/40 dark:border-white/5 backdrop-blur-md shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_#1abc9c]"></span>
                 Running on <span className="font-semibold text-primary-dark dark:text-primary-light">{formatModelName(settings.model)}</span>
+              </div>
+
+              <div className="flex justify-center pt-2">
+                <div className="rounded-full bg-white/40 dark:bg-white/5 border border-white/30 dark:border-white/10 p-0.5 flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => setChatMode('chat')}
+                    className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${chatMode === 'chat'
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5'
+                      }`}
+                  >
+                    Chat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChatMode('brand')}
+                    className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${chatMode === 'brand'
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5'
+                      }`}
+                  >
+                    Brand
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -910,6 +1068,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                       </div>
                     )}
 
+                    {msg.media && msg.media.length > 0 && (
+                      <div className="mb-3 space-y-2">
+                        {msg.media.map((m) => (
+                          <div
+                            key={m.id}
+                            className="rounded-xl overflow-hidden border border-white/40 dark:border-white/10 bg-white/30 dark:bg-slate-900/30 backdrop-blur-md shadow-sm"
+                          >
+                            <div className="w-full bg-black/5 dark:bg-black/20">
+                              {m.type === 'image' && (
+                                <img src={m.url} alt="Generated" className="w-full max-h-72 object-contain" />
+                              )}
+                            </div>
+                            <div className="px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+                              <div className="font-semibold text-gray-700 dark:text-gray-200">Saved to Media Gallery</div>
+                              <div className="mt-1 opacity-80 line-clamp-2">{m.prompt}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {renderMessageContent(msg.content)}
 
                     {msg.role === 'assistant' && (
@@ -947,7 +1126,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                       {/* Regenerate Action (Both) */}
                       <button
                         onClick={() => handleRetry(idx, msg)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-white/50 dark:hover:bg-white/10 transition-all"
+                        className="p-2 rounded-full text-gray-400 hover:text-primary hover:bg-white/60 dark:hover:bg-white/10 transition-all"
                         title="Regenerate/Retry"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
@@ -956,7 +1135,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                       {/* Branch Action (Both) */}
                       <button
                         onClick={() => handleBranch(idx)}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-white/50 dark:hover:bg-white/10 transition-all"
+                        className="p-2 rounded-full text-gray-400 hover:text-primary hover:bg-white/60 dark:hover:bg-white/10 transition-all"
                         title="Branch from here"
                       >
                         <GitBranch className="w-3.5 h-3.5" />
@@ -966,7 +1145,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                       {msg.role === 'user' && (
                         <button
                           onClick={() => handleEdit(msg, idx)}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-white/50 dark:hover:bg-white/10 transition-all"
+                          className="p-2 rounded-full text-gray-400 hover:text-primary hover:bg-white/60 dark:hover:bg-white/10 transition-all"
                           title="Edit"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
@@ -976,7 +1155,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                       {/* Copy Action (Both) */}
                       <button
                         onClick={() => handleCopy(typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content), msg.id || idx.toString())}
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-white/50 dark:hover:bg-white/10 transition-all"
+                        className="p-2 rounded-full text-gray-400 hover:text-primary hover:bg-white/60 dark:hover:bg-white/10 transition-all"
                         title="Copy"
                       >
                         {copiedId === (msg.id || idx.toString()) ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -986,7 +1165,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                       {msg.role === 'assistant' && (
                         <button
                           onClick={() => handleReplay(msg)}
-                          className={`p-1.5 rounded-lg transition-all ${generatingAudioId === msg.id ? 'text-primary' : 'text-gray-400 hover:text-primary hover:bg-white/50 dark:hover:bg-white/10'}`}
+                          className={`p-2 rounded-full transition-all ${generatingAudioId === msg.id ? 'text-primary' : 'text-gray-400 hover:text-primary hover:bg-white/60 dark:hover:bg-white/10'}`}
                           title="Read aloud"
                           disabled={generatingAudioId === msg.id}
                         >
@@ -998,19 +1177,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                         </button>
                       )}
 
-                      {/* Model Selector - This is a new element based on the diff, but placed here for context.
-                          It seems like a global model selector was intended, not per-message.
-                          However, following the diff's placement, it's inserted here.
-                          The content of the button and div below it seems to be a mix-up with the existing Model Badge.
-                          I will interpret this as adding the ID to the existing Model Badge if it's meant to be per-message,
-                          or if it's a global selector, it should be placed elsewhere.
-                          Given the instruction "Add tour IDs to chat input and model selector", and the diff's structure,
-                          I will add the ID to the existing Model Badge for assistant messages, as the diff's content
-                          for the button and div is malformed and seems to be a copy-paste error from the Model Badge itself.
-                          If a global model selector is intended, it would be a larger change.
-                          For now, I'll apply the ID to the most relevant existing element.
-                      */}
-                      {/* Model Badge (Assistant Only) */}
                       {msg.role === 'assistant' && msg.model && (
                         <div id="tour-model-selector" className="ml-1 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/5 text-[10px] font-medium text-gray-500 dark:text-gray-400 select-none cursor-default">
                           <Cpu className="w-3 h-3" />
@@ -1097,7 +1263,57 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
               <Paperclip className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
 
-            {/* Web Search Toggle - Themed */}
+            {chatMode === 'brand' && (
+              <Tooltip.Provider>
+                <Tooltip.Root delayDuration={0}>
+                  <Tooltip.Trigger asChild>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isAuthenticated) {
+                            onRequestAuth();
+                            return;
+                          }
+                          if (subscriptionTier !== 'plus' && subscriptionTier !== 'pro') {
+                            window.location.href = '/#pricing';
+                            return;
+                          }
+                          setBrandToolsEnabled(!brandToolsEnabled);
+                        }}
+                        className={`rounded-full h-8 w-8 sm:h-10 sm:w-10 shrink-0 transition-all duration-300 flex items-center justify-center relative ${brandToolsEnabled
+                          ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                          : (subscriptionTier !== 'plus' && subscriptionTier !== 'pro')
+                            ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed'
+                            : 'text-gray-500 hover:text-primary hover:bg-primary/5 dark:hover:bg-white/5'
+                          }`}
+                      >
+                        <Cpu className="w-4 h-4 sm:w-5 sm:h-5" />
+                        {(subscriptionTier !== 'plus' && subscriptionTier !== 'pro') && (
+                          <div className="absolute -top-1 -right-1 flex h-3 w-3 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900 z-10">
+                            <Lock className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />
+                          </div>
+                        )}
+                      </button>
+                    </div>
+                  </Tooltip.Trigger>
+                  <Tooltip.Portal>
+                    <Tooltip.Content
+                      className="z-50 px-3 py-1.5 text-xs font-medium text-white bg-slate-900 dark:bg-slate-800 rounded-lg shadow-xl animate-in fade-in zoom-in-95 border border-white/10"
+                      sideOffset={5}
+                    >
+                      {subscriptionTier !== 'plus' && subscriptionTier !== 'pro'
+                        ? 'Upgrade to Plus to unlock Brand Tools (Generate/Edit)'
+                        : brandToolsEnabled
+                          ? (subscriptionTier === 'pro' ? 'Tools ON: unlimited' : 'Tools ON: 1 credit per run')
+                          : 'Enable Brand Tools (Generate/Edit)'}
+                      <Tooltip.Arrow className="fill-slate-900 dark:fill-slate-800" />
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                </Tooltip.Root>
+              </Tooltip.Provider>
+            )}
+
             {canSearch && (
               <Button
                 variant="ghost"
@@ -1178,7 +1394,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   if (isAuthenticated) {
-                    if (canAfford('chat', settings.model)) {
+                    const modelToCharge = chatMode === 'brand' ? BRAND_STUDIO_MODEL_ID : settings.model;
+                    if (canAfford('chat', modelToCharge)) {
                       handleSendMessage(inputValue);
                     } else {
                       alert('Insufficient credits. Please add more credits to continue.');
@@ -1188,7 +1405,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                   }
                 }
               }}
-              placeholder="Message GT..."
+              placeholder={chatMode === 'brand' ? 'Describe your brand, upload an image, or ask for an ad prompt…' : 'Message GT...'}
               className="flex-1 min-w-[60px] bg-transparent border-none focus:ring-0 resize-none max-h-32 py-2.5 px-1 sm:px-2 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 text-sm sm:text-base scrollbar-hide focus:outline-none"
               rows={1}
             />
@@ -1207,7 +1424,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
               <CreditAwareButton
                 action="chat"
-                model={settings.model}
+                model={chatMode === 'brand' ? BRAND_STUDIO_MODEL_ID : settings.model}
                 onClick={() => handleSendMessage(inputValue)}
                 onRequestAuth={onRequestAuth}
                 disabled={isLoading || (!inputValue.trim() && !attachment)}

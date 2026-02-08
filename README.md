@@ -9,7 +9,7 @@ A next-generation AI Assistant platform featuring real-time Chat, Voice, Image G
 *   **Media Studio**:
     *   **Generator**: High-quality images (Hunyuan, Flux).
     *   **Magic Editor**: Edit images with simple text commands.
-    *   **Animator**: Wan 2.2 Image-to-Video and Text-to-Video.
+    *   **Animator**: Wan 2.2 Image-to-Video, Text-to-Video, and Lip Sync.
 *   **Monetization**: Tiered subscriptions and credit packs via Paystack.
 *   **Cloud Sync**: Persist your history and media via Supabase.
 *   **Voice Engine**: STT (Whisper) and TTS (Kokoro) with 28 premium voices.

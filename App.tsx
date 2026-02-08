@@ -386,8 +386,8 @@ const App: React.FC = () => {
 
             {/* Logo - Compact on Mobile */}
             <div className="flex items-center gap-2 px-1.5 py-1 sm:px-3 sm:py-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 shadow-lg">
-              <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25">
-                <Bot className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+              <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center shadow-lg shadow-primary/25 border border-primary/20 overflow-hidden">
+                <img src="/brand/mark.png" alt="Brand" className="w-full h-full object-cover" />
               </div>
               <h1 className="text-base sm:text-xl font-bold tracking-tight text-slate-800 dark:text-white hidden md:block">
                 Gasho<span className="text-primary italic">Chat</span>
@@ -504,9 +504,9 @@ const App: React.FC = () => {
 
         {/* Main Content Area - Scrollable Container */}
         <main className="flex-1 w-full overflow-hidden relative z-10 px-2 sm:px-4 pb-0 md:pb-4 pt-4 sm:pt-6 flex flex-col items-center min-h-0">
-          <div className="w-full h-full max-w-[1920px] mx-auto relative">
+          <div className="w-full flex-1 min-h-0 max-w-[1920px] mx-auto relative flex flex-col">
             {currentView === 'chat' && (
-              <div className="h-full w-full transition-all duration-500 animate-in fade-in zoom-in-95">
+              <div className="w-full flex-1 min-h-0 transition-all duration-500 animate-in fade-in zoom-in-95 flex flex-col">
                 <ChatInterface
                   key={`${currentSessionId}-${settings.useSupabase ? 'cloud' : 'local'}`}
                   settings={settings}
@@ -521,7 +521,7 @@ const App: React.FC = () => {
               </div>
             )}
             {currentView === 'media' && (
-              <div className="h-full w-full transition-all duration-500 animate-in fade-in zoom-in-95">
+              <div className="w-full flex-1 min-h-0 transition-all duration-500 animate-in fade-in zoom-in-95 flex flex-col">
                 <MediaStudio
                   settings={settings}
                   isAuthenticated={isSignedIn}
@@ -532,7 +532,7 @@ const App: React.FC = () => {
               </div>
             )}
             {currentView === 'pricing' && (
-              <div className="h-full w-full transition-all duration-500 animate-in fade-in zoom-in-95">
+              <div className="w-full flex-1 min-h-0 transition-all duration-500 animate-in fade-in zoom-in-95">
                 <PricingPage onBack={() => setCurrentView('chat')} />
               </div>
             )}

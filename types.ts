@@ -28,6 +28,7 @@ export interface Message {
   name?: string; // For tool responses
   tool_calls?: any[]; // For assistant tool requests
   sources?: SearchSource[]; // Attached search sources for UI
+  media?: MediaItem[]; // Attached generated media for UI (e.g., Brand Studio tools)
 }
 
 export interface ChatSession {
@@ -37,6 +38,8 @@ export interface ChatSession {
   preview: string;
   isBranch?: boolean;
   model?: string;
+  chatMode?: 'chat' | 'brand';
+  brandToolsEnabled?: boolean;
 }
 
 export interface MediaItem {
@@ -78,6 +81,16 @@ Provide well-formatted responses.`;
 
 export const DEFAULT_SYSTEM_PROMPT = "You answer concisely and clearly.";
 
+export const BRAND_STUDIO_MODEL_ID = 'moonshotai/Kimi-K2.5-TEE';
+
+export const NORMAL_CHAT_APP_FEATURES_CONTEXT = `App features and how to use them (no model names):
+- Media > Image: write a prompt, optionally enable Magic Enhance, then click Generate Image. For text-heavy posters, keep wording short and clear.
+- Media > Editor: upload an image under Image to Edit, describe the change in Edit Instruction, then click Apply Edits.
+- Media > Animator: choose Image-to-Video or Text-to-Video, add a Motion Prompt/Video Description, then click Animate Video. Clips are short; chain multiple clips if needed.
+- Media > Gallery: find past images/videos, re-download, reuse as inputs, or delete old ones.
+- MuseTalk Lipsync (Media > Animator > Lip Sync): provide a face video and an audio track, then run lipsync and review the preview.
+- LTX advanced video (Media > Animator): select the advanced engine, adjust advanced options if needed, then generate and iterate.`;
+
 export const AVAILABLE_MODELS = [
   { id: "deepseek-ai/DeepSeek-R1-0528-TEE", name: "🧠 DeepSeek R1" },
   { id: "deepseek-ai/DeepSeek-V3.2-TEE", name: "🧠 DeepSeek V3.2" },
@@ -87,6 +100,7 @@ export const AVAILABLE_MODELS = [
   { id: "zai-org/GLM-4.6V", name: "🧠👁️ GLM 4.6V" },
   { id: "zai-org/GLM-4.7-TEE", name: "🧠 GLM 4.7" },
   { id: "openai/gpt-oss-120b-TEE", name: "🧠 GPT OSS 120B" },
+  { id: "moonshotai/Kimi-K2.5-TEE", name: "🧠👁️ Kimi K2.5" },
   { id: "moonshotai/Kimi-K2-Thinking-TEE", name: "🧠 Kimi K2 Thinking" },
   { id: "MiniMaxAI/MiniMax-M2.1-TEE", name: "🧠 MiniMax M2.1" },
   { id: "NousResearch/DeepHermes-3-Mistral-24B-Preview", name: "Nous Hermes 3 Mistral" },
@@ -110,7 +124,30 @@ export const AVAILABLE_EDIT_MODELS = [
 
 export const AVAILABLE_VIDEO_MODELS = [
   { id: "wan-2.2-i2v", name: "Wan 2.2 I2V (Fast)", url: "https://chutes-wan-2-2-i2v-14b-fast.chutes.ai/generate", type: 'i2v' },
-  { id: "wan-2.1-t2v", name: "Wan 2.1 T2V (14B)", url: "https://chutes-wan2-1-14b.chutes.ai/text2video", type: 't2v' }
+  { id: "wan-2.1-t2v", name: "Wan 2.1 T2V (14B)", url: "https://chutes-wan2-1-14b.chutes.ai/text2video", type: 't2v' },
+  { id: "ltx-2-i2v", name: "LTX-2 (I2V)", url: "https://chutes-ltx-2.chutes.ai/generate", type: 'i2v' },
+  { id: "ltx-2-t2v", name: "LTX-2 (T2V)", url: "https://chutes-ltx-2.chutes.ai/generate", type: 't2v' }
+];
+
+export interface Ltx2AdvancedSettings {
+  pipeline: 'distilled' | 'two_stage' | 'ic_lora' | 'keyframe_interp';
+  conditioning: 'auto' | 'none' | 'image' | 'video_url' | 'keyframes';
+  width: number;
+  height: number;
+  frame_rate: number;
+  num_frames: number;
+  seed?: number;
+  image_strength: number;
+  video_strength: number;
+  cfg_guidance_scale: number;
+  num_inference_steps: number;
+  negative_prompt: string;
+  enhance_prompt: boolean;
+  json_override: string;
+}
+
+export const AVAILABLE_LIPSYNC_MODELS = [
+  { id: "musetalk", name: "Lip Sync", url: "https://chutes-musetalk.chutes.ai/generate" }
 ];
 
 export const AVAILABLE_VOICES = [
@@ -159,6 +196,24 @@ export interface VideoGenRequest {
   image?: string; // base64 or url (Optional for T2V)
   modelUrl: string;
   modelId?: string;
+  ltx2Params?: {
+    settings: Ltx2AdvancedSettings;
+    videoUrl?: string;
+    keyframeStart?: string | null;
+    keyframeEnd?: string | null;
+  };
+}
+
+export interface MuseTalkLipSyncRequest {
+  modelUrl: string;
+  video_input: string;
+  audio_input: string;
+  fps?: number;
+  batch_size?: number;
+  extra_margin?: number;
+  parsing_mode?: 'jaw' | 'raw';
+  left_cheek_width?: number;
+  right_cheek_width?: number;
 }
 
 export type ImageAspectRatio = '1:1' | '16:9' | '9:16' | '4:3';

@@ -180,7 +180,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                                     className="w-full text-sm bg-white dark:bg-black/50 rounded-lg px-2 py-1 border border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm text-black dark:text-white"
                                                     autoFocus
                                                 />
-                                                <button type="submit" className="p-1.5 text-green-500 hover:text-green-600 bg-green-50 dark:bg-green-900/30 rounded-lg ring-1 ring-green-500/20">
+                                                <button type="submit" className="p-2 text-green-500 hover:text-green-600 bg-green-50 dark:bg-green-900/30 rounded-full ring-1 ring-green-500/20">
                                                     <Check className="w-3.5 h-3.5" />
                                                 </button>
                                             </form>
@@ -200,7 +200,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                                     {/* Actions (visible on hover or if active) */}
                                     {editingId !== session.id && (
-                                        <div className={`flex items-center gap-1 absolute right-2 ${activeSessionId === session.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all duration-200 ${activeSessionId === session.id ? 'bg-white/80 dark:bg-slate-900/80' : 'bg-white/90 dark:bg-slate-900/90'} backdrop-blur-md rounded-lg p-1 shadow-sm border border-gray-100 dark:border-white/5`}>
+                                        <div className={`flex items-center gap-1 absolute right-2 ${activeSessionId === session.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-all duration-200 ${activeSessionId === session.id ? 'bg-white/80 dark:bg-slate-900/80' : 'bg-white/90 dark:bg-slate-900/90'} backdrop-blur-md rounded-xl p-1 shadow-sm border border-gray-100 dark:border-white/5`}>
                                             <button
                                                 onClick={(e) => startEditing(e, session)}
                                                 className={`p-1.5 rounded-md transition-colors ${activeSessionId === session.id ? 'text-primary hover:bg-primary/10' : 'text-gray-400 hover:text-primary hover:bg-primary/5'}`}
@@ -244,6 +244,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     )}
                                 </button>
                             )}
+
+                            <button
+                                onClick={() => window.dispatchEvent(new CustomEvent('start-tour', { detail: { tour: 'current' } }))}
+                                className="p-2.5 rounded-xl bg-white/50 dark:bg-white/5 border border-white/20 dark:border-white/10 hover:text-primary transition-all"
+                                title="Guide"
+                            >
+                                <Zap className="w-4 h-4 text-gray-500" />
+                            </button>
 
                             {onOpenSettings && (
                                 <button
