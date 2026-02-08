@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useUser, useClerk } from '@clerk/clerk-react';
-import { ChevronDown, User, LogOut, Settings, Coins, CreditCard, X } from 'lucide-react';
+import { ChevronDown, User, LogOut, Settings, Coins, CreditCard, X, MoreVertical } from 'lucide-react';
 import { Button } from './UI';
 import { useCredits } from '../context/CreditContext';
 
-export const UserProfile: React.FC = () => {
+export const UserProfile: React.FC<{ trigger?: 'avatar' | 'dots'; extraItems?: React.ReactNode }> = ({ trigger = 'avatar', extraItems }) => {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
   const { credits, subscriptionTier, loading } = useCredits();
@@ -51,27 +51,35 @@ export const UserProfile: React.FC = () => {
     <div className="relative">
       <Button
         variant="glass"
-        size="sm"
+        size={trigger === 'dots' ? 'icon' : 'sm'}
         onClick={() => setShowDropdown(!showDropdown)}
-        className="rounded-[1.25rem] px-2 py-1.5 flex items-center gap-2 xs:gap-2.5 hover:bg-white/60 dark:hover:bg-slate-700/60 transition-all duration-300 border-white/20 shadow-sm hover:shadow-md hover:scale-[1.02]"
+        className={trigger === 'dots'
+          ? "rounded-full w-9 h-9 border-white/20 shadow-sm hover:shadow-md hover:bg-white/60 dark:hover:bg-slate-700/60 transition-all duration-300"
+          : "rounded-[1.25rem] px-2 py-1.5 flex items-center gap-2 xs:gap-2.5 hover:bg-white/60 dark:hover:bg-slate-700/60 transition-all duration-300 border-white/20 shadow-sm hover:shadow-md hover:scale-[1.02]"}
       >
-        {user.imageUrl ? (
-          <img
-            src={user.imageUrl}
-            alt="Profile"
-            className="w-7 h-7 xs:w-8 xs:h-8 rounded-full object-cover ring-2 ring-white/50 dark:ring-white/10 shadow-sm"
-          />
+        {trigger === 'dots' ? (
+          <MoreVertical className="w-5 h-5 text-gray-500 dark:text-gray-300" />
         ) : (
-          <div className="w-7 h-7 xs:w-8 xs:h-8 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
-            {getInitials()}
-          </div>
+          <>
+            {user.imageUrl ? (
+              <img
+                src={user.imageUrl}
+                alt="Profile"
+                className="w-7 h-7 xs:w-8 xs:h-8 rounded-full object-cover ring-2 ring-white/50 dark:ring-white/10 shadow-sm"
+              />
+            ) : (
+              <div className="w-7 h-7 xs:w-8 xs:h-8 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
+                {getInitials()}
+              </div>
+            )}
+
+            <div className={`hidden sm:flex items-center justify-center px-2.5 py-0.5 rounded-full text-[9px] font-black tracking-widest uppercase ${getTierColor(subscriptionTier)} shadow-sm ring-1 ring-white/20`}>
+              {getTierLabel(subscriptionTier)}
+            </div>
+
+            <ChevronDown className={`hidden xs:block w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${showDropdown ? 'rotate-180' : ''}`} />
+          </>
         )}
-
-        <div className={`hidden sm:flex items-center justify-center px-2.5 py-0.5 rounded-full text-[9px] font-black tracking-widest uppercase ${getTierColor(subscriptionTier)} shadow-sm ring-1 ring-white/20`}>
-          {getTierLabel(subscriptionTier)}
-        </div>
-
-        <ChevronDown className={`hidden xs:block w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${showDropdown ? 'rotate-180' : ''}`} />
       </Button>
 
       {showDropdown && (
@@ -150,6 +158,11 @@ export const UserProfile: React.FC = () => {
             </div>
 
             <div className="p-2 space-y-1">
+              {extraItems && (
+                <div className="px-2 pt-1 pb-2">
+                  {extraItems}
+                </div>
+              )}
               <button
                 onClick={() => {
                   const event = new CustomEvent('open-account-settings');

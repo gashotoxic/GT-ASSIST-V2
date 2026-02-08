@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Mic, Square, Loader2, Volume2, Bot, User, StopCircle, Paperclip, X, FileText, Play, Search, Globe, Pause, RotateCcw, BrainCircuit, Edit3, Cpu, Copy, GitBranch, Check, Database, Lock } from 'lucide-react';
+import { Send, Mic, Square, Loader2, Volume2, Bot, User, StopCircle, Paperclip, X, FileText, Play, Search, Globe, Pause, RotateCcw, BrainCircuit, Edit3, Cpu, Copy, GitBranch, Check, Database, Lock, Plus } from 'lucide-react';
 import { Button } from './UI';
 import { Message, AppSettings, FileAttachment, ChatSession, AVAILABLE_MODELS, BASE_SYSTEM_CONTEXT, DEFAULT_SYSTEM_PROMPT, BRAND_STUDIO_MODEL_ID, NORMAL_CHAT_APP_FEATURES_CONTEXT, MediaItem } from '../types';
 import ReactMarkdown from 'react-markdown';
@@ -73,7 +73,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const [attachment, setAttachment] = useState<FileAttachment | null>(null);
   const [generatingAudioId, setGeneratingAudioId] = useState<string | null>(null);
-  const [isSearchEnabled, setIsSearchEnabled] = useState(false);
+  const [isSearchEnabled, setIsSearchEnabled] = useState(true);
   const [isKnowledgeEnabled, setIsKnowledgeEnabled] = useState(false);
   const [showKnowledgeModal, setShowKnowledgeModal] = useState(false);
   const [editingMessage, setEditingMessage] = useState<{ message: Message; index: number } | null>(null);
@@ -81,6 +81,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
   const [branchingIndex, setBranchingIndex] = useState<number | null>(null);
   const [chatMode, setChatMode] = useState<'chat' | 'brand'>('chat');
   const [brandToolsEnabled, setBrandToolsEnabled] = useState(false);
+  const [isQuickToolsOpen, setIsQuickToolsOpen] = useState(false);
   const [brandPromptText, setBrandPromptText] = useState('');
 
   // Audio State
@@ -106,6 +107,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
       .then(setBrandPromptText)
       .catch(() => setBrandPromptText(''));
   }, []);
+
+  useEffect(() => {
+    if (!isQuickToolsOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsQuickToolsOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isQuickToolsOpen]);
 
   // Knowledge Base service
   const knowledgeService = React.useMemo(
@@ -336,6 +346,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     const activeAttachment = forcedAttachment !== undefined ? forcedAttachment : attachment;
 
     if (!textInput.trim() && !activeAttachment) return;
+    setIsQuickToolsOpen(false);
 
     const activeModel = chatMode === 'brand' ? BRAND_STUDIO_MODEL_ID : settings.model;
     const cost = getCreditCost('chat', activeModel);
@@ -971,26 +982,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
               </div>
 
               <div className="flex justify-center pt-2">
-                <div className="rounded-full bg-white/40 dark:bg-white/5 border border-white/30 dark:border-white/10 p-0.5 flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => setChatMode('chat')}
-                    className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${chatMode === 'chat'
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5'
-                      }`}
-                  >
-                    Chat
-                  </button>
+                <div className="rounded-full bg-white/40 dark:bg-white/5 border border-white/30 dark:border-white/10 p-1 flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setChatMode('brand')}
-                    className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all ${chatMode === 'brand'
+                    className={`px-4 py-1.5 rounded-full text-[12px] font-semibold transition-all ${chatMode === 'brand'
                       ? 'bg-primary/10 text-primary'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5'
                       }`}
                   >
                     Brand
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setChatMode('chat')}
+                    className={`px-4 py-1.5 rounded-full text-[12px] font-semibold transition-all ${chatMode === 'chat'
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5'
+                      }`}
+                  >
+                    Chat
                   </button>
                 </div>
               </div>
@@ -1245,7 +1256,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
             </div>
           )}
 
-          <div className="flex items-end gap-1 sm:gap-2 bg-white/80 dark:bg-slate-950/50 p-1.5 sm:p-2 rounded-[1.5rem] border border-gray-200/50 dark:border-white/10 shadow-lg focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+          <div className="relative flex items-end gap-1 sm:gap-2 bg-white/80 dark:bg-slate-950/50 p-1.5 sm:p-2 rounded-[1.5rem] border border-gray-200/50 dark:border-white/10 shadow-lg focus-within:ring-2 focus-within:ring-primary/20 transition-all">
             <input
               type="file"
               ref={fileInputRef}
@@ -1256,14 +1267,104 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full h-8 w-8 sm:h-10 sm:w-10 text-gray-500 hover:text-primary hover:bg-primary/5 shrink-0"
-              onClick={() => fileInputRef.current?.click()}
-              title="Attach file"
+              className={`rounded-full h-8 w-8 sm:h-10 sm:w-10 shrink-0 transition-all duration-300 ${isQuickToolsOpen
+                ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                : 'text-gray-500 hover:text-primary hover:bg-primary/5 dark:hover:bg-white/5'
+                }`}
+              onClick={() => setIsQuickToolsOpen(v => !v)}
+              title={isQuickToolsOpen ? 'Hide tools' : 'Show tools'}
             >
-              <Paperclip className="w-4 h-4 sm:w-5 sm:h-5" />
+              <Plus className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 ${isQuickToolsOpen ? 'rotate-45' : ''}`} />
             </Button>
 
-            {chatMode === 'brand' && (
+            {isQuickToolsOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsQuickToolsOpen(false)} />
+                <div className="absolute left-0 bottom-[calc(100%+0.5rem)] z-50 w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl bg-white/85 dark:bg-[#0f172a]/90 backdrop-blur-2xl border border-white/40 dark:border-white/10 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] dark:shadow-black/50 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-bottom-2 ring-1 ring-black/5">
+                  <div className="p-2 flex flex-col gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsQuickToolsOpen(false);
+                        fileInputRef.current?.click();
+                      }}
+                      className="w-full px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-primary/5 transition-colors flex items-center gap-3"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                      <span>Attachments</span>
+                    </button>
+
+                    {canSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setIsSearchEnabled(v => !v)}
+                        className={`w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${isSearchEnabled
+                          ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                          : 'text-gray-700 dark:text-gray-200 hover:bg-primary/5'
+                          }`}
+                      >
+                        <Globe className="w-4 h-4" />
+                        <span>Web Search</span>
+                      </button>
+                    )}
+
+                    {isAuthenticated && userId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (subscriptionTier === 'free') return;
+                          setIsKnowledgeEnabled(v => !v);
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          if (subscriptionTier === 'free') return;
+                          setShowKnowledgeModal(true);
+                        }}
+                        className={`w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${isKnowledgeEnabled
+                          ? 'bg-violet-500/10 text-violet-500 hover:bg-violet-500/20'
+                          : subscriptionTier === 'free'
+                            ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed'
+                            : 'text-gray-700 dark:text-gray-200 hover:bg-violet-500/5'
+                          }`}
+                      >
+                        <Database className="w-4 h-4" />
+                        <span>Knowledge Base</span>
+                      </button>
+                    )}
+
+                    {chatMode === 'brand' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isAuthenticated) {
+                            setIsQuickToolsOpen(false);
+                            onRequestAuth();
+                            return;
+                          }
+                          if (subscriptionTier !== 'plus' && subscriptionTier !== 'pro') {
+                            setIsQuickToolsOpen(false);
+                            window.location.href = '/#pricing';
+                            return;
+                          }
+                          setBrandToolsEnabled(v => !v);
+                        }}
+                        className={`w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${brandToolsEnabled
+                          ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                          : (subscriptionTier !== 'plus' && subscriptionTier !== 'pro')
+                            ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed'
+                            : 'text-gray-700 dark:text-gray-200 hover:bg-primary/5'
+                          }`}
+                      >
+                        <Cpu className="w-4 h-4" />
+                        <span>Brand Tools</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {chatMode === 'brand' && !isQuickToolsOpen && brandToolsEnabled && (
               <Tooltip.Provider>
                 <Tooltip.Root delayDuration={0}>
                   <Tooltip.Trigger asChild>
@@ -1314,7 +1415,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
               </Tooltip.Provider>
             )}
 
-            {canSearch && (
+            {canSearch && !isQuickToolsOpen && isSearchEnabled && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -1330,7 +1431,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
             )}
 
             {/* Knowledge Base Toggle - For authenticated users (Paid Tiers Only) */}
-            {isAuthenticated && userId && (
+            {isAuthenticated && userId && !isQuickToolsOpen && isKnowledgeEnabled && (
               <Tooltip.Provider>
                 <Tooltip.Root delayDuration={0}>
                   <Tooltip.Trigger asChild>

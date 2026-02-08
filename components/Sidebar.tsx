@@ -82,7 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ${isOpen ? 'translate-x-0 lg:w-80 opacity-100' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0 lg:overflow-hidden'}
       `}>
                 {/* Inner Wrapper */}
-                <div className="w-80 h-full flex flex-col min-w-[20rem]">
+                <div className="w-[min(20rem,70vw)] max-[450px]:w-[70vw] h-full flex flex-col min-w-0">
 
                     {/* Header */}
                     <div className="px-5 py-6 flex items-center justify-between shrink-0">

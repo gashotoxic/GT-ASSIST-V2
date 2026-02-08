@@ -9,6 +9,7 @@ export const CREDIT_COSTS = {
     'zai-org/GLM-4.6': 1,
     'moonshotai/Kimi-K2-Thinking': 1,
     'moonshotai/Kimi-K2.5': 1,
+    'moonshotai/Kimi-K2.5-TEE': 1,
     'deepseek-ai/DeepSeek-R1-0528': 1,
     // Default cost for unknown models
     default: 1
