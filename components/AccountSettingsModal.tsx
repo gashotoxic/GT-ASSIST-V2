@@ -73,10 +73,10 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
             size="xl"
             showCloseButton={true}
         >
-            <div className="flex flex-col md:flex-row h-[600px] -m-6 divide-x divide-gray-100 dark:divide-white/5">
+            <div className="flex flex-col md:flex-row h-[calc(100dvh-14rem)] min-h-[520px] md:h-[600px] -m-6 md:divide-x divide-gray-100 dark:divide-white/5">
 
                 {/* Sidebar Navigation */}
-                <aside className="w-full md:w-64 bg-gray-50/50 dark:bg-slate-900/30 p-4 shrink-0 overflow-y-auto">
+                <aside className="hidden md:block w-full md:w-64 bg-gray-50/50 dark:bg-slate-900/30 p-4 shrink-0 overflow-y-auto">
                     <div className="space-y-1">
                         {tabs.map((tab) => {
                             const Icon = tab.icon;
@@ -134,13 +134,84 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
                 </aside>
 
                 {/* Content Area */}
-                <main className="flex-1 p-8 overflow-y-auto bg-white dark:bg-slate-950/50">
+                <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto bg-white dark:bg-slate-950/50 relative">
+
+                    <div className="md:hidden sticky top-0 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-3 sm:pt-5 pb-3 bg-gradient-to-b from-white/90 to-white/60 dark:from-slate-950/75 dark:to-slate-950/40 backdrop-blur-xl border-b border-gray-100/70 dark:border-white/10 ring-1 ring-black/5 dark:ring-white/10 shadow-[0_18px_40px_-30px_rgba(0,0,0,0.65)] rounded-b-3xl">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                                    Member
+                                </div>
+                                <div className="mt-1 flex items-center gap-2">
+                                    <span className="text-[11px] font-black text-primary px-2 py-1 bg-primary/10 border border-primary/20 rounded-full">
+                                        {subscriptionTier.toUpperCase()}
+                                    </span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-600 dark:text-gray-300">
+                                        Tier
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <div className="h-9 px-3 rounded-2xl bg-white/50 dark:bg-white/5 border border-white/70 dark:border-white/10 shadow-sm flex items-center gap-2">
+                                    <Zap className="w-3.5 h-3.5 text-primary fill-primary" />
+                                    <div className="leading-none">
+                                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Daily</div>
+                                        <div className="mt-0.5 text-[13px] font-black text-primary">{dailyCredits}</div>
+                                    </div>
+                                </div>
+                                <div className="h-9 px-3 rounded-2xl bg-white/50 dark:bg-white/5 border border-white/70 dark:border-white/10 shadow-sm flex items-center gap-2">
+                                    <Database className="w-3.5 h-3.5 text-gray-500 dark:text-gray-300" />
+                                    <div className="leading-none">
+                                        <div className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Perm</div>
+                                        <div className="mt-0.5 text-[13px] font-black text-gray-800 dark:text-gray-200">{credits}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            {!isPro && (
+                                <button
+                                    onClick={() => {
+                                        onClose();
+                                        const event = new CustomEvent('open-view', { detail: 'pricing' });
+                                        window.dispatchEvent(event);
+                                    }}
+                                    className="shrink-0 h-9 px-3 rounded-xl bg-gradient-to-r from-primary to-teal-500 text-[10px] font-black text-white uppercase tracking-widest hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-1 shadow-lg shadow-primary/20"
+                                >
+                                    Upgrade <ChevronRight className="w-3 h-3" />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="mt-2.5 p-1 rounded-3xl bg-white/40 dark:bg-white/5 border border-white/60 dark:border-white/10 shadow-inner">
+                            <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                                {tabs.map((tab) => {
+                                    const Icon = tab.icon;
+                                    const isLocked = tab.pro && !isPlus;
+                                    const isActive = activeTab === tab.id;
+                                    return (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => !isLocked && setActiveTab(tab.id as SettingsTab)}
+                                            className={`shrink-0 flex items-center gap-2 px-2.5 py-1.5 rounded-2xl text-[10px] font-black border transition-all ${isActive
+                                                ? 'bg-primary text-white border-transparent shadow-sm'
+                                                : 'bg-white/40 dark:bg-white/5 border-white/50 dark:border-white/10 text-gray-700 dark:text-gray-200 hover:bg-black/5 dark:hover:bg-white/10'
+                                                } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        >
+                                            <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-gray-500 dark:text-gray-300'}`} />
+                                            <span className="whitespace-nowrap">{tab.label.split(' ')[0]}</span>
+                                            {isLocked && <ShieldCheck className="w-3.5 h-3.5 text-amber-200" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                    </div>
 
                     {activeTab === 'general' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
                             <div className="space-y-1">
-                                <h3 className="text-xl font-heading font-black text-gray-900 dark:text-white">Profile Details</h3>
-                                <p className="text-sm text-gray-500">Manage your account information and security.</p>
+                                <h3 className="text-lg md:text-xl font-heading font-black text-gray-900 dark:text-white">Profile Details</h3>
+                                <p className="text-xs md:text-sm text-gray-500">Manage your account information and security.</p>
                             </div>
 
                             <div className="flex items-center gap-6 p-6 rounded-3xl bg-gray-50/50 dark:bg-white/5 border border-gray-100 dark:border-white/10">
@@ -224,8 +295,8 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
                     {activeTab === 'ai' && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                             <div className="space-y-1">
-                                <h3 className="text-xl font-heading font-black text-gray-900 dark:text-white">AI Configuration</h3>
-                                <p className="text-sm text-gray-500">Fine-tune the reasoning engine.</p>
+                                <h3 className="text-lg md:text-xl font-heading font-black text-gray-900 dark:text-white">AI Configuration</h3>
+                                <p className="text-xs md:text-sm text-gray-500">Fine-tune the reasoning engine.</p>
                             </div>
 
                             <div className="space-y-6 pt-4">
@@ -235,8 +306,10 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
                                         value={isCustomModel ? 'custom' : formData.model}
                                         onChange={(e) => handleModelChange(e.target.value)}
                                     >
-                                        {AVAILABLE_MODELS.map(model => (
-                                            <option key={model.id} value={model.id}>{model.name}</option>
+                                    {AVAILABLE_MODELS.map(model => (
+                                            <option key={model.id} value={model.id}>
+                                                {`${model.name}${model.badge ? ` (${model.badge})` : ''}`}
+                                            </option>
                                         ))}
                                         <option value="custom">Custom Endpoint...</option>
                                     </Select>
@@ -273,8 +346,8 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
                     {activeTab === 'tts' && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                             <div className="space-y-1">
-                                <h3 className="text-xl font-heading font-black text-gray-900 dark:text-white">Voice & Lexicon</h3>
-                                <p className="text-sm text-gray-500">Configure how the assistant speaks to you.</p>
+                                <h3 className="text-lg md:text-xl font-heading font-black text-gray-900 dark:text-white">Voice & Lexicon</h3>
+                                <p className="text-xs md:text-sm text-gray-500">Configure how the assistant speaks to you.</p>
                             </div>
 
                             <div className="space-y-8 pt-4">
@@ -325,10 +398,10 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2">
-                                    <h3 className="text-xl font-heading font-black text-gray-900 dark:text-white uppercase tracking-tighter">Cloud Persistence</h3>
+                                    <h3 className="text-lg md:text-xl font-heading font-black text-gray-900 dark:text-white uppercase tracking-tighter">Cloud Persistence</h3>
                                     <div className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[9px] font-black text-amber-500 uppercase tracking-widest">PLUS+</div>
                                 </div>
-                                <p className="text-sm text-gray-500">Sync history across all browsers and devices.</p>
+                                <p className="text-xs md:text-sm text-gray-500">Sync history across all browsers and devices.</p>
                             </div>
 
                             <div className="space-y-4 p-6 rounded-3xl bg-blue-500/5 border border-blue-500/10">
@@ -364,10 +437,10 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2">
-                                    <h3 className="text-xl font-heading font-black text-gray-900 dark:text-white uppercase tracking-tighter">Advanced Gateways</h3>
+                                    <h3 className="text-lg md:text-xl font-heading font-black text-gray-900 dark:text-white uppercase tracking-tighter">Advanced Gateways</h3>
                                     <div className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[9px] font-black text-primary uppercase tracking-widest">PRO</div>
                                 </div>
-                                <p className="text-sm text-gray-500">Manage third-party search and intelligence providers.</p>
+                                <p className="text-xs md:text-sm text-gray-500">Manage third-party search and intelligence providers.</p>
                             </div>
 
                             <div className="space-y-6 pt-4">

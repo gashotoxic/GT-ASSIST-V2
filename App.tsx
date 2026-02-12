@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Send, Menu, PanelLeftOpen, PanelLeftClose, Plus, MessageSquare, ImageIcon, LayoutGrid, X, LogOut, User, Settings, CreditCard, ChevronDown, Monitor, Smartphone, Moon, Sun, Search, Zap, Check, Sparkles, Bot, LifeBuoy, Sliders } from 'lucide-react';
 import { OnboardingTour } from './components/OnboardingTour';
 import ChatInterface from './components/ChatInterface';
@@ -9,7 +9,8 @@ import { Sidebar } from './components/Sidebar';
 import { PricingPage } from './components/PricingPage';
 import { AccountSettingsModal } from './components/AccountSettingsModal';
 import { Button } from './components/UI';
-import { AppSettings, DEFAULT_SYSTEM_PROMPT, ChatSession } from './types';
+import { LogoModelPicker } from './components/LogoModelPicker';
+import { AppSettings, BRAND_STUDIO_MODEL_ID, DEFAULT_SYSTEM_PROMPT, ChatSession, getModelShortName } from './types';
 import { SupabaseService } from './services/supabase';
 import { useAuthContext } from './context/AuthContext';
 import { useCredits } from './context/CreditContext';
@@ -18,6 +19,7 @@ import { summarizePrompt } from './utils/stringUtils';
 const DEFAULT_SETTINGS: AppSettings = {
   apiKey: 'internal', // Use internal default key
   model: 'moonshotai/Kimi-K2-Thinking-TEE',
+  brandModel: 'moonshotai/Kimi-K2.5-TEE',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   ttsVoice: 'af_heart',
   ttsSpeed: 1.0,
@@ -49,6 +51,11 @@ const App: React.FC = () => {
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string>('');
+  const [isModelPickerOpen, setIsModelPickerOpen] = useState(false);
+  const [headerChatMode, setHeaderChatMode] = useState<'chat' | 'brand'>('chat');
+  const [modelPickerAnchorRect, setModelPickerAnchorRect] = useState<DOMRect | null>(null);
+  const [modelPickerAnchorEl, setModelPickerAnchorEl] = useState<HTMLElement | null>(null);
+  const modelPickerAnchorElRef = useRef<HTMLElement | null>(null);
 
   // Create Supabase Instance - ALWAYS use app's database for authenticated users
   const supabaseService = useMemo(() => {
@@ -91,6 +98,62 @@ const App: React.FC = () => {
       setLastUserId(userId || null);
     }
   }, [userId]);
+
+  const getSessionPrefsKey = (sid: string) => `chutes_chat_prefs_${sid}`;
+
+  useEffect(() => {
+    if (!currentSessionId) return;
+    const raw = localStorage.getItem(getSessionPrefsKey(currentSessionId));
+    if (!raw) {
+      setHeaderChatMode('chat');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      setHeaderChatMode(parsed?.chatMode === 'brand' ? 'brand' : 'chat');
+    } catch {
+      setHeaderChatMode('chat');
+    }
+  }, [currentSessionId]);
+
+  useEffect(() => {
+    const onChatModeChanged = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail as { sessionId?: string; chatMode?: string } | undefined;
+      if (!detail?.sessionId || detail.sessionId !== currentSessionId) return;
+      setHeaderChatMode(detail.chatMode === 'brand' ? 'brand' : 'chat');
+    };
+    window.addEventListener('chat-mode-changed', onChatModeChanged);
+    return () => window.removeEventListener('chat-mode-changed', onChatModeChanged);
+  }, [currentSessionId]);
+
+  const handleChatModeChange = (mode: 'chat' | 'brand') => {
+    setHeaderChatMode(mode);
+    if (!currentSessionId) return;
+    window.dispatchEvent(new CustomEvent('set-chat-mode', { detail: { sessionId: currentSessionId, chatMode: mode } }));
+  };
+
+  const openModelPicker = (el: HTMLElement) => {
+    modelPickerAnchorElRef.current = el;
+    setModelPickerAnchorEl(el);
+    setModelPickerAnchorRect(el.getBoundingClientRect());
+    setIsModelPickerOpen(true);
+  };
+
+  useEffect(() => {
+    if (!isModelPickerOpen) return;
+    const update = () => {
+      const el = modelPickerAnchorElRef.current;
+      if (!el) return;
+      setModelPickerAnchorRect(el.getBoundingClientRect());
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [isModelPickerOpen]);
 
   useEffect(() => {
     const loadSessions = async () => {
@@ -326,6 +389,11 @@ const App: React.FC = () => {
     { id: 'pricing' as const, label: 'Pricing', icon: CreditCard },
   ];
 
+  const headerActiveModelId = headerChatMode === 'brand'
+    ? (settings.brandModel || BRAND_STUDIO_MODEL_ID)
+    : settings.model;
+  const headerActiveModelShortName = getModelShortName(headerActiveModelId);
+
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden font-sans selection:bg-primary/30 text-slate-900 dark:text-slate-100 transition-colors duration-500">
 
@@ -342,6 +410,7 @@ const App: React.FC = () => {
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        onOpen={() => setIsSidebarOpen(true)}
         sessions={sessions}
         activeSessionId={currentSessionId}
         onSelectSession={setCurrentSessionId}
@@ -359,8 +428,8 @@ const App: React.FC = () => {
         {/* Header - Mobile Optimized with Navigation */}
         <header className="flex-none flex flex-wrap sm:flex-nowrap items-center justify-between px-2 sm:px-6 py-3 sm:py-4 z-20 gap-x-2 gap-y-2 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-slate-900/40 backdrop-blur-xl">
 
-          <div className="md:hidden w-full flex items-center gap-2">
-            <div className="flex items-center gap-1.5 shrink-0">
+          <div className="md:hidden w-full grid grid-cols-[auto,1fr,auto] items-center gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
               <button
                 id="tour-sidebar-toggle"
                 onClick={() => setIsSidebarOpen(v => !v)}
@@ -370,37 +439,45 @@ const App: React.FC = () => {
                 <Menu className="w-5 h-5 text-slate-600 dark:text-slate-300" />
               </button>
 
-              <div className="h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 overflow-hidden flex items-center justify-center shrink-0">
-                <img src="/brand/mark.png" alt="Brand" className="w-full h-full object-cover" />
-              </div>
+              <button
+                type="button"
+                onClick={(e) => openModelPicker(e.currentTarget)}
+                className="h-9 px-2 rounded-xl bg-white/20 dark:bg-white/5 border border-white/30 dark:border-white/10 hover:bg-white/40 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5 text-[11px] font-black text-slate-700 dark:text-slate-100 max-w-[120px] min-[360px]:max-w-[140px] min-[420px]:max-w-[170px]"
+                title="Change model"
+              >
+                <span className="truncate">{headerActiveModelShortName || headerActiveModelId}</span>
+                <ChevronDown className="w-3.5 h-3.5 opacity-70" />
+              </button>
             </div>
 
-            <div className="flex-1 min-w-0 flex justify-center">
-              <div className="flex items-center gap-1 bg-black/5 dark:bg-white/10 p-1 rounded-2xl border border-white/10 shadow-inner max-w-full">
+            <div className="min-w-0 overflow-hidden">
+              <div className="flex justify-center">
+                <div className="flex items-center gap-1 bg-black/5 dark:bg-white/10 p-1 rounded-2xl border border-white/10 shadow-inner max-w-full overflow-x-auto scrollbar-hide">
                 <button
                   onClick={() => setCurrentView('chat')}
-                  className={`flex items-center gap-2 px-4 max-[400px]:px-3 py-2 max-[400px]:py-1.5 rounded-xl text-xs font-semibold transition-all duration-300 ${currentView === 'chat'
+                  className={`flex items-center gap-2 px-3 min-[360px]:px-3.5 min-[420px]:px-4 py-1.5 min-[420px]:py-2 rounded-xl text-[11px] min-[420px]:text-xs font-semibold transition-all duration-300 whitespace-nowrap ${currentView === 'chat'
                     ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'
                     }`}
                   title="Chat"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span className="max-[400px]:hidden">Chat</span>
+                  <span className="max-[360px]:hidden">Chat</span>
                 </button>
                 <button
                   id="tour-media-nav"
                   onClick={() => setCurrentView('media')}
-                  className={`flex items-center gap-2 px-4 max-[400px]:px-3 py-2 max-[400px]:py-1.5 rounded-xl text-xs font-semibold transition-all duration-300 ${currentView === 'media'
+                  className={`flex items-center gap-2 px-3 min-[360px]:px-3.5 min-[420px]:px-4 py-1.5 min-[420px]:py-2 rounded-xl text-[11px] min-[420px]:text-xs font-semibold transition-all duration-300 whitespace-nowrap ${currentView === 'media'
                     ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
                     : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'
                     }`}
                   title="Media"
                 >
                   <ImageIcon className="w-4 h-4" />
-                  <span className="max-[400px]:hidden">Media</span>
+                  <span className="max-[360px]:hidden">Media</span>
                 </button>
               </div>
+            </div>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
@@ -408,15 +485,17 @@ const App: React.FC = () => {
                 <>
                   <button
                     onClick={() => setCurrentView('pricing')}
-                    className="h-9 px-2.5 max-[400px]:px-2 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-colors flex items-center gap-1.5 text-xs font-bold text-primary whitespace-nowrap"
+                    className="h-9 px-2 max-[360px]:px-2 min-[420px]:px-2.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-colors flex items-center gap-1.5 text-[11px] min-[420px]:text-xs font-bold text-primary whitespace-nowrap"
                     title="Credits"
                   >
                     <Zap className="w-4 h-4" />
-                    <span className="text-[11px] font-black">
+                    <span className="text-[11px] font-black max-[360px]:hidden">
                       {subscriptionTier === 'pro' ? '∞' : (credits + (dailyCredits || 0))}
                     </span>
                   </button>
-                  <UserProfile trigger="dots" />
+                  <div className="shrink-0">
+                    <UserProfile trigger="dots" />
+                  </div>
                 </>
               ) : (
                 <>
@@ -459,12 +538,15 @@ const App: React.FC = () => {
               )}
 
               <div className="hidden md:flex items-center gap-2 px-1.5 py-1 sm:px-3 sm:py-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 shadow-lg">
-                <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center shadow-lg shadow-primary/25 border border-primary/20 overflow-hidden">
-                  <img src="/brand/mark.png" alt="Brand" className="w-full h-full object-cover" />
-                </div>
-                <h1 className="text-base sm:text-xl font-bold tracking-tight text-slate-800 dark:text-white hidden md:block">
-                  Gasho<span className="text-primary italic">Chat</span>
-                </h1>
+                <button
+                  type="button"
+                  onClick={(e) => openModelPicker(e.currentTarget)}
+                  className="flex items-center gap-1 h-9 px-2.5 rounded-xl bg-white/20 dark:bg-white/5 border border-white/30 dark:border-white/10 hover:bg-white/40 dark:hover:bg-white/10 transition-colors text-xs font-black text-slate-700 dark:text-slate-100 max-w-[220px]"
+                  title="Change model"
+                >
+                  <span className="truncate">{headerActiveModelShortName || headerActiveModelId}</span>
+                  <ChevronDown className="w-4 h-4 opacity-70" />
+                </button>
               </div>
             </div>
 
@@ -534,6 +616,17 @@ const App: React.FC = () => {
             </div>
           </div>
         </header>
+
+        <LogoModelPicker
+          isOpen={isModelPickerOpen}
+          onClose={() => setIsModelPickerOpen(false)}
+          chatMode={headerChatMode}
+          onChatModeChange={handleChatModeChange}
+          settings={settings}
+          onUpdateSettings={(patch) => setSettings(prev => ({ ...prev, ...patch }))}
+          anchorRect={modelPickerAnchorRect}
+          anchorEl={modelPickerAnchorEl}
+        />
 
         {/* Main Content Area - Scrollable Container */}
         <main className="flex-1 w-full overflow-hidden relative z-10 px-2 sm:px-4 pb-0 md:pb-4 pt-4 sm:pt-6 flex flex-col items-center min-h-0">

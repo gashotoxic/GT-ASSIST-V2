@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Mic, Square, Loader2, Volume2, Bot, User, StopCircle, Paperclip, X, FileText, Play, Search, Globe, Pause, RotateCcw, BrainCircuit, Edit3, Cpu, Copy, GitBranch, Check, Database, Lock, Plus } from 'lucide-react';
 import { Button } from './UI';
-import { Message, AppSettings, FileAttachment, ChatSession, AVAILABLE_MODELS, BASE_SYSTEM_CONTEXT, DEFAULT_SYSTEM_PROMPT, BRAND_STUDIO_MODEL_ID, NORMAL_CHAT_APP_FEATURES_CONTEXT, MediaItem } from '../types';
+import { Message, AppSettings, FileAttachment, ChatSession, AVAILABLE_MODELS, BASE_SYSTEM_CONTEXT, DEFAULT_SYSTEM_PROMPT, BRAND_STUDIO_MODEL_ID, NORMAL_CHAT_APP_FEATURES_CONTEXT, MediaItem, getModelShortName } from '../types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChutesService } from '../services/chutes';
@@ -168,11 +168,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     localStorage.setItem(getSessionPrefsKey(sessionId), JSON.stringify({ chatMode, brandToolsEnabled }));
   }, [sessionId, chatMode, brandToolsEnabled]);
 
+  useEffect(() => {
+    const onSetChatMode = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail as { sessionId?: string; chatMode?: string } | undefined;
+      if (!detail?.sessionId || detail.sessionId !== sessionId) return;
+      setChatMode(detail.chatMode === 'brand' ? 'brand' : 'chat');
+    };
+    window.addEventListener('set-chat-mode', onSetChatMode);
+    return () => window.removeEventListener('set-chat-mode', onSetChatMode);
+  }, [sessionId]);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('chat-mode-changed', { detail: { sessionId, chatMode } }));
+  }, [sessionId, chatMode]);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Check if search is actually available based on keys
   const canSearch = (settings.searchProvider === 'tavily' && !!(settings.tavilyApiKey || import.meta.env.VITE_TAVILY_API_KEY)) ||
     (settings.searchProvider === 'brave' && !!(settings.braveApiKey || import.meta.env.VITE_BRAVE_API_KEY));
+  const isHoverPointer = typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
   // Cleanup effect when sessionId changes (Stop generation/audio)
   useEffect(() => {
@@ -348,7 +363,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     if (!textInput.trim() && !activeAttachment) return;
     setIsQuickToolsOpen(false);
 
-    const activeModel = chatMode === 'brand' ? BRAND_STUDIO_MODEL_ID : settings.model;
+    const brandChatModelId = settings.brandModel || BRAND_STUDIO_MODEL_ID;
+    const activeModel = chatMode === 'brand' ? brandChatModelId : settings.model;
     const cost = getCreditCost('chat', activeModel);
 
     // For authenticated users, ALWAYS use Supabase (enforced by App.tsx)
@@ -978,7 +994,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100 tracking-tight drop-shadow-sm">How can I help?</h2>
               <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-white/30 dark:bg-slate-800/30 px-4 py-2 rounded-full w-fit mx-auto border border-white/40 dark:border-white/5 backdrop-blur-md shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_#1abc9c]"></span>
-                Running on <span className="font-semibold text-primary-dark dark:text-primary-light">{formatModelName(settings.model)}</span>
+                Running on{' '}
+                <span className="font-semibold text-primary-dark dark:text-primary-light">
+                  {getModelShortName(chatMode === 'brand' ? (settings.brandModel || BRAND_STUDIO_MODEL_ID) : settings.model)}
+                </span>
               </div>
 
               <div className="flex justify-center pt-2">
@@ -1211,17 +1230,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
               <BrainCircuit className="w-4 h-4 text-primary relative z-10 animate-bounce transition-all duration-1000" />
             </div>
             <div className="flex flex-col gap-1.5">
-              <div className="bg-gradient-to-r from-white/40 to-white/60 dark:from-slate-800/40 dark:to-slate-900/40 px-5 py-2.5 rounded-2xl rounded-bl-sm backdrop-blur-md border border-white/30 dark:border-white/5 flex items-center gap-4 shadow-sm">
-                <div className="flex gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-[bounce_1s_infinite_0ms]"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-[bounce_1s_infinite_200ms]"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-[bounce_1s_infinite_400ms]"></span>
+              <div className="bg-gradient-to-r from-white/40 to-white/60 dark:from-slate-800/40 dark:to-slate-900/40 px-4 py-2 rounded-2xl rounded-bl-sm backdrop-blur-md border border-white/30 dark:border-white/5 flex items-center shadow-sm">
+                <div className="flex items-end gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-[bounce_1s_infinite_0ms]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-[bounce_1s_infinite_120ms]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-[bounce_1s_infinite_240ms]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-[bounce_1s_infinite_360ms]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-[bounce_1s_infinite_480ms]"></span>
                 </div>
-                <span className="text-sm font-medium bg-gradient-to-r from-gray-700 to-gray-500 dark:from-gray-200 dark:to-gray-400 bg-clip-text text-transparent animate-pulse">
-                  {loadingStatus || 'Analyzing & Processing...'}
-                </span>
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary/80" />
               </div>
+              {loadingStatus && (
+                <div className="pl-1 text-[11px] font-semibold text-gray-500 dark:text-gray-400 truncate">
+                  {loadingStatus}
+                </div>
+              )}
               <button
                 onClick={handleStop}
                 className="text-[10px] font-semibold text-red-400 hover:text-red-500 flex items-center gap-1 pl-1 transition-colors uppercase tracking-wider"
@@ -1279,18 +1301,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
             {isQuickToolsOpen && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setIsQuickToolsOpen(false)} />
-                <div className="absolute left-0 bottom-[calc(100%+0.5rem)] z-50 w-[min(18rem,calc(100vw-1.5rem))] rounded-2xl bg-white/85 dark:bg-[#0f172a]/90 backdrop-blur-2xl border border-white/40 dark:border-white/10 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] dark:shadow-black/50 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-bottom-2 ring-1 ring-black/5">
-                  <div className="p-2 flex flex-col gap-1">
+                {!isHoverPointer && <div className="fixed inset-0 z-40" onClick={() => setIsQuickToolsOpen(false)} />}
+                <div
+                  onMouseLeave={() => {
+                    if (isHoverPointer) setIsQuickToolsOpen(false);
+                  }}
+                  className="absolute left-0 bottom-[calc(100%+0.5rem)] z-50 w-[min(15.5rem,calc(100vw-1.25rem))] rounded-2xl bg-white/85 dark:bg-[#0f172a]/90 backdrop-blur-2xl border border-white/40 dark:border-white/10 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] dark:shadow-black/50 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-bottom-2 ring-1 ring-black/5"
+                >
+                  <div className="p-1.5 flex flex-col gap-0.5">
                     <button
                       type="button"
                       onClick={() => {
                         setIsQuickToolsOpen(false);
                         fileInputRef.current?.click();
                       }}
-                      className="w-full px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-primary/5 transition-colors flex items-center gap-3"
+                      className="w-full px-3 py-2 rounded-xl text-[13px] font-bold text-gray-700 dark:text-gray-200 hover:bg-primary/5 transition-colors flex items-center gap-2"
                     >
-                      <Paperclip className="w-4 h-4" />
+                      <Paperclip className="w-3.5 h-3.5" />
                       <span>Attachments</span>
                     </button>
 
@@ -1298,12 +1325,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                       <button
                         type="button"
                         onClick={() => setIsSearchEnabled(v => !v)}
-                        className={`w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${isSearchEnabled
+                        className={`w-full px-3 py-2 rounded-xl text-[13px] font-bold transition-colors flex items-center gap-2 ${isSearchEnabled
                           ? 'bg-primary/10 text-primary hover:bg-primary/20'
                           : 'text-gray-700 dark:text-gray-200 hover:bg-primary/5'
                           }`}
                       >
-                        <Globe className="w-4 h-4" />
+                        <Globe className="w-3.5 h-3.5" />
                         <span>Web Search</span>
                       </button>
                     )}
@@ -1320,14 +1347,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                           if (subscriptionTier === 'free') return;
                           setShowKnowledgeModal(true);
                         }}
-                        className={`w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${isKnowledgeEnabled
+                        className={`w-full px-3 py-2 rounded-xl text-[13px] font-bold transition-colors flex items-center gap-2 ${isKnowledgeEnabled
                           ? 'bg-violet-500/10 text-violet-500 hover:bg-violet-500/20'
                           : subscriptionTier === 'free'
                             ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed'
                             : 'text-gray-700 dark:text-gray-200 hover:bg-violet-500/5'
                           }`}
                       >
-                        <Database className="w-4 h-4" />
+                        <Database className="w-3.5 h-3.5" />
                         <span>Knowledge Base</span>
                       </button>
                     )}
@@ -1348,14 +1375,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                           }
                           setBrandToolsEnabled(v => !v);
                         }}
-                        className={`w-full px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${brandToolsEnabled
+                        className={`w-full px-3 py-2 rounded-xl text-[13px] font-bold transition-colors flex items-center gap-2 ${brandToolsEnabled
                           ? 'bg-primary/10 text-primary hover:bg-primary/20'
                           : (subscriptionTier !== 'plus' && subscriptionTier !== 'pro')
                             ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed'
                             : 'text-gray-700 dark:text-gray-200 hover:bg-primary/5'
                           }`}
                       >
-                        <Cpu className="w-4 h-4" />
+                        <Cpu className="w-3.5 h-3.5" />
                         <span>Brand Tools</span>
                       </button>
                     )}
@@ -1495,7 +1522,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   if (isAuthenticated) {
-                    const modelToCharge = chatMode === 'brand' ? BRAND_STUDIO_MODEL_ID : settings.model;
+                    const brandChatModelId = settings.brandModel || BRAND_STUDIO_MODEL_ID;
+                    const modelToCharge = chatMode === 'brand' ? brandChatModelId : settings.model;
                     if (canAfford('chat', modelToCharge)) {
                       handleSendMessage(inputValue);
                     } else {
@@ -1525,7 +1553,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
               <CreditAwareButton
                 action="chat"
-                model={chatMode === 'brand' ? BRAND_STUDIO_MODEL_ID : settings.model}
+                model={chatMode === 'brand' ? (settings.brandModel || BRAND_STUDIO_MODEL_ID) : settings.model}
                 onClick={() => handleSendMessage(inputValue)}
                 onRequestAuth={onRequestAuth}
                 disabled={isLoading || (!inputValue.trim() && !attachment)}

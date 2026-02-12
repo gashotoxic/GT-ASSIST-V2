@@ -62,6 +62,7 @@ export interface FileAttachment {
 export interface AppSettings {
   apiKey: string;
   model: string;
+  brandModel?: string;
   systemPrompt: string;
   ttsVoice: string;
   ttsSpeed: number;
@@ -91,21 +92,47 @@ export const NORMAL_CHAT_APP_FEATURES_CONTEXT = `App features and how to use the
 - MuseTalk Lipsync (Media > Animator > Lip Sync): provide a face video and an audio track, then run lipsync and review the preview.
 - LTX advanced video (Media > Animator): select the advanced engine, adjust advanced options if needed, then generate and iterate.`;
 
-export const AVAILABLE_MODELS = [
-  { id: "deepseek-ai/DeepSeek-R1-0528-TEE", name: "🧠 DeepSeek R1" },
-  { id: "deepseek-ai/DeepSeek-V3.2-TEE", name: "🧠 DeepSeek V3.2" },
-  { id: "deepseek-ai/DeepSeek-V3.2-Speciale-TEE", name: "🧠 DeepSeek V3.2 Speciale" },
-  { id: "Qwen/Qwen2.5-VL-72B-Instruct-TEE", name: "🧠👁️ Qwen 2.5 VL (72B)" },
-  { id: "OpenGVLab/InternVL3-78B-TEE", name: "🧠👁️ InternVL 3 (78B)" },
-  { id: "zai-org/GLM-4.6V", name: "🧠👁️ GLM 4.6V" },
-  { id: "zai-org/GLM-4.7-TEE", name: "🧠 GLM 4.7" },
-  { id: "openai/gpt-oss-120b-TEE", name: "🧠 GPT OSS 120B" },
-  { id: "moonshotai/Kimi-K2.5-TEE", name: "🧠👁️ Kimi K2.5" },
-  { id: "moonshotai/Kimi-K2-Thinking-TEE", name: "🧠 Kimi K2 Thinking" },
-  { id: "MiniMaxAI/MiniMax-M2.1-TEE", name: "🧠 MiniMax M2.1" },
-  { id: "NousResearch/DeepHermes-3-Mistral-24B-Preview", name: "Nous Hermes 3 Mistral" },
-  { id: "XiaomiMiMo/MiMo-V2-Flash", name: "Xiaomi MiMo V2 Flash" }
+export type AvailableModel = {
+  id: string;
+  name: string;
+  shortName: string;
+  supportsVision?: boolean;
+  badge?: 'NEW';
+};
+
+export const AVAILABLE_MODELS: AvailableModel[] = [
+  { id: "deepseek-ai/DeepSeek-R1-0528-TEE", name: "🧠 DeepSeek R1", shortName: "DeepSeek R1" },
+  { id: "deepseek-ai/DeepSeek-V3.2-TEE", name: "🧠 DeepSeek V3.2", shortName: "DeepSeek V3.2" },
+  { id: "deepseek-ai/DeepSeek-V3.2-Speciale-TEE", name: "🧠 DeepSeek V3.2 Speciale", shortName: "DeepSeek V3.2 Sp" },
+  { id: "Qwen/Qwen2.5-VL-72B-Instruct-TEE", name: "🧠👁️ Qwen 2.5 VL (72B)", shortName: "Qwen 2.5 VL", supportsVision: true },
+  { id: "OpenGVLab/InternVL3-78B-TEE", name: "🧠👁️ InternVL 3 (78B)", shortName: "InternVL 3", supportsVision: true },
+  { id: "zai-org/GLM-4.6V", name: "🧠👁️ GLM 4.6V", shortName: "GLM 4.6V", supportsVision: true },
+  { id: "zai-org/GLM-4.7-TEE", name: "🧠 GLM 4.7", shortName: "GLM 4.7" },
+  { id: "zai-org/GLM-5-TEE", name: "🧠 GLM 5", shortName: "GLM 5", badge: "NEW" },
+  { id: "openai/gpt-oss-120b-TEE", name: "🧠 GPT OSS 120B", shortName: "GPT OSS 120B" },
+  { id: "moonshotai/Kimi-K2.5-TEE", name: "🧠👁️ Kimi K2.5", shortName: "Kimi K2.5", supportsVision: true, badge: "NEW" },
+  { id: "moonshotai/Kimi-K2-Thinking-TEE", name: "🧠 Kimi K2 Thinking", shortName: "Kimi K2 Thinking" },
+  { id: "MiniMaxAI/MiniMax-M2.1-TEE", name: "🧠 MiniMax M2.1", shortName: "MiniMax M2.1" },
+  { id: "NousResearch/DeepHermes-3-Mistral-24B-Preview", name: "Nous Hermes 3 Mistral", shortName: "Hermes 3 Mistral" },
+  { id: "XiaomiMiMo/MiMo-V2-Flash", name: "Xiaomi MiMo V2 Flash", shortName: "MiMo V2 Flash" }
 ];
+
+export const BRAND_VISION_MODEL_IDS = [
+  "moonshotai/Kimi-K2.5-TEE",
+  "zai-org/GLM-4.6V",
+  "Qwen/Qwen2.5-VL-72B-Instruct-TEE",
+  "OpenGVLab/InternVL3-78B-TEE",
+] as const;
+
+export const getModelInfo = (modelId: string) => AVAILABLE_MODELS.find(m => m.id === modelId);
+
+export const getModelShortName = (modelId: string) => {
+  if (!modelId) return '';
+  const fromList = getModelInfo(modelId)?.shortName;
+  if (fromList) return fromList;
+  const guessed = modelId.split('/').pop() || modelId;
+  return guessed.replace(/-TEE$/i, '').trim();
+};
 
 export const AVAILABLE_IMAGE_MODELS = [
   { id: "qwen-image-2.5-12b", name: "Qwen Image 2.5 (12B)", url: "https://image.chutes.ai/generate" },

@@ -1,5 +1,8 @@
 # Task Log
 
+## 2026-02-12
+- Add logo model picker with short names, add GLM-5, and make Brand mode vision-only with Kimi K2.5 default; document Dots OCR curl. (completed)
+
 ## 2026-02-08
 - Add Brand Studio chat mode switch with Plus/Pro image tools (generate/edit) and inline media results. (completed)
 

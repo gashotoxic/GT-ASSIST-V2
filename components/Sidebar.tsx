@@ -9,6 +9,7 @@ import { useUser } from '@clerk/clerk-react';
 interface SidebarProps {
     isOpen: boolean;
     onClose: () => void;
+    onOpen?: () => void;
     sessions: ChatSession[];
     activeSessionId: string;
     onSelectSession: (id: string) => void;
@@ -23,6 +24,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
     isOpen,
     onClose,
+    onOpen,
     sessions,
     activeSessionId,
     onSelectSession,
@@ -79,19 +81,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
         border-r border-white/20 dark:border-white/5
         shadow-[4px_0_24px_rgba(0,0,0,0.02)] lg:shadow-none
         transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.25,1)]
-        ${isOpen ? 'translate-x-0 lg:w-80 opacity-100' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:opacity-0 lg:overflow-hidden'}
+        ${isOpen ? 'translate-x-0 lg:w-80 opacity-100' : '-translate-x-full lg:translate-x-0 lg:w-16 opacity-100'}
       `}>
-                {/* Inner Wrapper */}
-                <div className="w-[min(20rem,70vw)] max-[450px]:w-[70vw] h-full flex flex-col min-w-0">
+                {isOpen ? (
+                <div className="w-[min(20rem,70vw)] max-[450px]:w-[70vw] lg:w-full h-full flex flex-col min-w-0">
 
                     {/* Header */}
-                    <div className="px-5 py-6 flex items-center justify-between shrink-0">
-                        <h2 className="font-bold text-lg text-gray-800 dark:text-gray-100 tracking-tight flex items-center gap-2">
-                            History
-                            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/10">{sessions.length}</span>
-                        </h2>
+                    <div className="px-5 pt-5 pb-4 flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/20 overflow-hidden flex items-center justify-center shrink-0">
+                                <img src="/brand/mark.png" alt="Brand" className="w-full h-full object-cover" />
+                            </div>
+                            <div className="min-w-0">
+                                <div className="text-sm font-black tracking-tight text-slate-800 dark:text-white truncate">
+                                    Gasho<span className="text-primary italic">Chat</span>
+                                </div>
+                                <div className="mt-0.5 flex items-center gap-2 text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                                    <span>History</span>
+                                    <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/10">
+                                        {sessions.length}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 shrink-0">
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -264,6 +278,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </div>
                     </div>
                 </div>
+                ) : (
+                    <div className="hidden lg:flex h-full w-16 flex-col items-center py-4">
+                        <button
+                            type="button"
+                            onClick={() => onOpen?.()}
+                            className="h-11 w-11 rounded-2xl bg-primary/10 border border-primary/20 overflow-hidden flex items-center justify-center hover:bg-primary/15 transition-colors"
+                            title="Open sidebar"
+                        >
+                            <img src="/brand/mark.png" alt="Brand" className="w-full h-full object-cover" />
+                        </button>
+
+                        <div className="w-10 h-px bg-black/10 dark:bg-white/10 mt-3" />
+
+                        <button
+                            type="button"
+                            onClick={() => onNewChat()}
+                            className="h-11 w-11 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-100 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                            title="New chat"
+                        >
+                            <Plus className="w-5 h-5" />
+                        </button>
+
+                        <div className="flex-1" />
+
+                        {onOpenSettings && (
+                            <button
+                                type="button"
+                                onClick={() => onOpenSettings()}
+                                className="h-11 w-11 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-100 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                                title="Settings"
+                            >
+                                <Settings className="w-5 h-5" />
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
         </>
     );
