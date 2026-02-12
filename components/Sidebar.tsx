@@ -69,22 +69,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <>
             {/* Mobile Overlay */}
             <div
-                className={`fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm lg:hidden transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                className={`fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm md:hidden transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                 onClick={onClose}
             />
 
             {/* Sidebar Container */}
             <div className={`
-        fixed lg:relative inset-y-0 left-0 z-[70] h-full
+        fixed md:relative inset-y-0 left-0 z-[70] h-full
         flex flex-col flex-shrink-0
         bg-white/90 dark:bg-[#0f172a]/95 backdrop-blur-2xl
         border-r border-white/20 dark:border-white/5
-        shadow-[4px_0_24px_rgba(0,0,0,0.02)] lg:shadow-none
+        shadow-[4px_0_24px_rgba(0,0,0,0.02)] md:shadow-none
         transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.25,1)]
-        ${isOpen ? 'translate-x-0 lg:w-80 opacity-100' : '-translate-x-full lg:translate-x-0 lg:w-16 opacity-100'}
+        ${isOpen ? 'translate-x-0 md:w-[21rem] opacity-100' : '-translate-x-full md:translate-x-0 md:w-16 opacity-100'}
       `}>
                 {isOpen ? (
-                <div className="w-[min(20rem,70vw)] max-[450px]:w-[70vw] lg:w-full h-full flex flex-col min-w-0">
+                <div className="w-[min(21rem,78vw)] max-[450px]:w-[78vw] md:w-full h-full flex flex-col min-w-0">
 
                     {/* Header */}
                     <div className="px-5 pt-5 pb-4 flex items-center justify-between shrink-0">
@@ -93,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 <img src="/brand/mark.png" alt="Brand" className="w-full h-full object-cover" />
                             </div>
                             <div className="min-w-0">
-                                <div className="text-sm font-black tracking-tight text-slate-800 dark:text-white truncate">
+                                <div className="text-[13px] font-black tracking-tight text-slate-800 dark:text-white whitespace-nowrap">
                                     Gasho<span className="text-primary italic">Chat</span>
                                 </div>
                                 <div className="mt-0.5 flex items-center gap-2 text-[11px] font-bold text-gray-600 dark:text-gray-300">
@@ -109,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="hidden lg:flex w-8 h-8 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 transition-all duration-200"
+                                className="hidden md:flex w-8 h-8 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 transition-all duration-200"
                                 onClick={onClose}
                                 title="Collapse Sidebar"
                             >
@@ -119,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="lg:hidden w-8 h-8 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-200"
+                                className="md:hidden w-8 h-8 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-200"
                                 onClick={onClose}
                             >
                                 <X className="w-5 h-5 text-gray-500" />
@@ -132,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <Button
                             onClick={() => {
                                 onNewChat();
-                                if (window.innerWidth < 1024) onClose();
+                                if (window.innerWidth < 768) onClose();
                             }}
                             className="w-full justify-center py-6 shadow-xl shadow-primary/25 rounded-2xl bg-gradient-to-r from-primary to-teal-500 hover:brightness-110 active:scale-[0.98] transition-all duration-300 border border-white/20 relative overflow-hidden group"
                         >
@@ -158,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     onClick={() => {
                                         if (editingId !== session.id) {
                                             onSelectSession(session.id);
-                                            if (window.innerWidth < 1024) onClose();
+                                            if (window.innerWidth < 768) onClose();
                                         }
                                     }}
                                     className={`
@@ -279,7 +279,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                 </div>
                 ) : (
-                    <div className="hidden lg:flex h-full w-16 flex-col items-center py-4">
+                    <div className="hidden md:flex h-full w-16 flex-col items-center py-4">
                         <button
                             type="button"
                             onClick={() => onOpen?.()}

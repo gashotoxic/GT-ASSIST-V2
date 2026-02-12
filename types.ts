@@ -112,6 +112,7 @@ export const AVAILABLE_MODELS: AvailableModel[] = [
   { id: "openai/gpt-oss-120b-TEE", name: "🧠 GPT OSS 120B", shortName: "GPT OSS 120B" },
   { id: "moonshotai/Kimi-K2.5-TEE", name: "🧠👁️ Kimi K2.5", shortName: "Kimi K2.5", supportsVision: true, badge: "NEW" },
   { id: "moonshotai/Kimi-K2-Thinking-TEE", name: "🧠 Kimi K2 Thinking", shortName: "Kimi K2 Thinking" },
+  { id: "MiniMaxAI/MiniMax-M2.5-TEE", name: "🧠 MiniMax M2.5", shortName: "MiniMax M2.5", badge: "NEW" },
   { id: "MiniMaxAI/MiniMax-M2.1-TEE", name: "🧠 MiniMax M2.1", shortName: "MiniMax M2.1" },
   { id: "NousResearch/DeepHermes-3-Mistral-24B-Preview", name: "Nous Hermes 3 Mistral", shortName: "Hermes 3 Mistral" },
   { id: "XiaomiMiMo/MiMo-V2-Flash", name: "Xiaomi MiMo V2 Flash", shortName: "MiMo V2 Flash" }

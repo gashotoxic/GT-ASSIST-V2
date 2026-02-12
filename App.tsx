@@ -529,7 +529,7 @@ const App: React.FC = () => {
                 <Button
                   variant="glass"
                   size="icon"
-                  className="hidden lg:flex shrink-0 h-9 w-9"
+                  className="hidden md:flex shrink-0 h-9 w-9"
                   onClick={() => setIsSidebarOpen(true)}
                   title="Open Sidebar"
                 >
