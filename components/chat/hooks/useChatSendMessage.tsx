@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { AppSettings, BRAND_STUDIO_MODEL_ID, DEFAULT_SYSTEM_PROMPT, Message, MediaItem, NORMAL_CHAT_APP_FEATURES_CONTEXT, BASE_SYSTEM_CONTEXT } from '../../../types';
+import { AppSettings, BRAND_STUDIO_MODEL_ID, DEFAULT_SYSTEM_PROMPT, Message, MediaItem, NORMAL_CHAT_APP_FEATURES_CONTEXT, BASE_SYSTEM_CONTEXT, RESPONSE_FORMAT_CONTEXT } from '../../../types';
 import { createBrandStudioToolRuntime } from '../../../services/brandStudioToolRuntime';
 import { KnowledgeBaseService } from '../../../services/knowledgeBase';
 import { getCreditCost } from '../../../services/creditCosts';
@@ -195,6 +195,7 @@ export const useChatSendMessage = ({
       }
 
       finalSystemPrompt += `\n\nUser Instructions:\n${userPrompt}`;
+      finalSystemPrompt += `\n\n${RESPONSE_FORMAT_CONTEXT}`;
 
       const toolRuntime = brandToolsAllowed
         ? createBrandStudioToolRuntime({
