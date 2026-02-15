@@ -1232,11 +1232,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
             <div className="flex flex-col gap-1.5">
               <div className="bg-gradient-to-r from-white/40 to-white/60 dark:from-slate-800/40 dark:to-slate-900/40 px-4 py-2 rounded-2xl rounded-bl-sm backdrop-blur-md border border-white/30 dark:border-white/5 flex items-center shadow-sm">
                 <div className="flex items-end gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-[bounce_1s_infinite_0ms]"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-[bounce_1s_infinite_120ms]"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-[bounce_1s_infinite_240ms]"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-[bounce_1s_infinite_360ms]"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-[bounce_1s_infinite_480ms]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce [animation-delay:-0.4s]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce [animation-delay:-0.2s]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce [animation-delay:-0.1s]"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce"></span>
                 </div>
               </div>
               {loadingStatus && (
