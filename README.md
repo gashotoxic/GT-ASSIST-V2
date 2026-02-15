@@ -33,10 +33,10 @@ A next-generation AI Assistant platform featuring real-time Chat, Voice, Image G
 
 ## 🛠️ Setup
 
-1.  **Clone** and `npm install`.
+1.  **Clone** and `bun install`.
 2.  Configure `.env.local` using `.env.example`.
 3.  Deploy **Supabase Edge Functions** for Paystack webhooks.
-4.  Run `npm run dev`.
+4.  Run `bun run dev`.
 
 Detailed guide: [docs/SETUP.md](docs/SETUP.md)
 

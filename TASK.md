@@ -1,5 +1,12 @@
 # Task Log
 
+## 2026-02-15
+- Fix chat code block overflow: keep bubbles within viewport and make long code scroll horizontally. (completed)
+- Stop chat loading dots from persisting after stream completion. (completed)
+- Prevent guest mode from attempting Supabase session upserts (avoids Failed to fetch noise). (completed)
+- Fix stuck loading indicator by ending streams on finish_reason and emitting a done signal; reduce dots to 3. (completed)
+- Harden mobile chat width: prevent horizontal chat scroll and enable swipe-scroll inside code blocks. (completed)
+
 ## 2026-02-12
 - Add logo model picker with short names, add GLM-5, and make Brand mode vision-only with Kimi K2.5 default; document Dots OCR curl. (completed)
 

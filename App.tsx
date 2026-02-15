@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Send, Menu, PanelLeftOpen, PanelLeftClose, Plus, MessageSquare, ImageIcon, LayoutGrid, X, LogOut, User, Settings, CreditCard, ChevronDown, Monitor, Smartphone, Moon, Sun, Search, Zap, Check, Sparkles, Bot, LifeBuoy, Sliders } from 'lucide-react';
+import { Send, PanelLeftClose, Plus, MessageSquare, Image as ImageIcon, LayoutGrid, X, LogOut, User, Settings, Monitor, Smartphone, Search, Check, Sparkles, Bot, LifeBuoy, Sliders, CreditCard } from 'lucide-react';
 import { OnboardingTour } from './components/OnboardingTour';
-import ChatInterface from './components/ChatInterface';
-import MediaStudio from './components/MediaStudio';
 import { AuthModal } from './components/AuthModal';
-import { UserProfile } from './components/UserProfile';
 import { Sidebar } from './components/Sidebar';
-import { PricingPage } from './components/PricingPage';
-import { AccountSettingsModal } from './components/AccountSettingsModal';
 import { Button } from './components/UI';
 import { LogoModelPicker } from './components/LogoModelPicker';
+import { AppHeader } from './components/AppHeader';
+import { AppRoutes } from './components/AppRoutes';
 import { AppSettings, BRAND_STUDIO_MODEL_ID, DEFAULT_SYSTEM_PROMPT, ChatSession, getModelShortName } from './types';
-import { SupabaseService } from './services/supabase';
 import { useAuthContext } from './context/AuthContext';
 import { useCredits } from './context/CreditContext';
 import { summarizePrompt } from './utils/stringUtils';
+import { ServicesProvider } from './context/ServicesContext';
+import { getAppServices } from './services/appServices';
+
+const AccountSettingsModal = React.lazy(() => import('./components/AccountSettingsModal').then((m) => ({ default: m.AccountSettingsModal })));
 
 const DEFAULT_SETTINGS: AppSettings = {
   apiKey: 'internal', // Use internal default key
@@ -57,33 +57,8 @@ const App: React.FC = () => {
   const [modelPickerAnchorEl, setModelPickerAnchorEl] = useState<HTMLElement | null>(null);
   const modelPickerAnchorElRef = useRef<HTMLElement | null>(null);
 
-  // Create Supabase Instance - ALWAYS use app's database for authenticated users
-  const supabaseService = useMemo(() => {
-    // For authenticated users, ALWAYS enforce Supabase with app's database
-    if (isSignedIn) {
-      const supabaseUrl = import.meta.env.VITE_APP_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_APP_SUPABASE_KEY;
-
-      if (!supabaseUrl || !supabaseKey) {
-        console.error('App Supabase configuration missing for authenticated user');
-        return new SupabaseService(settings);
-      }
-
-      // Create settings with Supabase always enabled for authenticated users
-      // IGNORE any user-configured Supabase - use app's database only
-      const enhancedSettings = {
-        ...settings,
-        useSupabase: true,
-        supabaseUrl: supabaseUrl,
-        supabaseKey: supabaseKey,
-      };
-
-      return new SupabaseService(enhancedSettings);
-    }
-
-    // Guest users - use whatever is configured in settings
-    return new SupabaseService(settings);
-  }, [settings, isSignedIn]);
+  const services = useMemo(() => getAppServices(settings, Boolean(isSignedIn)), [settings, isSignedIn]);
+  const supabaseService = services.supabaseService;
 
   // -- INIT / LOAD SESSIONS --
   // Clear stale session IDs when user changes to prevent cross-user leakage
@@ -395,6 +370,7 @@ const App: React.FC = () => {
   const headerActiveModelShortName = getModelShortName(headerActiveModelId);
 
   return (
+    <ServicesProvider services={services}>
     <div className="relative flex h-[100dvh] w-full overflow-hidden font-sans selection:bg-primary/30 text-slate-900 dark:text-slate-100 transition-colors duration-500">
 
       {/* Background */}
@@ -425,197 +401,26 @@ const App: React.FC = () => {
       {/* Main Layout */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10 w-full min-w-0">
 
-        {/* Header - Mobile Optimized with Navigation */}
-        <header className="flex-none flex flex-wrap sm:flex-nowrap items-center justify-between px-2 sm:px-6 py-3 sm:py-4 z-20 gap-x-2 gap-y-2 border-b border-white/10 dark:border-white/5 bg-white/20 dark:bg-slate-900/40 backdrop-blur-xl">
-
-          <div className="md:hidden w-full grid grid-cols-[auto,1fr,auto] items-center gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <button
-                id="tour-sidebar-toggle"
-                onClick={() => setIsSidebarOpen(v => !v)}
-                className="h-9 w-9 rounded-xl border border-white/30 dark:border-white/10 bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-colors flex items-center justify-center shrink-0"
-                title={isSidebarOpen ? 'Close chats' : 'Open chats'}
-              >
-                <Menu className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-              </button>
-
-              <button
-                type="button"
-                onClick={(e) => openModelPicker(e.currentTarget)}
-                className="h-9 px-2 rounded-xl bg-white/20 dark:bg-white/5 border border-white/30 dark:border-white/10 hover:bg-white/40 dark:hover:bg-white/10 transition-colors flex items-center gap-1.5 text-[11px] font-black text-slate-700 dark:text-slate-100 max-w-[120px] min-[360px]:max-w-[140px] min-[420px]:max-w-[170px]"
-                title="Change model"
-              >
-                <span className="truncate">{headerActiveModelShortName || headerActiveModelId}</span>
-                <ChevronDown className="w-3.5 h-3.5 opacity-70" />
-              </button>
-            </div>
-
-            <div className="min-w-0 overflow-hidden">
-              <div className="flex justify-center">
-                <div className="flex items-center gap-1 bg-black/5 dark:bg-white/10 p-1 rounded-2xl border border-white/10 shadow-inner max-w-full overflow-x-auto scrollbar-hide">
-                <button
-                  onClick={() => setCurrentView('chat')}
-                  className={`flex items-center gap-2 px-3 min-[360px]:px-3.5 min-[420px]:px-4 py-1.5 min-[420px]:py-2 rounded-xl text-[11px] min-[420px]:text-xs font-semibold transition-all duration-300 whitespace-nowrap ${currentView === 'chat'
-                    ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'
-                    }`}
-                  title="Chat"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  <span className="max-[360px]:hidden">Chat</span>
-                </button>
-                <button
-                  id="tour-media-nav"
-                  onClick={() => setCurrentView('media')}
-                  className={`flex items-center gap-2 px-3 min-[360px]:px-3.5 min-[420px]:px-4 py-1.5 min-[420px]:py-2 rounded-xl text-[11px] min-[420px]:text-xs font-semibold transition-all duration-300 whitespace-nowrap ${currentView === 'media'
-                    ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'
-                    }`}
-                  title="Media"
-                >
-                  <ImageIcon className="w-4 h-4" />
-                  <span className="max-[360px]:hidden">Media</span>
-                </button>
-              </div>
-            </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              {isSignedIn ? (
-                <>
-                  <button
-                    onClick={() => setCurrentView('pricing')}
-                    className="h-9 px-2 max-[360px]:px-2 min-[420px]:px-2.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-colors flex items-center gap-1.5 text-[11px] min-[420px]:text-xs font-bold text-primary whitespace-nowrap"
-                    title="Credits"
-                  >
-                    <Zap className="w-4 h-4" />
-                    <span className="text-[11px] font-black max-[360px]:hidden">
-                      {subscriptionTier === 'pro' ? '∞' : (credits + (dailyCredits || 0))}
-                    </span>
-                  </button>
-                  <div className="shrink-0">
-                    <UserProfile trigger="dots" />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <button
-                    id="tour-pricing-nav-mobile"
-                    onClick={() => setCurrentView('pricing')}
-                    className={`h-9 w-9 rounded-xl border border-white/30 dark:border-white/10 bg-white/20 dark:bg-white/5 hover:bg-white/40 dark:hover:bg-white/10 transition-colors flex items-center justify-center ${currentView === 'pricing' ? 'text-primary' : 'text-slate-600 dark:text-slate-300'}`}
-                    title="Pricing"
-                  >
-                    <CreditCard className="w-4 h-4" />
-                  </button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      setAuthMode('signin');
-                      setShowAuthModal(true);
-                    }}
-                    className="rounded-full px-3 max-[400px]:px-2 py-1.5 text-xs font-medium shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
-                  >
-                    Sign In
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="hidden md:flex w-full items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              {!isSidebarOpen && (
-                <Button
-                  variant="glass"
-                  size="icon"
-                  className="hidden md:flex shrink-0 h-9 w-9"
-                  onClick={() => setIsSidebarOpen(true)}
-                  title="Open Sidebar"
-                >
-                  <PanelLeftOpen className="w-5 h-5" />
-                </Button>
-              )}
-
-              <div className="hidden md:flex items-center gap-2 px-1.5 py-1 sm:px-3 sm:py-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 shadow-lg">
-                <button
-                  type="button"
-                  onClick={(e) => openModelPicker(e.currentTarget)}
-                  className="flex items-center gap-1 h-9 px-2.5 rounded-xl bg-white/20 dark:bg-white/5 border border-white/30 dark:border-white/10 hover:bg-white/40 dark:hover:bg-white/10 transition-colors text-xs font-black text-slate-700 dark:text-slate-100 max-w-[220px]"
-                  title="Change model"
-                >
-                  <span className="truncate">{headerActiveModelShortName || headerActiveModelId}</span>
-                  <ChevronDown className="w-4 h-4 opacity-70" />
-                </button>
-              </div>
-            </div>
-
-            <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center bg-black/5 dark:bg-white/10 p-1 rounded-2xl border border-white/10 shadow-inner">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setCurrentView(item.id)}
-                  className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-semibold transition-all duration-300 ${currentView === item.id
-                    ? 'bg-white dark:bg-slate-800 text-primary shadow-sm scale-105'
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5'
-                    }`}
-                >
-                  <item.icon className="w-4 h-4" />
-                  <span className="inline">{item.label}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
-              {isSignedIn && (
-                <div
-                  onClick={() => setCurrentView('pricing')}
-                  className="flex items-center gap-1 px-1.5 xs:px-2 sm:px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 cursor-pointer transition-colors whitespace-nowrap"
-                  title={subscriptionTier === 'pro' ? 'Pro Plan - Unlimited' : 'Total Credits (Daily + Permanent)'}
-                >
-                  <Zap className="w-3 h-3 xs:w-3.5 xs:h-3.5 sm:w-4 sm:h-4 text-primary" />
-                  <span id="tour-credit-balance" className="text-[11px] xs:text-xs sm:text-sm font-bold text-primary">
-                    {subscriptionTier === 'pro' ? '∞' : (credits + (dailyCredits || 0))}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                {isSignedIn ? (
-                  <UserProfile />
-                ) : (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      setAuthMode('signin');
-                      setShowAuthModal(true);
-                    }}
-                    className="rounded-full px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
-                  >
-                    Sign In
-                  </Button>
-                )}
-
-                <div className="hidden sm:flex items-center gap-2">
-                  <Button
-                    variant="glass"
-                    size="icon"
-                    onClick={toggleTheme}
-                    className="rounded-full w-9 h-9 border-white/40 dark:border-white/10"
-                    title="Toggle Theme"
-                  >
-                    {theme === 'dark' ? (
-                      <Sun className="w-4 h-4 text-yellow-300" />
-                    ) : (
-                      <Moon className="w-4 h-4 text-slate-600" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
+        <AppHeader
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={() => setIsSidebarOpen(v => !v)}
+          onOpenSidebar={() => setIsSidebarOpen(true)}
+          onOpenModelPicker={openModelPicker}
+          activeModelLabel={headerActiveModelShortName || headerActiveModelId}
+          currentView={currentView}
+          setCurrentView={setCurrentView}
+          navItems={navItems}
+          isSignedIn={Boolean(isSignedIn)}
+          credits={credits}
+          dailyCredits={dailyCredits || 0}
+          subscriptionTier={subscriptionTier}
+          onOpenAuth={() => {
+            setAuthMode('signin');
+            setShowAuthModal(true);
+          }}
+          theme={theme}
+          toggleTheme={toggleTheme}
+        />
 
         <LogoModelPicker
           isOpen={isModelPickerOpen}
@@ -628,54 +433,34 @@ const App: React.FC = () => {
           anchorEl={modelPickerAnchorEl}
         />
 
-        {/* Main Content Area - Scrollable Container */}
-        <main className="flex-1 w-full overflow-hidden relative z-10 px-2 sm:px-4 pb-0 md:pb-4 pt-4 sm:pt-6 flex flex-col items-center min-h-0">
-          <div className="w-full flex-1 min-h-0 max-w-[1920px] mx-auto relative flex flex-col">
-            {currentView === 'chat' && (
-              <div className="w-full flex-1 min-h-0 transition-all duration-500 animate-in fade-in zoom-in-95 flex flex-col">
-                <ChatInterface
-                  key={`${currentSessionId}-${settings.useSupabase ? 'cloud' : 'local'}`}
-                  settings={settings}
-                  sessionId={currentSessionId}
-                  onSessionUpdate={updateSessionPreview}
-                  onSwitchSession={setCurrentSessionId}
-                  onNewSession={(s) => setSessions(prev => [s, ...prev])}
-                  isAuthenticated={isSignedIn}
-                  onRequestAuth={() => { setAuthMode('signin'); setShowAuthModal(true); }}
-                  userId={isSignedIn ? userId : undefined}
-                />
-              </div>
-            )}
-            {currentView === 'media' && (
-              <div className="w-full flex-1 min-h-0 transition-all duration-500 animate-in fade-in zoom-in-95 flex flex-col">
-                <MediaStudio
-                  settings={settings}
-                  isAuthenticated={isSignedIn}
-                  onRequestAuth={() => { setAuthMode('signin'); setShowAuthModal(true); }}
-                  userId={isSignedIn ? userId : undefined}
-                  onTabChange={setActiveMediaTab}
-                />
-              </div>
-            )}
-            {currentView === 'pricing' && (
-              <div className="w-full flex-1 min-h-0 transition-all duration-500 animate-in fade-in zoom-in-95">
-                <PricingPage onBack={() => setCurrentView('chat')} />
-              </div>
-            )}
-          </div>
-        </main>
+        <AppRoutes
+          currentView={currentView}
+          settings={settings}
+          currentSessionId={currentSessionId}
+          updateSessionPreview={updateSessionPreview}
+          setCurrentSessionId={setCurrentSessionId}
+          setSessions={setSessions}
+          isSignedIn={Boolean(isSignedIn)}
+          userId={userId}
+          setAuthMode={setAuthMode}
+          setShowAuthModal={setShowAuthModal}
+          setActiveMediaTab={setActiveMediaTab}
+          setCurrentView={setCurrentView}
+        />
 
         {/* Mobile Navigation Moved to Top Header - No Bottom Nav Needed */}
       </div>
 
       {/* Account Settings Modal */}
       {isAccountSettingsOpen && (
-        <AccountSettingsModal
-          isOpen={isAccountSettingsOpen}
-          onClose={() => setIsAccountSettingsOpen(false)}
-          settings={settings}
-          onSave={setSettings}
-        />
+        <React.Suspense fallback={null}>
+          <AccountSettingsModal
+            isOpen={isAccountSettingsOpen}
+            onClose={() => setIsAccountSettingsOpen(false)}
+            settings={settings}
+            onSave={setSettings}
+          />
+        </React.Suspense>
       )}
 
       {/* Auth Modal */}
@@ -696,6 +481,7 @@ const App: React.FC = () => {
         activeMediaTab={activeMediaTab}
       />
     </div>
+    </ServicesProvider>
   );
 };
 

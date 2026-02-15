@@ -255,6 +255,7 @@ export class ChutesService {
     let buffer = '';
 
     let currentToolCalls: any[] = [];
+    let sawDone = false;
 
     try {
       while (true) {
@@ -267,7 +268,13 @@ export class ChutesService {
 
         for (const line of lines) {
           if (line.trim() === '') continue;
-          if (line.trim() === 'data: [DONE]') break;
+          if (line.trim() === 'data: [DONE]') {
+            if (!sawDone) {
+              sawDone = true;
+              yield { type: 'done' };
+            }
+            break;
+          }
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
@@ -303,6 +310,16 @@ export class ChutesService {
                     }
                   }
                 }
+              }
+
+              if (
+                (choice?.finish_reason === 'stop' || choice?.finish_reason === 'length') &&
+                currentToolCalls.length === 0 &&
+                !sawDone
+              ) {
+                sawDone = true;
+                yield { type: 'done' };
+                break;
               }
 
               if (choice?.finish_reason === 'tool_calls' || (choice?.finish_reason === 'stop' && currentToolCalls.length > 0)) {
@@ -414,6 +431,8 @@ export class ChutesService {
             }
           }
         }
+
+        if (sawDone) break;
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -422,6 +441,13 @@ export class ChutesService {
       }
       throw error;
     } finally {
+      if (sawDone) {
+        try {
+          await reader.cancel();
+        } catch {
+          void 0;
+        }
+      }
       reader.releaseLock();
     }
   }

@@ -13,13 +13,12 @@ export class SupabaseService {
     }
     this.sessionId = storedSessionId;
 
-    // Always initialize Supabase client if environment variables are available
-    // This is needed for credit operations even if useSupabase is false
-    const supabaseUrl = settings.supabaseUrl || import.meta.env.VITE_APP_SUPABASE_URL;
-    const supabaseKey = settings.supabaseKey || import.meta.env.VITE_APP_SUPABASE_KEY;
-
-    if (supabaseUrl && supabaseKey) {
-      this.client = createClient(supabaseUrl, supabaseKey);
+    if (settings.useSupabase) {
+      const supabaseUrl = settings.supabaseUrl || import.meta.env.VITE_APP_SUPABASE_URL;
+      const supabaseKey = settings.supabaseKey || import.meta.env.VITE_APP_SUPABASE_KEY;
+      if (supabaseUrl && supabaseKey) {
+        this.client = createClient(supabaseUrl, supabaseKey);
+      }
     }
   }
 

@@ -66,8 +66,8 @@ VITE_PAYSTACK_PUBLIC_KEY=pk_test_...
 ## 🚀 Local Development
 
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 Visit `http://localhost:5173`.

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, MessageSquare, Trash2, X, Pencil, Check, PanelLeftClose, ChevronLeft, GitBranch, Zap, ChevronRight, Sliders, Settings } from 'lucide-react';
+import { Plus, MessageSquare, Trash2, X, Pencil, Check, PanelLeftClose, ChevronLeft, GitBranch, BookOpen, ChevronRight, Sliders, Settings } from 'lucide-react';
 import { ChatSession } from '../types';
 import { Button } from './UI';
 import { useCredits } from '../context/CreditContext';
@@ -264,7 +264,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 className="p-2.5 rounded-xl bg-white/50 dark:bg-white/5 border border-white/20 dark:border-white/10 hover:text-primary transition-all"
                                 title="Guide"
                             >
-                                <Zap className="w-4 h-4 text-gray-500" />
+                                <BookOpen className="w-4 h-4 text-gray-500" />
                             </button>
 
                             {onOpenSettings && (

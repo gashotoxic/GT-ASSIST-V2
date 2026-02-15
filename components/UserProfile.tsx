@@ -7,7 +7,7 @@ import { useCredits } from '../context/CreditContext';
 export const UserProfile: React.FC<{ trigger?: 'avatar' | 'dots'; extraItems?: React.ReactNode }> = ({ trigger = 'avatar', extraItems }) => {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
-  const { credits, subscriptionTier, loading } = useCredits();
+  const { credits, dailyCredits, subscriptionTier, loading } = useCredits();
   const [showDropdown, setShowDropdown] = useState(false);
 
   if (!isLoaded || !user || loading) {
@@ -141,15 +141,21 @@ export const UserProfile: React.FC<{ trigger?: 'avatar' | 'dots'; extraItems?: R
                   </div>
                   <div>
                     <span className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 block">Balance</span>
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Available Credits</span>
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Total Credits</span>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
-                    {subscriptionTier === 'pro' ? '∞' : credits}
+                    {subscriptionTier === 'pro' ? '∞' : (credits + (dailyCredits || 0))}
                   </span>
                 </div>
               </div>
+              {subscriptionTier !== 'pro' && (
+                <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                  <span>Daily: {dailyCredits || 0}</span>
+                  <span>Permanent: {credits}</span>
+                </div>
+              )}
               
               {/* Progress Bar (Fake for visual) */}
               <div className="h-1.5 w-full bg-gray-200 dark:bg-white/10 rounded-full mt-3 overflow-hidden">
