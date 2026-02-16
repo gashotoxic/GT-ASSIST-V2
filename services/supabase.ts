@@ -169,6 +169,29 @@ export class SupabaseService {
     }
   }
 
+  async deleteMessage(messageId: string, sessionId: string, userId?: string): Promise<boolean> {
+    if (!this.client || !messageId) return false;
+    try {
+      let query = this.client
+        .from('messages')
+        .delete()
+        .eq('id', messageId)
+        .eq('session_id', sessionId);
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+      const { error } = await query;
+      if (error) {
+        console.error('Supabase Delete Message Error:', error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('Error deleting message:', err);
+      return false;
+    }
+  }
+
   async saveMessage(message: Message, targetSessionId?: string, userId?: string): Promise<string | null> {
     if (!this.client) return null;
 
@@ -780,6 +803,27 @@ export class SupabaseService {
       return data === true;
     } catch (error) {
       console.error('Error purchasing credits:', error);
+      throw error;
+    }
+  }
+
+  async addCredits(userId: string, amount: number, action: string = 'refund', purchaseId?: string): Promise<boolean> {
+    if (!this.client) throw new Error('Supabase client not initialized');
+    try {
+      const params: any = {
+        p_user_id: userId,
+        p_amount: amount,
+        p_action: action,
+      };
+      if (purchaseId) params.p_purchase_id = purchaseId;
+      const { data, error } = await this.client.rpc('add_user_credits', params);
+      if (error) {
+        console.error('RPC Error in addCredits:', error);
+        throw error;
+      }
+      return data === true;
+    } catch (error) {
+      console.error('Error adding credits:', error);
       throw error;
     }
   }

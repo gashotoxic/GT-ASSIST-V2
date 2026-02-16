@@ -404,6 +404,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleDelete = async (msg: Message, index: number) => {
+    const confirmed = confirm('Delete this message?');
+    if (!confirmed) return;
+    const prev = messages;
+    const next = prev.filter((_, i) => i !== index);
+    setMessages(next);
+
+    if (isAuthenticated && userId && msg.id) {
+      try {
+        const ok = await supabaseService.deleteMessage(msg.id, sessionId, userId);
+        if (!ok) {
+          setMessages(prev); // revert
+          alert('Failed to delete message from server.');
+        }
+      } catch {
+        setMessages(prev);
+        alert('Failed to delete message from server.');
+      }
+    }
+  };
+
   const handleBranch = (index: number) => {
     setBranchingIndex(index);
   };
@@ -723,6 +744,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
         onRetry={handleRetry}
         onBranch={handleBranch}
         onEdit={handleEdit}
+        onDelete={handleDelete}
         onCopy={handleCopy}
         renderMessageContent={renderMessageContent}
         formatModelName={formatModelName}

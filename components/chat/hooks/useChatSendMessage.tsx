@@ -131,7 +131,14 @@ export const useChatSendMessage = ({
     abortControllerRef.current = new AbortController();
 
     if (isAuthenticated && userId) {
-      supabaseService.saveMessage(userMsg, sessionId, userId);
+      try {
+        const dbId = await supabaseService.saveMessage(userMsg, sessionId, userId);
+        if (dbId) {
+          setMessages(prev => prev.map(m => (m.id === userMsg.id ? { ...m, id: dbId } : m)));
+        }
+      } catch {
+        void 0;
+      }
     }
 
     try {
@@ -265,7 +272,14 @@ export const useChatSendMessage = ({
       assistantMsg.thinking = fullThinking || undefined;
 
       if (isAuthenticated && userId) {
-        await supabaseService.saveMessage(assistantMsg, sessionId, userId);
+        try {
+          const dbId = await supabaseService.saveMessage(assistantMsg, sessionId, userId);
+          if (dbId) {
+            setMessages(prev => prev.map(m => (m.id === assistantMsg.id ? { ...m, id: dbId } : m)));
+          }
+        } catch {
+          void 0;
+        }
       }
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -278,6 +292,18 @@ export const useChatSendMessage = ({
       } else {
         const errorMsg: Message = { role: 'system', content: `Error: ${(error as Error).message}` };
         setMessages(prev => [...prev, errorMsg]);
+        // Refund credits on error (not on user abort)
+        if (isAuthenticated && userId) {
+          try {
+            await supabaseService.addCredits(userId, cost, 'refund');
+            refetchCredits();
+          } catch {
+            void 0;
+          }
+        } else {
+          const guestCredits = parseInt(localStorage.getItem('chutes_guest_credits') || '10');
+          localStorage.setItem('chutes_guest_credits', String(guestCredits + cost));
+        }
       }
     } finally {
       setIsLoading(false);

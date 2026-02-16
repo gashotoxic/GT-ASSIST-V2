@@ -47,9 +47,13 @@ export const useChatMessageStore = ({
   }, [sessionId, isAuthenticated, userId, supabaseService, setMessages]);
 
   useEffect(() => {
-    if (!isAuthenticated && messages.length > 0) {
-      const safeMessages = messages.map(({ audioUrl, ...rest }) => rest);
-      localStorage.setItem(`chutes_messages_${sessionId}`, JSON.stringify(safeMessages));
+    if (!isAuthenticated) {
+      if (messages.length > 0) {
+        const safeMessages = messages.map(({ audioUrl, ...rest }) => rest);
+        localStorage.setItem(`chutes_messages_${sessionId}`, JSON.stringify(safeMessages));
+      } else {
+        localStorage.removeItem(`chutes_messages_${sessionId}`);
+      }
     }
 
     if (messages.length > 0) {

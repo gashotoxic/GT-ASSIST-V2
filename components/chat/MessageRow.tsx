@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, BrainCircuit, Camera, Check, Copy, Cpu, Edit3, GitBranch, Loader2, Pause, Play, RotateCcw, Search, User, Volume2 } from 'lucide-react';
+import { Bot, BrainCircuit, Camera, Check, Copy, Cpu, Edit3, GitBranch, Loader2, Pause, Play, RotateCcw, Search, Trash2, User, Volume2 } from 'lucide-react';
 import { Message, MediaItem, getModelInfo } from '../../types';
 import { SearchResultsCard } from '../SearchResultsCard';
 
@@ -20,6 +20,7 @@ type MessageRowProps = {
   onBranch: (idx: number) => void;
   onEdit: (msg: Message, idx: number) => void;
   onCopy: (text: string, id: string) => void;
+  onDelete: (msg: Message, idx: number) => void;
   renderMessageContent: (content: any) => React.ReactNode;
   formatModelName: (modelId: string) => string;
 };
@@ -41,6 +42,7 @@ export const MessageRow: React.FC<MessageRowProps> = ({
   onBranch,
   onEdit,
   onCopy,
+  onDelete,
   renderMessageContent,
   formatModelName,
 }) => {
@@ -158,6 +160,14 @@ export const MessageRow: React.FC<MessageRowProps> = ({
 
             {!isLoading && (
               <div className={`flex items-center gap-1 transition-opacity duration-300 opacity-0 group-hover:opacity-100 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <button
+                  onClick={() => onDelete(msg, idx)}
+                  className="p-2 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                  title="Delete message"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+
                 <button
                   onClick={() => onRetry(idx, msg)}
                   className="p-2 rounded-full text-gray-400 hover:text-primary hover:bg-white/60 dark:hover:bg-white/10 transition-all"

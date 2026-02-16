@@ -23,6 +23,7 @@ type MessageListProps = {
   onRetry: (idx: number, msg: Message) => void;
   onBranch: (idx: number) => void;
   onEdit: (msg: Message, idx: number) => void;
+  onDelete: (msg: Message, idx: number) => void;
   onCopy: (text: string, id: string) => void;
   renderMessageContent: (content: any) => React.ReactNode;
   formatModelName: (modelId: string) => string;
@@ -48,6 +49,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   onRetry,
   onBranch,
   onEdit,
+  onDelete,
   onCopy,
   renderMessageContent,
   formatModelName,
@@ -124,6 +126,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           onRetry={onRetry}
           onBranch={onBranch}
           onEdit={onEdit}
+          onDelete={onDelete}
           onCopy={onCopy}
           renderMessageContent={renderMessageContent}
           formatModelName={formatModelName}
