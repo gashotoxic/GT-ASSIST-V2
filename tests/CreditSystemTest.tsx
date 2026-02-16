@@ -38,8 +38,8 @@ export const CreditSystemTest: React.FC = () => {
     // Initialize Supabase service for testing
     const settings: AppSettings = {
       useSupabase: true,
-      supabaseUrl: import.meta.env.VITE_APP_SUPABASE_URL!,
-      supabaseKey: import.meta.env.VITE_APP_SUPABASE_KEY!,
+      supabaseUrl: (import.meta.env.VITE_APP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL)!,
+      supabaseKey: (import.meta.env.VITE_APP_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_KEY)!,
       apiKey: '',
       model: 'zai-org/GLM-4.6',
       systemPrompt: '',

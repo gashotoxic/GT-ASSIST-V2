@@ -3,20 +3,20 @@ import { AppSettings } from '../types';
 
 export class UserSyncService {
   private supabaseService: SupabaseService;
+  private isConfigured: boolean;
 
   constructor() {
-    // User management ALWAYS uses app's Supabase - never depend on localStorage settings
-    const supabaseUrl = import.meta.env.VITE_APP_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_APP_SUPABASE_KEY;
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('App Supabase configuration not found in environment variables');
+    const supabaseUrl = import.meta.env.VITE_APP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_APP_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_KEY;
+    this.isConfigured = Boolean(supabaseUrl && supabaseKey);
+    if (!this.isConfigured) {
+      console.error('App Supabase configuration not found in environment variables');
+    } else {
+      console.log('Initializing UserSyncService with app Supabase:', { supabaseUrl: supabaseUrl.substring(0, 20) + '...' });
     }
 
-    console.log('Initializing UserSyncService with app Supabase:', { supabaseUrl: supabaseUrl.substring(0, 20) + '...' });
-    
     const settings: AppSettings = {
-      useSupabase: true,
+      useSupabase: this.isConfigured,
       supabaseUrl,
       supabaseKey,
       apiKey: '',
@@ -41,6 +41,9 @@ export class UserSyncService {
     lastName?: string;
     imageUrl?: string;
   }): Promise<{ success: boolean; error?: string }> {
+    if (!this.isConfigured) {
+      return { success: false, error: 'Supabase configuration missing' };
+    }
     try {
       const email = clerkUser.emailAddresses[0]?.emailAddress;
       if (!email) {
@@ -69,6 +72,9 @@ export class UserSyncService {
     type: string;
     data: any;
   }): Promise<{ success: boolean; error?: string }> {
+    if (!this.isConfigured) {
+      return { success: false, error: 'Supabase configuration missing' };
+    }
     try {
       switch (event.type) {
         case 'user.created':
@@ -121,6 +127,13 @@ export class UserSyncService {
     tier: string;
     loading: boolean;
   }> {
+    if (!this.isConfigured) {
+      return {
+        credits: 0,
+        tier: 'free',
+        loading: false,
+      };
+    }
     try {
       const profile = await this.supabaseService.getUserProfile(userId);
       return {
@@ -142,6 +155,9 @@ export class UserSyncService {
    * Check if user exists in Supabase
    */
   async userExists(userId: string): Promise<boolean> {
+    if (!this.isConfigured) {
+      return false;
+    }
     try {
       console.log(`Checking Supabase for user: ${userId}`);
       const profile = await this.supabaseService.getUserProfile(userId);
@@ -178,6 +194,9 @@ export class UserSyncService {
     firstName?: string;
     lastName?: string;
   }): Promise<{ created: boolean; success: boolean; error?: string }> {
+    if (!this.isConfigured) {
+      return { created: false, success: false, error: 'Supabase configuration missing' };
+    }
     try {
       console.log(`Checking if user exists in Supabase: ${clerkUser.id}`);
       

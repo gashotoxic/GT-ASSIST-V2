@@ -1,5 +1,5 @@
 import React from 'react';
-import { CreditCard, Menu, MessageSquare, Image as ImageIcon, PanelLeftOpen, Coins, ChevronDown, Moon, Sun } from 'lucide-react';
+import { Camera, CreditCard, Menu, MessageSquare, Image as ImageIcon, PanelLeftOpen, Coins, ChevronDown, Moon, Sun } from 'lucide-react';
 import { Button } from './UI';
 import { UserProfile } from './UserProfile';
 
@@ -17,6 +17,7 @@ type AppHeaderProps = {
   onOpenSidebar: () => void;
   onOpenModelPicker: (el: HTMLElement) => void;
   activeModelLabel: string;
+  activeModelSupportsVision?: boolean;
   currentView: ViewId;
   setCurrentView: (view: ViewId) => void;
   navItems: NavItem[];
@@ -35,6 +36,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onOpenSidebar,
   onOpenModelPicker,
   activeModelLabel,
+  activeModelSupportsVision,
   currentView,
   setCurrentView,
   navItems,
@@ -66,6 +68,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             title="Change model"
           >
             <span className="truncate">{activeModelLabel}</span>
+            {activeModelSupportsVision && <Camera className="w-3.5 h-3.5 opacity-70 shrink-0" />}
             <ChevronDown className="w-3.5 h-3.5 opacity-70" />
           </button>
         </div>
@@ -162,6 +165,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               title="Change model"
             >
               <span className="truncate">{activeModelLabel}</span>
+              {activeModelSupportsVision && <Camera className="w-4 h-4 opacity-70 shrink-0" />}
               <ChevronDown className="w-4 h-4 opacity-70" />
             </button>
           </div>

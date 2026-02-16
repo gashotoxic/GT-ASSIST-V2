@@ -156,7 +156,7 @@ export class ChutesService {
     onToolResult?: (payload: { tool: string; result: any }) => void,
     onStatusChange?: (status: string | null) => void,
     signal?: AbortSignal
-  ): AsyncGenerator<{ type: 'thinking' | 'content' | 'sources' | 'tool_result'; text?: string; sources?: SearchSource[]; tool?: string; result?: any }, void, unknown> {
+  ): AsyncGenerator<{ type: 'thinking' | 'content' | 'sources' | 'tool_result' | 'done'; text?: string; sources?: SearchSource[]; tool?: string; result?: any }, void, unknown> {
 
     // Setup Tools
     const tools: any[] = [];

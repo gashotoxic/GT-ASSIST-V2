@@ -1,6 +1,6 @@
 import React from 'react';
-import { Bot } from 'lucide-react';
-import { AppSettings, BRAND_STUDIO_MODEL_ID, Message, getModelShortName } from '../../types';
+import { Bot, Camera } from 'lucide-react';
+import { AppSettings, BRAND_STUDIO_MODEL_ID, Message, getModelInfo, getModelShortName } from '../../types';
 import { MessageRow } from './MessageRow';
 
 type MessageListProps = {
@@ -52,6 +52,10 @@ export const MessageList: React.FC<MessageListProps> = ({
   renderMessageContent,
   formatModelName,
 }) => {
+  const activeModelId = chatMode === 'brand' ? (settings.brandModel || BRAND_STUDIO_MODEL_ID) : settings.model;
+  const activeModelShortName = getModelShortName(activeModelId);
+  const activeModelSupportsVision = Boolean(getModelInfo(activeModelId)?.supportsVision);
+
   return (
     <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-1 xs:p-2 sm:p-6 space-y-3 xs:space-y-4 sm:space-y-8 scroll-smooth custom-scrollbar">
       {messages.length === 0 && (
@@ -68,8 +72,9 @@ export const MessageList: React.FC<MessageListProps> = ({
             <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 bg-white/30 dark:bg-slate-800/30 px-4 py-2 rounded-full w-fit mx-auto border border-white/40 dark:border-white/5 backdrop-blur-md shadow-sm">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_10px_#1abc9c]"></span>
               Running on{' '}
-              <span className="font-semibold text-primary-dark dark:text-primary-light">
-                {getModelShortName(chatMode === 'brand' ? (settings.brandModel || BRAND_STUDIO_MODEL_ID) : settings.model)}
+              <span className="font-semibold text-primary-dark dark:text-primary-light inline-flex items-center gap-1">
+                {activeModelSupportsVision && <Camera className="w-3.5 h-3.5" />}
+                {activeModelShortName}
               </span>
             </div>
 

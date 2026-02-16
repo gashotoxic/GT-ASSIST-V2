@@ -1,5 +1,10 @@
 # Task Log
 
+## 2026-02-16
+- Add in-app camera capture option in Brand chat (quick tools → Camera) to attach photos for vision prompts. (completed)
+- Add camera indicator for vision-capable models and fix camera overlay capture button visibility. (completed)
+- Diagnose Vercel blank/white screen and harden environment configuration handling. (completed)
+
 ## 2026-02-15
 - Fix chat code block overflow: keep bubbles within viewport and make long code scroll horizontally. (completed)
 - Stop chat loading dots from persisting after stream completion. (completed)

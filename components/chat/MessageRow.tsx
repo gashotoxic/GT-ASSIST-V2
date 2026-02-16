@@ -1,6 +1,6 @@
 import React from 'react';
-import { Bot, BrainCircuit, Check, Copy, Cpu, Edit3, GitBranch, Loader2, Pause, Play, RotateCcw, Search, User, Volume2 } from 'lucide-react';
-import { Message, MediaItem } from '../../types';
+import { Bot, BrainCircuit, Camera, Check, Copy, Cpu, Edit3, GitBranch, Loader2, Pause, Play, RotateCcw, Search, User, Volume2 } from 'lucide-react';
+import { Message, MediaItem, getModelInfo } from '../../types';
 import { SearchResultsCard } from '../SearchResultsCard';
 
 type MessageRowProps = {
@@ -51,7 +51,7 @@ export const MessageRow: React.FC<MessageRowProps> = ({
     <div
       className={`flex w-full items-end gap-1 xs:gap-2 min-w-0 group animate-in slide-in-from-bottom-4 duration-500 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
     >
-      {msg.role !== 'tool' && (msg.role !== 'assistant' || msg.content !== '') ? (
+      {(msg.role !== 'assistant' || msg.content !== '') ? (
         <div className={`shrink-0 w-6 h-6 xs:w-7 xs:h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shadow-lg transition-transform hover:scale-105 duration-300 ${msg.role === 'user'
           ? 'bg-gradient-to-br from-primary to-primary-dark text-white border border-primary-light/30'
           : msg.role === 'system'
@@ -63,7 +63,7 @@ export const MessageRow: React.FC<MessageRowProps> = ({
         </div>
       ) : null}
 
-      {msg.role !== 'tool' && msg.content && (
+      {msg.content && (
         <div className={`flex flex-col gap-1 flex-1 min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
           <div className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div
@@ -209,7 +209,7 @@ export const MessageRow: React.FC<MessageRowProps> = ({
 
                 {msg.role === 'assistant' && msg.model && (
                   <div id="tour-model-selector" className="ml-1 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/5 text-[10px] font-medium text-gray-500 dark:text-gray-400 select-none cursor-default">
-                    <Cpu className="w-3 h-3" />
+                    {getModelInfo(msg.model)?.supportsVision ? <Camera className="w-3 h-3" /> : <Cpu className="w-3 h-3" />}
                     <span>{formatModelName(msg.model)}</span>
                   </div>
                 )}

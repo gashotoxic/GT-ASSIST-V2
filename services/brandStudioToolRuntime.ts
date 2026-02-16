@@ -94,6 +94,7 @@ export function createBrandStudioToolRuntime(args: {
         const item: MediaItem = {
           id,
           type: 'image',
+          url: '',
           prompt,
           createdAt: Date.now(),
           sessionId
@@ -125,6 +126,7 @@ export function createBrandStudioToolRuntime(args: {
         const item: MediaItem = {
           id,
           type: 'image',
+          url: '',
           prompt,
           createdAt: Date.now(),
           sessionId

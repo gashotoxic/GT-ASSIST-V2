@@ -33,8 +33,8 @@ export function CreditProvider({ children }: { children: React.ReactNode }) {
   // Initialize Supabase service when user is signed in
   useEffect(() => {
     if (isSignedIn && userId) {
-      const supabaseUrl = import.meta.env.VITE_APP_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_APP_SUPABASE_KEY;
+      const supabaseUrl = import.meta.env.VITE_APP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_APP_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_KEY;
 
       if (supabaseUrl && supabaseKey) {
         const service = new SupabaseService({

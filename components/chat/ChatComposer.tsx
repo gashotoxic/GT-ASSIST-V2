@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Cpu, Database, FileText, Globe, Lock, Mic, Plus, Send, Square, X } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { AppSettings, BRAND_STUDIO_MODEL_ID, FileAttachment } from '../../types';
+import { AppSettings, BRAND_STUDIO_MODEL_ID, FileAttachment, getModelInfo } from '../../types';
 import { Button } from '../UI';
 import { CreditAwareButton } from '../CreditAwareButton';
 import { ChatQuickToolsMenu } from './ChatQuickToolsMenu';
+import { CameraCaptureModal } from './CameraCaptureModal';
 
 type SubscriptionTier = 'free' | 'basic' | 'plus' | 'pro';
 type ChatMode = 'chat' | 'brand';
@@ -29,6 +30,7 @@ type ChatComposerProps = {
   fileInputRef: React.RefObject<HTMLInputElement>;
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   attachment: FileAttachment | null;
+  onSetAttachment: (attachment: FileAttachment) => void;
   onClearAttachment: () => void;
   inputValue: string;
   setInputValue: (v: string) => void;
@@ -61,6 +63,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
   fileInputRef,
   onFileSelect,
   attachment,
+  onSetAttachment,
   onClearAttachment,
   inputValue,
   setInputValue,
@@ -74,10 +77,28 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
 }) => {
   const brandChatModelId = settings.brandModel || BRAND_STUDIO_MODEL_ID;
   const modelToCharge = chatMode === 'brand' ? brandChatModelId : settings.model;
+  const canUseCamera =
+    typeof navigator !== 'undefined' &&
+    !!navigator.mediaDevices?.getUserMedia &&
+    !!getModelInfo(modelToCharge)?.supportsVision;
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   return (
     <div className="p-2 sm:p-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-t border-white/50 dark:border-white/5 z-20">
       <div className="max-w-4xl mx-auto flex flex-col gap-3">
+        <CameraCaptureModal
+          isOpen={isCameraOpen}
+          onClose={() => setIsCameraOpen(false)}
+          onCapture={({ dataUrl, mimeType, name }) => {
+            onSetAttachment({
+              type: 'image',
+              name,
+              data: dataUrl,
+              mimeType,
+            });
+          }}
+        />
+
         {attachment && (
           <div className="flex items-center gap-3 p-2 bg-white/50 dark:bg-slate-800/50 rounded-lg w-fit border border-primary/20 animate-in slide-in-from-bottom-2">
             <div className="w-10 h-10 rounded bg-gray-100 dark:bg-black/20 flex items-center justify-center overflow-hidden">
@@ -125,6 +146,8 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               onClose={() => setIsQuickToolsOpen(false)}
               isHoverPointer={isHoverPointer}
               fileInputRef={fileInputRef}
+              canUseCamera={canUseCamera}
+              onOpenCamera={() => setIsCameraOpen(true)}
               canSearch={canSearch}
               isSearchEnabled={isSearchEnabled}
               onToggleSearch={onToggleSearch}

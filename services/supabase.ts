@@ -14,8 +14,8 @@ export class SupabaseService {
     this.sessionId = storedSessionId;
 
     if (settings.useSupabase) {
-      const supabaseUrl = settings.supabaseUrl || import.meta.env.VITE_APP_SUPABASE_URL;
-      const supabaseKey = settings.supabaseKey || import.meta.env.VITE_APP_SUPABASE_KEY;
+      const supabaseUrl = settings.supabaseUrl || import.meta.env.VITE_APP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = settings.supabaseKey || import.meta.env.VITE_APP_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_KEY;
       if (supabaseUrl && supabaseKey) {
         this.client = createClient(supabaseUrl, supabaseKey);
       }

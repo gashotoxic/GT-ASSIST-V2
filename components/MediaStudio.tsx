@@ -53,6 +53,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
     }, [activeTab, onTabChange]);
 
     const { genStatus, updateGenStatus, startGeneration, cancelGeneration } = useMediaGeneration();
+    const handleCancel = (type: GenType) => cancelGeneration(type);
 
     // Image Gen State
     const [imagePrompt, setImagePrompt] = useState('');

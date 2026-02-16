@@ -5,6 +5,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 // @ts-ignore
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 
+declare const Deno: {
+  env: {
+    get: (key: string) => string | undefined;
+  };
+};
+
 console.log("Paystack Webhook Function Loaded - Unified Lifecycle v2 (Stripe-Free)");
 
 serve(async (req) => {

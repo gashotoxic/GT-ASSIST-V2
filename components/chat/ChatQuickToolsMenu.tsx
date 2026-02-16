@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Database, Globe, Lock, Paperclip } from 'lucide-react';
+import { Camera, Cpu, Database, Globe, Lock, Paperclip } from 'lucide-react';
 
 type SubscriptionTier = 'free' | 'basic' | 'plus' | 'pro';
 type ChatMode = 'chat' | 'brand';
@@ -9,6 +9,8 @@ type ChatQuickToolsMenuProps = {
   onClose: () => void;
   isHoverPointer: boolean;
   fileInputRef: React.RefObject<HTMLInputElement>;
+  canUseCamera: boolean;
+  onOpenCamera: () => void;
   canSearch: boolean;
   isSearchEnabled: boolean;
   onToggleSearch: () => void;
@@ -29,6 +31,8 @@ export const ChatQuickToolsMenu: React.FC<ChatQuickToolsMenuProps> = ({
   onClose,
   isHoverPointer,
   fileInputRef,
+  canUseCamera,
+  onOpenCamera,
   canSearch,
   isSearchEnabled,
   onToggleSearch,
@@ -66,6 +70,20 @@ export const ChatQuickToolsMenu: React.FC<ChatQuickToolsMenuProps> = ({
             <Paperclip className="w-3.5 h-3.5" />
             <span>Attachments</span>
           </button>
+
+          {canUseCamera && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenCamera();
+              }}
+              className="w-full px-3 py-2 rounded-xl text-[13px] font-bold text-gray-700 dark:text-gray-200 hover:bg-primary/5 transition-colors flex items-center gap-2"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>Camera</span>
+            </button>
+          )}
 
           {canSearch && (
             <button
@@ -139,4 +157,3 @@ export const ChatQuickToolsMenu: React.FC<ChatQuickToolsMenuProps> = ({
     </>
   );
 };
-

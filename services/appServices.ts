@@ -13,8 +13,8 @@ const chutesCache = new Map<string, ChutesService>();
 
 export const getEffectiveSettings = (settings: AppSettings, isSignedIn: boolean): AppSettings => {
   if (!isSignedIn) return settings;
-  const supabaseUrl = import.meta.env.VITE_APP_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_APP_SUPABASE_KEY;
+  const supabaseUrl = import.meta.env.VITE_APP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_APP_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_KEY;
   if (!supabaseUrl || !supabaseKey) return settings;
   return {
     ...settings,
@@ -56,4 +56,3 @@ export const getAppServices = (settings: AppSettings, isSignedIn: boolean): AppS
     chutesService: getAppChutesService(effectiveSettings),
   };
 };
-

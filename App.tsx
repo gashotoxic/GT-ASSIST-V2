@@ -7,7 +7,7 @@ import { Button } from './components/UI';
 import { LogoModelPicker } from './components/LogoModelPicker';
 import { AppHeader } from './components/AppHeader';
 import { AppRoutes } from './components/AppRoutes';
-import { AppSettings, BRAND_STUDIO_MODEL_ID, DEFAULT_SYSTEM_PROMPT, ChatSession, getModelShortName } from './types';
+import { AppSettings, BRAND_STUDIO_MODEL_ID, DEFAULT_SYSTEM_PROMPT, ChatSession, getModelInfo, getModelShortName } from './types';
 import { useAuthContext } from './context/AuthContext';
 import { useCredits } from './context/CreditContext';
 import { summarizePrompt } from './utils/stringUtils';
@@ -368,6 +368,7 @@ const App: React.FC = () => {
     ? (settings.brandModel || BRAND_STUDIO_MODEL_ID)
     : settings.model;
   const headerActiveModelShortName = getModelShortName(headerActiveModelId);
+  const headerActiveModelSupportsVision = Boolean(getModelInfo(headerActiveModelId)?.supportsVision);
 
   return (
     <ServicesProvider services={services}>
@@ -407,6 +408,7 @@ const App: React.FC = () => {
           onOpenSidebar={() => setIsSidebarOpen(true)}
           onOpenModelPicker={openModelPicker}
           activeModelLabel={headerActiveModelShortName || headerActiveModelId}
+          activeModelSupportsVision={headerActiveModelSupportsVision}
           currentView={currentView}
           setCurrentView={setCurrentView}
           navItems={navItems}

@@ -141,6 +141,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     setBrandToolsEnabled,
   });
 
+  const setSessionPrefs = (sid: string, prefs: { chatMode: 'chat' | 'brand'; brandToolsEnabled: boolean }) => {
+    localStorage.setItem(`chutes_chat_prefs_${sid}`, JSON.stringify(prefs));
+  };
+
   const getDraftKey = (sid: string) => `chutes_chat_draft_${sid}`;
 
   useEffect(() => {
@@ -746,6 +750,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
         fileInputRef={fileInputRef}
         onFileSelect={handleFileSelect}
         attachment={attachment}
+        onSetAttachment={(next) => setAttachment(next)}
         onClearAttachment={clearAttachment}
         inputValue={inputValue}
         setInputValue={setInputValue}
