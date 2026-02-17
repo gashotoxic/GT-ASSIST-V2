@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Send, PanelLeftClose, Plus, MessageSquare, Image as ImageIcon, LayoutGrid, X, LogOut, User, Settings, Monitor, Smartphone, Search, Check, Sparkles, Bot, LifeBuoy, Sliders, CreditCard } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 import { OnboardingTour } from './components/OnboardingTour';
 import { AuthModal } from './components/AuthModal';
 import { Sidebar } from './components/Sidebar';
@@ -482,6 +483,9 @@ const App: React.FC = () => {
         isSignedIn={isSignedIn}
         activeMediaTab={activeMediaTab}
       />
+
+      {/* Vercel Web Analytics */}
+      <Analytics />
     </div>
     </ServicesProvider>
   );
