@@ -47,7 +47,7 @@ export const CreditSystemTest: React.FC = () => {
       ttsSpeed: 1.0,
       searchProvider: 'tavily'
     };
-    const supabaseService = new SupabaseService(settings);
+    const supabaseService = new SupabaseService(settings, null);
 
     try {
       // Test 1: User Profile Creation/Sync

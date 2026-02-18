@@ -83,7 +83,7 @@ The app uses a **Unified Credit Model** powered by Paystack.
 ## 6. Security & Configuration
 *   **Auth**: Clerk manages the identity layer.
 *   **Webhooks**: Verified via `PAYSTACK_SECRET_KEY`.
-*   **Row Level Security (RLS)**: Strict policies for `users`, `chat_sessions`, `media_history`, `knowledge_documents`, and `knowledge_chunks`.
+*   **Row Level Security (RLS)**: Enforced via Clerk JWT claims (`sub`) when `database/migrations/enable_rls_and_secure_functions.sql` is applied.
 
 ---
 

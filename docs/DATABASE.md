@@ -15,6 +15,14 @@ This document is a comprehensive technical blueprint of the GT Assistant data la
 | **Media** | Supabase `media_history` | *Not Persisted* |
 | **Credits** | Supabase `users.credits` | *Not Shared* |
 
+### 2. Security Model (Clerk JWT → Supabase RLS)
+Authenticated reads/writes use Supabase Row Level Security (RLS) with policies based on the Clerk user id in the JWT `sub` claim.
+
+Key implications:
+- Guest mode never touches Supabase (local-only).
+- Signed-in requests must include a valid Clerk JWT so Supabase can populate `request.jwt.claims`.
+- Core credit operations are executed via guarded RPCs (not direct table writes).
+
 ### 2. The CASE Logic
 The app uses a strict mapping between frontend `camelCase` and backend `snake_case`.
 
@@ -60,6 +68,12 @@ Tracks generated artifacts (Images, Videos). RLS enforces user isolation.
 3. **Hierarchy**: Deducts from `daily_credits` first, then `credits` (permanent).
 **Security**: Row-level locking to prevent double-spending.
 
+### `sync_user_profile`
+Creates or updates the `users` row for the currently signed-in Clerk user.
+
+Security:
+- Only allowed when `p_user_id` matches the JWT `sub` claim (or when called via `service_role`).
+
 ### `expire_user_subscription`
 **Logic**: Triggered by webhook (`subscription.disable`). Reverts user to `free` tier and sets all credits to `0`. 
 **Safety**: Only affects users on a paid tier.
@@ -75,6 +89,11 @@ Tracks generated artifacts (Images, Videos). RLS enforces user isolation.
 | :--- | :--- | :--- |
 | `media-assets` | Public | `${userId}/${sessionId}/${itemId}.${ext}` |
 | `chat-audio` | Public | `${sessionId}/${itemId}.wav` |
+
+---
+
+## 💳 Paystack Idempotency Ledger
+To prevent double-crediting on webhook retries, Paystack events are deduped into `paystack_event_ledger` before any credit/subscription mutation runs.
 
 ---
 *Last Updated: January 3, 2026 | GT Assistant Engineering Audit*

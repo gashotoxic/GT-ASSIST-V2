@@ -24,19 +24,27 @@ export const getEffectiveSettings = (settings: AppSettings, isSignedIn: boolean)
   };
 };
 
-export const getAppSupabaseService = (settings: AppSettings, isSignedIn: boolean): SupabaseService => {
+export const getAppSupabaseService = (
+  settings: AppSettings,
+  isSignedIn: boolean,
+  userId?: string | null,
+  authToken?: string | null
+): SupabaseService => {
   const effective = getEffectiveSettings(settings, isSignedIn);
   const supabaseUrl = effective.supabaseUrl;
   const supabaseKey = effective.supabaseKey;
   if (isSignedIn && effective.useSupabase && supabaseUrl && supabaseKey) {
-    const cacheKey = `${supabaseUrl}::${supabaseKey}`;
+    const cacheKey = `${supabaseUrl}::${supabaseKey}::${userId || 'signed_in'}`;
     const existing = supabaseCache.get(cacheKey);
-    if (existing) return existing;
-    const created = new SupabaseService(effective);
+    if (existing) {
+      existing.setAuthToken(authToken || null);
+      return existing;
+    }
+    const created = new SupabaseService(effective, authToken || null);
     supabaseCache.set(cacheKey, created);
     return created;
   }
-  return new SupabaseService(effective);
+  return new SupabaseService(effective, authToken || null);
 };
 
 export const getAppChutesService = (settings: AppSettings): ChutesService => {
@@ -48,11 +56,16 @@ export const getAppChutesService = (settings: AppSettings): ChutesService => {
   return created;
 };
 
-export const getAppServices = (settings: AppSettings, isSignedIn: boolean): AppServices => {
+export const getAppServices = (
+  settings: AppSettings,
+  isSignedIn: boolean,
+  userId?: string | null,
+  authToken?: string | null
+): AppServices => {
   const effectiveSettings = getEffectiveSettings(settings, isSignedIn);
   return {
     effectiveSettings,
-    supabaseService: getAppSupabaseService(settings, isSignedIn),
+    supabaseService: getAppSupabaseService(settings, isSignedIn, userId, authToken),
     chutesService: getAppChutesService(effectiveSettings),
   };
 };

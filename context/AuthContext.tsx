@@ -31,12 +31,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           console.log('Syncing Clerk user to Supabase:', { userId, email: user.emailAddresses?.[0]?.emailAddress });
 
+          let token: string | null = null;
+          try {
+            token = (await getToken({ template: 'supabase' })) || null;
+          } catch {
+            token = null;
+          }
+          if (!token) {
+            token = (await getToken()) || null;
+          }
+
           const result = await syncUser({
             id: userId,
             emailAddresses: user.emailAddresses || [],
             firstName: user.firstName,
             lastName: user.lastName,
-          });
+          }, token || null);
 
           if (result.created) {
             console.log(`✅ New Supabase user created: ${userId} with 10 free credits`);

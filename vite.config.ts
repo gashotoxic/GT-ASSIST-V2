@@ -8,7 +8,7 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          if (id.includes('/react-dom/') || id.includes('/react/')) return 'react';
+          if (id.includes('/node_modules/react-dom/') || id.includes('/node_modules/react/') || id.includes('/node_modules/scheduler/')) return 'react';
           if (id.includes('/@supabase/')) return 'supabase';
           if (id.includes('/react-markdown/') || id.includes('/remark-gfm/') || id.includes('/micromark') || id.includes('/mdast') || id.includes('/unist')) return 'markdown';
           if (id.includes('/@radix-ui/')) return 'radix';

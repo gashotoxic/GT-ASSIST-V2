@@ -1,5 +1,12 @@
 # Task Log
 
+## 2026-02-18
+- Analyse codebase stage, implemented vs missing features, and define next phase. (completed)
+- Add Qwen/Qwen3.5-397B-A17B-TEE multimodal model to Chat + Brand model picker. (completed)
+- Prepare next phase security hardening (Clerk JWT → Supabase RLS) and safe RPC migration. (completed)
+- Add Paystack webhook idempotency via event ledger and dedupe logic. (completed)
+- Apply Supabase migrations: `enable_rls_and_secure_functions.sql` and `paystack_event_ledger.sql`. (completed)
+
 ## 2026-02-16
 - Add in-app camera capture option in Brand chat (quick tools → Camera) to attach photos for vision prompts. (completed)
 - Add camera indicator for vision-capable models and fix camera overlay capture button visibility. (completed)

@@ -168,6 +168,7 @@ export const AVAILABLE_MODELS: AvailableModel[] = [
   { id: "deepseek-ai/DeepSeek-V3.2-TEE", name: "🧠 DeepSeek V3.2", shortName: "DeepSeek V3.2" },
   { id: "deepseek-ai/DeepSeek-V3.2-Speciale-TEE", name: "🧠 DeepSeek V3.2 Speciale", shortName: "DeepSeek V3.2 Sp" },
   { id: "Qwen/Qwen2.5-VL-72B-Instruct-TEE", name: "🧠👁️ Qwen 2.5 VL (72B)", shortName: "Qwen 2.5 VL", supportsVision: true },
+  { id: "Qwen/Qwen3.5-397B-A17B-TEE", name: "🧠👁️ Qwen 3.5 (397B)", shortName: "Qwen 3.5", supportsVision: true, badge: "NEW" },
   { id: "OpenGVLab/InternVL3-78B-TEE", name: "🧠👁️ InternVL 3 (78B)", shortName: "InternVL 3", supportsVision: true },
   { id: "zai-org/GLM-4.6V", name: "🧠👁️ GLM 4.6V", shortName: "GLM 4.6V", supportsVision: true },
   { id: "zai-org/GLM-4.7-TEE", name: "🧠 GLM 4.7", shortName: "GLM 4.7" },
@@ -185,6 +186,7 @@ export const BRAND_VISION_MODEL_IDS = [
   "moonshotai/Kimi-K2.5-TEE",
   "zai-org/GLM-4.6V",
   "Qwen/Qwen2.5-VL-72B-Instruct-TEE",
+  "Qwen/Qwen3.5-397B-A17B-TEE",
   "OpenGVLab/InternVL3-78B-TEE",
 ] as const;
 

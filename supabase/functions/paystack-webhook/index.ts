@@ -42,6 +42,40 @@ serve(async (req) => {
     const event = JSON.parse(body);
     const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
+    const rawEventId =
+      event?.data?.id ??
+      event?.data?.subscription_code ??
+      event?.data?.reference ??
+      event?.data?.invoice_code ??
+      null;
+
+    const paystackEventId = rawEventId ? `${event.event}:${String(rawEventId)}` : null;
+
+    if (paystackEventId) {
+      const userId = event?.data?.metadata?.userId || null;
+      const reference = event?.data?.reference || null;
+      const amountKes = typeof event?.data?.amount === 'number' ? event.data.amount / 100 : null;
+
+      const { data: ledgerInsert } = await supabase
+        .from('paystack_event_ledger')
+        .upsert(
+          {
+            paystack_event_id: paystackEventId,
+            event_type: event.event,
+            reference,
+            user_id: userId,
+            amount_kes: amountKes,
+            payload: event,
+          },
+          { onConflict: 'paystack_event_id', ignoreDuplicates: true }
+        )
+        .select('paystack_event_id');
+
+      if (!ledgerInsert || ledgerInsert.length === 0) {
+        return new Response('ACK - Duplicate', { status: 200 });
+      }
+    }
+
     // 2. EVENT HANDLING
     if (event.event === "charge.success") {
       const { metadata, amount, customer, reference, plan } = event.data;

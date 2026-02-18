@@ -2,23 +2,26 @@ import { SupabaseService } from './supabase';
 import { AppSettings } from '../types';
 
 export class UserSyncService {
-  private supabaseService: SupabaseService;
   private isConfigured: boolean;
+  private supabaseUrl: string | undefined;
+  private supabaseKey: string | undefined;
 
   constructor() {
-    const supabaseUrl = import.meta.env.VITE_APP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_APP_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_KEY;
-    this.isConfigured = Boolean(supabaseUrl && supabaseKey);
+    this.supabaseUrl = import.meta.env.VITE_APP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+    this.supabaseKey = import.meta.env.VITE_APP_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_KEY;
+    this.isConfigured = Boolean(this.supabaseUrl && this.supabaseKey);
     if (!this.isConfigured) {
       console.error('App Supabase configuration not found in environment variables');
     } else {
-      console.log('Initializing UserSyncService with app Supabase:', { supabaseUrl: supabaseUrl.substring(0, 20) + '...' });
+      console.log('Initializing UserSyncService with app Supabase:', { supabaseUrl: this.supabaseUrl!.substring(0, 20) + '...' });
     }
+  }
 
+  private getSupabaseService(authToken?: string | null) {
     const settings: AppSettings = {
       useSupabase: this.isConfigured,
-      supabaseUrl,
-      supabaseKey,
+      supabaseUrl: this.supabaseUrl,
+      supabaseKey: this.supabaseKey,
       apiKey: '',
       model: 'zai-org/GLM-4.6',
       systemPrompt: '',
@@ -26,8 +29,8 @@ export class UserSyncService {
       ttsSpeed: 1.0,
       searchProvider: 'tavily'
     };
-    
-    this.supabaseService = new SupabaseService(settings);
+
+    return new SupabaseService(settings, authToken || null);
   }
 
   /**
@@ -40,9 +43,13 @@ export class UserSyncService {
     firstName?: string;
     lastName?: string;
     imageUrl?: string;
-  }): Promise<{ success: boolean; error?: string }> {
+  }, authToken?: string | null): Promise<{ success: boolean; error?: string }> {
     if (!this.isConfigured) {
       return { success: false, error: 'Supabase configuration missing' };
+    }
+
+    if (!authToken) {
+      return { success: false, error: 'Authentication token missing' };
     }
     try {
       const email = clerkUser.emailAddresses[0]?.emailAddress;
@@ -51,7 +58,8 @@ export class UserSyncService {
       }
 
       // Create or update user profile in Supabase
-      await this.supabaseService.createUserProfile(clerkUser.id, email);
+      const supabaseService = this.getSupabaseService(authToken);
+      await supabaseService.createUserProfile(clerkUser.id, email);
 
       console.log(`User profile synced: ${clerkUser.id} - ${email}`);
       return { success: true };
@@ -135,7 +143,8 @@ export class UserSyncService {
       };
     }
     try {
-      const profile = await this.supabaseService.getUserProfile(userId);
+      const supabaseService = this.getSupabaseService(null);
+      const profile = await supabaseService.getUserProfile(userId);
       return {
         credits: profile.credits || 0,
         tier: profile.subscription_tier || 'free',
@@ -160,7 +169,8 @@ export class UserSyncService {
     }
     try {
       console.log(`Checking Supabase for user: ${userId}`);
-      const profile = await this.supabaseService.getUserProfile(userId);
+      const supabaseService = this.getSupabaseService(null);
+      const profile = await supabaseService.getUserProfile(userId);
       
       // Profile is null if user doesn't exist
       if (!profile) {
@@ -193,18 +203,24 @@ export class UserSyncService {
     emailAddresses: Array<{ emailAddress: string }>;
     firstName?: string;
     lastName?: string;
-  }): Promise<{ created: boolean; success: boolean; error?: string }> {
+  }, authToken?: string | null): Promise<{ created: boolean; success: boolean; error?: string }> {
     if (!this.isConfigured) {
       return { created: false, success: false, error: 'Supabase configuration missing' };
     }
     try {
       console.log(`Checking if user exists in Supabase: ${clerkUser.id}`);
       
-      const exists = await this.userExists(clerkUser.id);
+      if (!authToken) {
+        return { created: false, success: false, error: 'Authentication token missing' };
+      }
+
+      const supabaseService = this.getSupabaseService(authToken);
+
+      const exists = await supabaseService.getUserProfile(clerkUser.id);
       
       if (!exists) {
         console.log(`User ${clerkUser.id} not found, creating new Supabase user...`);
-        const result = await this.syncUserProfile(clerkUser);
+        const result = await this.syncUserProfile(clerkUser, authToken);
         if (result.success) {
           console.log(`✅ Successfully created Supabase user: ${clerkUser.id}`);
         } else {
@@ -250,12 +266,12 @@ export function useUserSync() {
     emailAddresses: Array<{ emailAddress: string }>;
     firstName?: string;
     lastName?: string;
-  }) => {
+  }, authToken?: string | null) => {
     try {
       console.log('useUserSync: Syncing Clerk user to Supabase...');
       
       const service = getUserSyncService();
-      const result = await service.ensureUserExists(clerkUser);
+      const result = await service.ensureUserExists(clerkUser, authToken);
       
       if (result.success) {
         console.log(`✅ useUserSync: Successfully synced user ${clerkUser.id}`);

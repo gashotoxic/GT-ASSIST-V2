@@ -22,7 +22,7 @@ export const CreditContext = createContext<CreditContextType>({
 });
 
 export function CreditProvider({ children }: { children: React.ReactNode }) {
-  const { userId, isSignedIn } = useAuthContext();
+  const { userId, isSignedIn, getToken } = useAuthContext();
   const [credits, setCredits] = useState(0);
   const [dailyCredits, setDailyCredits] = useState(0);
   const [tier, setTier] = useState<'free' | 'basic' | 'plus' | 'pro'>('free');
@@ -32,12 +32,37 @@ export function CreditProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize Supabase service when user is signed in
   useEffect(() => {
-    if (isSignedIn && userId) {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!(isSignedIn && userId)) {
+        if (!cancelled) setSupabaseService(null);
+        return;
+      }
+
       const supabaseUrl = import.meta.env.VITE_APP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_APP_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_KEY;
+      if (!supabaseUrl || !supabaseKey) {
+        if (!cancelled) setSupabaseService(null);
+        return;
+      }
 
-      if (supabaseUrl && supabaseKey) {
-        const service = new SupabaseService({
+      let token: string | null = null;
+      try {
+        token = (await getToken({ template: 'supabase' })) || (await getToken());
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!cancelled) setSyncError(msg);
+        token = null;
+      }
+
+      if (!token) {
+        if (!cancelled) setSupabaseService(null);
+        return;
+      }
+
+      const service = new SupabaseService(
+        {
           apiKey: 'internal',
           model: '',
           systemPrompt: '',
@@ -47,13 +72,18 @@ export function CreditProvider({ children }: { children: React.ReactNode }) {
           supabaseUrl,
           supabaseKey,
           searchProvider: 'tavily',
-        });
-        setSupabaseService(service);
-      }
-    } else {
-      setSupabaseService(null);
-    }
-  }, [isSignedIn, userId]);
+        },
+        token
+      );
+
+      if (!cancelled) setSupabaseService(service);
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [isSignedIn, userId, getToken]);
 
   const fetchCredits = async () => {
     if (!isSignedIn || !userId) {
@@ -86,11 +116,29 @@ export function CreditProvider({ children }: { children: React.ReactNode }) {
         setTier('free');
       }
     } catch (error: any) {
+      const msg = error?.message || 'Failed to load credits';
       console.error('Failed to fetch credits from Supabase:', error);
-      setSyncError(error.message || 'Failed to load credits');
-      setCredits(0);
-      setDailyCredits(0);
-      setTier('free');
+
+      if (msg.includes('JWT expired')) {
+        try {
+          const refreshed = (await getToken({ template: 'supabase' })) || (await getToken());
+          if (refreshed) {
+            supabaseService.setAuthToken(refreshed);
+            const retry = await supabaseService.getUserProfile(userId);
+            if (retry) {
+              setCredits(retry.credits || 0);
+              setDailyCredits(retry.daily_credits || 0);
+              setTier((retry.subscription_tier as 'free' | 'basic' | 'plus' | 'pro') || 'free');
+              setSyncError(null);
+              return;
+            }
+          }
+        } catch (e) {
+          void e;
+        }
+      }
+
+      setSyncError(msg);
     } finally {
       setLoading(false);
     }

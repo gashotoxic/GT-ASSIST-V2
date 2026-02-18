@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Send, PanelLeftClose, Plus, MessageSquare, Image as ImageIcon, LayoutGrid, X, LogOut, User, Settings, Monitor, Smartphone, Search, Check, Sparkles, Bot, LifeBuoy, Sliders, CreditCard } from 'lucide-react';
 import { OnboardingTour } from './components/OnboardingTour';
 import { AuthModal } from './components/AuthModal';
@@ -29,8 +29,11 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const App: React.FC = () => {
-  const { isSignedIn, isLoaded, userId } = useAuthContext();
+  const { isSignedIn, isLoaded, userId, getToken } = useAuthContext();
   const { credits, dailyCredits, subscriptionTier } = useCredits();
+
+  const [supabaseAuthToken, setSupabaseAuthToken] = useState<string | null>(null);
+  const [supabaseAuthError, setSupabaseAuthError] = useState<string | null>(null);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
 
@@ -57,7 +60,91 @@ const App: React.FC = () => {
   const [modelPickerAnchorEl, setModelPickerAnchorEl] = useState<HTMLElement | null>(null);
   const modelPickerAnchorElRef = useRef<HTMLElement | null>(null);
 
-  const services = useMemo(() => getAppServices(settings, Boolean(isSignedIn)), [settings, isSignedIn]);
+  useEffect(() => {
+    let cancelled = false;
+    let refreshTimer: number | null = null;
+
+    const decodeJwtExpMs = (jwt: string): number | null => {
+      const parts = jwt.split('.');
+      if (parts.length < 2) return null;
+      try {
+        const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+        const json = atob(padded);
+        const payload = JSON.parse(json) as { exp?: number };
+        if (typeof payload.exp !== 'number') return null;
+        return payload.exp * 1000;
+      } catch {
+        return null;
+      }
+    };
+
+    const clearTimer = () => {
+      if (refreshTimer) {
+        window.clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+    };
+
+    const scheduleRefresh = (jwt: string) => {
+      const expMs = decodeJwtExpMs(jwt);
+      if (!expMs) return;
+      const now = Date.now();
+      const refreshInMs = Math.max(5_000, expMs - now - 30_000);
+      clearTimer();
+      refreshTimer = window.setTimeout(() => {
+        void fetchAndSetToken();
+      }, refreshInMs);
+    };
+
+    const fetchAndSetToken = async () => {
+      if (!isSignedIn) {
+        if (!cancelled) setSupabaseAuthToken(null);
+        if (!cancelled) setSupabaseAuthError(null);
+        clearTimer();
+        return;
+      }
+
+      try {
+        let token: string | null = null;
+        try {
+          token = (await getToken({ template: 'supabase' })) || null;
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (!cancelled) setSupabaseAuthError(msg);
+          token = null;
+        }
+
+        if (!token) {
+          token = (await getToken()) || null;
+        }
+
+        if (!cancelled) setSupabaseAuthToken(token);
+        if (!cancelled) setSupabaseAuthError(null);
+        if (token) scheduleRefresh(token);
+      } catch {
+        if (!cancelled) setSupabaseAuthToken(null);
+        if (!cancelled) setSupabaseAuthError('Failed to obtain auth token');
+        clearTimer();
+      }
+    };
+
+    const run = async () => {
+      await fetchAndSetToken();
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+      clearTimer();
+    };
+  }, [isSignedIn, getToken]);
+
+  const isSupabaseAuthed = Boolean(isSignedIn && supabaseAuthToken);
+  const services = useMemo(
+    () => getAppServices(settings, isSupabaseAuthed, userId, supabaseAuthToken),
+    [settings, isSupabaseAuthed, userId, supabaseAuthToken]
+  );
   const supabaseService = services.supabaseService;
 
   // -- INIT / LOAD SESSIONS --
@@ -231,7 +318,7 @@ const App: React.FC = () => {
 
   // -- HANDLERS --
 
-  const updateSessionPreview = async (id: string, preview: string) => {
+  const updateSessionPreview = useCallback((id: string, preview: string) => {
     const timestamp = Date.now();
     const shortTitle = summarizePrompt(preview);
 
@@ -239,9 +326,12 @@ const App: React.FC = () => {
       const existing = prevSessions.find(s => s.id === id);
       if (!existing) return prevSessions;
 
+      const nextTitle = (existing.title && existing.title !== 'New Conversation') ? existing.title : (shortTitle || 'Conversation');
+      if (existing.preview === preview && existing.title === nextTitle) return prevSessions;
+
       const updatedSession: ChatSession = {
         ...existing,
-        title: (existing.title && existing.title !== 'New Conversation') ? existing.title : (shortTitle || 'Conversation'),
+        title: nextTitle,
         preview,
         updatedAt: timestamp,
       };
@@ -260,7 +350,7 @@ const App: React.FC = () => {
       finalList.sort((a, b) => b.updatedAt - a.updatedAt);
       return finalList;
     });
-  };
+  }, [isSignedIn, supabaseService, userId]);
 
   const handleRenameSession = async (id: string, newTitle: string) => {
     const updatedSessions = sessions.map(s =>

@@ -105,6 +105,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const didInitSessionCleanupRef = useRef(false);
+  const lastDraftSessionIdRef = useRef<string | null>(null);
+  const skipNextDraftSaveRef = useRef(false);
+  const inputValueRef = useRef('');
 
   const { isRecording, startRecording, stopRecording } = useAudioRecorder();
   const { canAfford, refetch } = useCredits();
@@ -145,23 +149,46 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     localStorage.setItem(`chutes_chat_prefs_${sid}`, JSON.stringify(prefs));
   };
 
-  const getDraftKey = (sid: string) => `chutes_chat_draft_${sid}`;
+  const getDraftKey = (sid: string, uid?: string | null) => `chutes_chat_draft_${uid || 'guest'}_${sid}`;
 
   useEffect(() => {
-    const draft = localStorage.getItem(getDraftKey(sessionId));
-    if (draft && !inputValue) {
+    inputValueRef.current = inputValue;
+  }, [inputValue]);
+
+  useEffect(() => {
+    const prevSessionId = lastDraftSessionIdRef.current;
+    lastDraftSessionIdRef.current = sessionId;
+
+    if (prevSessionId !== sessionId) {
+      const primary = localStorage.getItem(getDraftKey(sessionId, userId));
+      const fallback = userId ? localStorage.getItem(getDraftKey(sessionId, null)) : null;
+      const draft = primary || fallback || '';
+      skipNextDraftSaveRef.current = true;
       setInputValue(draft);
+      return;
     }
-  }, [sessionId]);
+
+    if (userId) {
+      const primary = localStorage.getItem(getDraftKey(sessionId, userId));
+      const guest = localStorage.getItem(getDraftKey(sessionId, null));
+      if (!primary && guest && inputValueRef.current) {
+        localStorage.setItem(getDraftKey(sessionId, userId), inputValueRef.current);
+      }
+    }
+  }, [sessionId, userId]);
 
   useEffect(() => {
-    const key = getDraftKey(sessionId);
+    if (skipNextDraftSaveRef.current) {
+      skipNextDraftSaveRef.current = false;
+      return;
+    }
+    const key = getDraftKey(sessionId, userId);
     if (inputValue) {
       localStorage.setItem(key, inputValue);
     } else {
       localStorage.removeItem(key);
     }
-  }, [sessionId, inputValue]);
+  }, [sessionId, userId, inputValue]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -172,6 +199,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
   // Cleanup effect when sessionId changes (Stop generation/audio)
   useEffect(() => {
+    if (!didInitSessionCleanupRef.current) {
+      didInitSessionCleanupRef.current = true;
+      return;
+    }
     // 1. Abort generation
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -186,7 +217,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     setPlayingMessageId(null);
     setIsLoading(false);
     setLoadingStatus(null);
-    setInputValue('');
     setAttachment(null);
   }, [sessionId]);
 

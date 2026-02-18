@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Message } from '../../../types';
 import { SupabaseService } from '../../../services/supabase';
 
@@ -19,6 +19,8 @@ export const useChatMessageStore = ({
   setMessages: (msgs: Message[] | ((prev: Message[]) => Message[])) => void;
   onSessionUpdate: (id: string, preview: string) => void;
 }) => {
+  const lastPreviewRef = useRef<{ sessionId: string; preview: string } | null>(null);
+
   useEffect(() => {
     const loadData = async () => {
       setMessages([]); // Clear previous chat instantly
@@ -60,7 +62,11 @@ export const useChatMessageStore = ({
       const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
       if (lastUserMsg && typeof lastUserMsg.content === 'string') {
         if (messages.length <= 2) {
-          onSessionUpdate(sessionId, lastUserMsg.content);
+          const prev = lastPreviewRef.current;
+          if (!prev || prev.sessionId !== sessionId || prev.preview !== lastUserMsg.content) {
+            lastPreviewRef.current = { sessionId, preview: lastUserMsg.content };
+            onSessionUpdate(sessionId, lastUserMsg.content);
+          }
         }
       }
     }

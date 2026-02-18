@@ -4,22 +4,53 @@ import { Message, AppSettings, ChatSession, MediaItem } from '../types';
 export class SupabaseService {
   private client: SupabaseClient | null = null;
   private sessionId: string;
+  private supabaseUrl: string | null = null;
+  private supabaseKey: string | null = null;
+  private authToken: string | null = null;
+  private instanceId: string;
 
-  constructor(settings: AppSettings) {
+  constructor(settings: AppSettings, authToken?: string | null) {
     let storedSessionId = localStorage.getItem('chutes_session_id');
     if (!storedSessionId) {
       storedSessionId = crypto.randomUUID();
       localStorage.setItem('chutes_session_id', storedSessionId);
     }
     this.sessionId = storedSessionId;
+    this.instanceId = crypto.randomUUID();
+
+    this.authToken = authToken || null;
 
     if (settings.useSupabase) {
-      const supabaseUrl = settings.supabaseUrl || import.meta.env.VITE_APP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = settings.supabaseKey || import.meta.env.VITE_APP_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_KEY;
-      if (supabaseUrl && supabaseKey) {
-        this.client = createClient(supabaseUrl, supabaseKey);
-      }
+      this.supabaseUrl = settings.supabaseUrl || import.meta.env.VITE_APP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+      this.supabaseKey = settings.supabaseKey || import.meta.env.VITE_APP_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_KEY;
+      this.refreshClient();
     }
+  }
+
+  public setAuthToken(token?: string | null) {
+    const next = token || null;
+    if (this.authToken === next) return;
+    this.authToken = next;
+    this.refreshClient();
+  }
+
+  private refreshClient() {
+    if (!this.supabaseUrl || !this.supabaseKey) return;
+
+    const headers: Record<string, string> = {};
+    if (this.authToken) {
+      headers.Authorization = `Bearer ${this.authToken}`;
+    }
+
+    this.client = createClient(this.supabaseUrl, this.supabaseKey, {
+      global: Object.keys(headers).length ? { headers } : undefined,
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+        storageKey: `gt-assistant-sb-${this.sessionId}-${this.instanceId}`,
+      },
+    });
   }
 
   // --- Session Management ---
@@ -627,42 +658,13 @@ export class SupabaseService {
     if (!this.client) throw new Error('Supabase client not initialized');
 
     try {
-      // First, check if user already exists
-      const { data: existingUser } = await this.client
-        .from('users')
-        .select('id, credits')
-        .eq('id', userId)
-        .single();
-
-      if (existingUser) {
-        // User already exists - just update the email if needed, DON'T reset credits
-        console.log('User already exists:', userId, 'with', existingUser.credits, 'credits - not resetting');
-        await this.client
-          .from('users')
-          .update({
-            email: email,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', userId);
-        return true;
-      }
-
-      // New user - INSERT with 10 free credits
-      const { error } = await this.client
-        .from('users')
-        .insert({
-          id: userId,
-          email: email,
-          credits: 10, // 10 free credits for NEW users only
-          subscription_tier: 'free',
-          daily_credits: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+      const { data, error } = await this.client.rpc('sync_user_profile', {
+        p_user_id: userId,
+        p_email: email,
+      });
 
       if (error) throw error;
-      console.log('New user profile created:', userId, 'with 10 free credits');
-      return true;
+      return Boolean(data);
     } catch (error) {
       console.error('Error creating user profile:', error);
       throw error;

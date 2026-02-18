@@ -37,7 +37,29 @@ VITE_PAYSTACK_PUBLIC_KEY=pk_test_...
 
 1. Create a project at [clerk.com](https://clerk.com).
 2. Copy the **Publishable Key** to your `.env.local`.
-3. Configure your JWT Templates if using Supabase Interop (Optional).
+3. Configure a Clerk JWT Template for Supabase interop.
+   - The app calls `getToken({ template: 'supabase' })` when available.
+   - Supabase RLS policies depend on the JWT `sub` claim matching the Clerk user id.
+
+### Clerk JWT Template (Required for Supabase RLS)
+Create a JWT template named `supabase` in the Clerk dashboard.
+
+Recommended settings:
+- Token lifetime: `600` seconds (10 minutes)
+- Allowed clock skew: `5` seconds
+
+Minimum required custom claims:
+```json
+{
+  "role": "authenticated"
+}
+```
+
+Without this template, the browser will fail to fetch `/tokens/supabase` and Supabase RLS requests will return `401`.
+
+If you see `JWT expired` in Supabase responses:
+- Increase the template token lifetime (e.g. 10 minutes).
+- Ensure your device clock is correct.
 
 ---
 
@@ -58,6 +80,8 @@ VITE_PAYSTACK_PUBLIC_KEY=pk_test_...
 ## 🗄️ Database (Supabase)
 
 1. Run the schema in `database/migrations/`.
+   - `enable_rls_and_secure_functions.sql` (Clerk JWT-backed RLS + safe RPC)
+   - `paystack_event_ledger.sql` (webhook idempotency ledger)
 2. Configure **Storage Buckets**: `chat-audio` and `media-assets`.
 3. Set **RLS Policies** to allow Clerk-authenticated uploads.
 
@@ -66,8 +90,8 @@ VITE_PAYSTACK_PUBLIC_KEY=pk_test_...
 ## 🚀 Local Development
 
 ```bash
-bun install
-bun run dev
+npm install
+npm run dev
 ```
 
 Visit `http://localhost:5173`.
