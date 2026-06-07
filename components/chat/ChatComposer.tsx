@@ -104,6 +104,10 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             <div className="w-10 h-10 rounded bg-gray-100 dark:bg-black/20 flex items-center justify-center overflow-hidden">
               {attachment.type === 'image' ? (
                 <img src={attachment.data} alt="preview" className="w-full h-full object-cover" />
+              ) : attachment.type === 'video' ? (
+                <video src={attachment.data} className="w-full h-full object-cover" muted />
+              ) : attachment.type === 'audio' ? (
+                <div className="flex items-center justify-center w-full h-full"><Mic className="w-5 h-5 text-blue-500" /></div>
               ) : (
                 <FileText className="w-5 h-5 text-gray-500" />
               )}
@@ -124,7 +128,7 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             ref={fileInputRef}
             className="hidden"
             onChange={onFileSelect}
-            accept="image/*, .txt, .md, .json, .js, .ts, .csv"
+            accept="image/*, video/*, audio/*, .txt, .md, .json, .js, .ts, .csv"
           />
 
           <div className="relative shrink-0">
@@ -309,14 +313,17 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
               const items = e.clipboardData?.items;
               if (!items) return;
               for (const item of items) {
-                if (item.type.startsWith('image/')) {
+                const isMedia = item.type.startsWith('image/') || item.type.startsWith('video/') || item.type.startsWith('audio/');
+                if (isMedia) {
                   e.preventDefault();
                   const file = item.getAsFile();
                   if (!file) continue;
-                  if (file.size > 5 * 1024 * 1024) { alert('Image too large (max 5MB)'); return; }
+                  const maxSize = item.type.startsWith('image/') ? 5 * 1024 * 1024 : 20 * 1024 * 1024;
+                  if (file.size > maxSize) { alert(`File too large (max ${item.type.startsWith('image/') ? '5MB' : '20MB'})`); return; }
                   const reader = new FileReader();
                   reader.onload = () => {
-                    onSetAttachment({ type: 'image', name: file.name || 'pasted-image.png', data: reader.result as string, mimeType: file.type });
+                    const attachmentType = item.type.startsWith('video/') ? 'video' : item.type.startsWith('audio/') ? 'audio' : 'image';
+                    onSetAttachment({ type: attachmentType, name: file.name || `pasted-${attachmentType}.${item.type.split('/')[1]}`, data: reader.result as string, mimeType: item.type });
                   };
                   reader.readAsDataURL(file);
                   return;
@@ -325,12 +332,16 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             }}
             onDrop={async (e) => {
               const file = e.dataTransfer?.files?.[0];
-              if (!file || !file.type.startsWith('image/')) return;
+              if (!file) return;
+              const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/');
+              if (!isMedia) return;
               e.preventDefault();
-              if (file.size > 5 * 1024 * 1024) { alert('Image too large (max 5MB)'); return; }
+              const maxSize = file.type.startsWith('image/') ? 5 * 1024 * 1024 : 20 * 1024 * 1024;
+              if (file.size > maxSize) { alert(`File too large (max ${file.type.startsWith('image/') ? '5MB' : '20MB'})`); return; }
               const reader = new FileReader();
               reader.onload = () => {
-                onSetAttachment({ type: 'image', name: file.name, data: reader.result as string, mimeType: file.type });
+                const attachmentType = file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'image';
+                onSetAttachment({ type: attachmentType, name: file.name, data: reader.result as string, mimeType: file.type });
               };
               reader.readAsDataURL(file);
             }}

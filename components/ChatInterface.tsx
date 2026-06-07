@@ -283,10 +283,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
     const reader = new FileReader();
 
-    if (file.type.startsWith('image/')) {
+    if (file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')) {
+      // Size limit: 20MB for video/audio, 5MB for images
+      const maxSize = file.type.startsWith('image/') ? 5 * 1024 * 1024 : 20 * 1024 * 1024;
+      if (file.size > maxSize) {
+        alert(`File too large. Max ${file.type.startsWith('image/') ? '5MB' : '20MB'} for ${file.type.split('/')[0]} files.`);
+        return;
+      }
       reader.onload = () => {
+        const attachmentType = file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'image';
         setAttachment({
-          type: 'image',
+          type: attachmentType,
           name: file.name,
           data: reader.result as string,
           mimeType: file.type
@@ -741,6 +748,20 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
           return (
             <div key={i} className="my-2 rounded-lg overflow-hidden border border-white/20 shadow-lg">
               <img src={part.image_url.url} alt="User upload" className="max-w-full h-auto max-h-64 object-contain" />
+            </div>
+          );
+        }
+        if (part.type === 'video_url') {
+          return (
+            <div key={i} className="my-2 rounded-lg overflow-hidden border border-white/20 shadow-lg">
+              <video src={part.video_url.url} controls className="max-w-full h-auto max-h-64" />
+            </div>
+          );
+        }
+        if (part.type === 'audio_url') {
+          return (
+            <div key={i} className="my-2">
+              <audio src={part.audio_url.url} controls className="w-full" />
             </div>
           );
         }

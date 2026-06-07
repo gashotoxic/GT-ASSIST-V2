@@ -1,10 +1,10 @@
 
 export interface ContentPart {
-  type: 'text' | 'image_url';
+  type: 'text' | 'image_url' | 'video_url' | 'audio_url';
   text?: string;
-  image_url?: {
-    url: string;
-  };
+  image_url?: { url: string };
+  video_url?: { url: string };
+  audio_url?: { url: string };
 }
 
 export interface SearchSource {
@@ -53,9 +53,9 @@ export interface MediaItem {
 }
 
 export interface FileAttachment {
-  type: 'image' | 'text';
+  type: 'image' | 'video' | 'audio' | 'text';
   name: string;
-  data: string; // base64 for image, raw string for text
+  data: string; // base64 data URL for image/video/audio, raw string for text
   mimeType: string;
 }
 
