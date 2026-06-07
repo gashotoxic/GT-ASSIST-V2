@@ -305,6 +305,36 @@ export const ChatComposer: React.FC<ChatComposerProps> = ({
             placeholder={chatMode === 'brand' ? 'Describe your brand, upload an image, or ask for an ad prompt…' : 'Message GT...'}
             className="flex-1 min-w-[60px] bg-transparent border-none focus:ring-0 resize-none max-h-32 py-2.5 px-1 sm:px-2 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 text-sm sm:text-base scrollbar-hide focus:outline-none"
             rows={1}
+            onPaste={async (e) => {
+              const items = e.clipboardData?.items;
+              if (!items) return;
+              for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                  e.preventDefault();
+                  const file = item.getAsFile();
+                  if (!file) continue;
+                  if (file.size > 5 * 1024 * 1024) { alert('Image too large (max 5MB)'); return; }
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    onSetAttachment({ type: 'image', name: file.name || 'pasted-image.png', data: reader.result as string, mimeType: file.type });
+                  };
+                  reader.readAsDataURL(file);
+                  return;
+                }
+              }
+            }}
+            onDrop={async (e) => {
+              const file = e.dataTransfer?.files?.[0];
+              if (!file || !file.type.startsWith('image/')) return;
+              e.preventDefault();
+              if (file.size > 5 * 1024 * 1024) { alert('Image too large (max 5MB)'); return; }
+              const reader = new FileReader();
+              reader.onload = () => {
+                onSetAttachment({ type: 'image', name: file.name, data: reader.result as string, mimeType: file.type });
+              };
+              reader.readAsDataURL(file);
+            }}
+            onDragOver={(e) => e.preventDefault()}
           />
 
           <div className="flex items-center gap-0.5 sm:gap-1 pb-0.5">
