@@ -1,6 +1,7 @@
 import React from 'react';
 import ChatInterface from './ChatInterface';
 import { AppSettings, ChatSession } from '../types';
+import { ErrorBoundary } from './ErrorBoundary';
 
 const MediaStudio = React.lazy(() => import('./MediaStudio'));
 const PricingPage = React.lazy(() => import('./PricingPage').then((m) => ({ default: m.PricingPage })));
@@ -63,13 +64,15 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         {currentView === 'media' && (
           <React.Suspense fallback={<div className="w-full flex-1 min-h-0 flex items-center justify-center text-sm text-slate-500 dark:text-slate-300">Loading…</div>}>
             <div className="w-full flex-1 min-h-0 transition-all duration-500 animate-in fade-in zoom-in-95 flex flex-col">
-              <MediaStudio
-                settings={settings}
-                isAuthenticated={isSignedIn}
-                onRequestAuth={requestAuth}
-                userId={isSignedIn ? userId : undefined}
-                onTabChange={setActiveMediaTab}
-              />
+              <ErrorBoundary>
+                <MediaStudio
+                  settings={settings}
+                  isAuthenticated={isSignedIn}
+                  onRequestAuth={requestAuth}
+                  userId={isSignedIn ? userId : undefined}
+                  onTabChange={setActiveMediaTab}
+                />
+              </ErrorBoundary>
             </div>
           </React.Suspense>
         )}
