@@ -21,6 +21,7 @@ export const useMediaHandlers = ({
   editAspectRatio,
   setEditedImageUrl,
   setEditedImageItem,
+  editedImageUrl,
   videoPrompt,
   videoMode,
   sourceImage,
@@ -68,6 +69,7 @@ export const useMediaHandlers = ({
   editAspectRatio: ImageAspectRatio;
   setEditedImageUrl: (v: string | null) => void;
   setEditedImageItem: (v: MediaItem | null) => void;
+  editedImageUrl: string | null;
   videoPrompt: string;
   videoMode: 'i2v' | 't2v';
   sourceImage: string | null;

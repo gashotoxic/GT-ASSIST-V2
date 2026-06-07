@@ -322,6 +322,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         editAspectRatio,
         setEditedImageUrl,
         setEditedImageItem,
+        editedImageUrl,
         videoPrompt,
         videoMode,
         sourceImage,
