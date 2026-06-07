@@ -86,7 +86,7 @@ export function createBrandStudioToolRuntime(args: {
         const aspectRatio = toolArgs?.aspectRatio as ImageAspectRatio | undefined;
         if (!prompt) return { type: 'error', message: 'Missing prompt for image generation.' };
 
-        const model = AVAILABLE_IMAGE_MODELS.find(m => m.id === 'z-image-turbo') || AVAILABLE_IMAGE_MODELS[0];
+        const model = AVAILABLE_IMAGE_MODELS.find(m => m.id === 'qwen-image-2512') || AVAILABLE_IMAGE_MODELS[0];
         await maybeDeductCredits('image', model.id);
         const blob = await chutesService.generateImage({ prompt, modelUrl: model.url, modelId: model.id, aspectRatio });
 

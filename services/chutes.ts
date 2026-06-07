@@ -4,8 +4,8 @@ import { SearchAgent } from './searchAgent';
 import { isLtx2Model, buildLtx2GenerationInput } from './chutesLtx2';
 
 const BASE_LLM_URL = 'https://llm.chutes.ai/v1/chat/completions';
-const BASE_TTS_URL = 'https://chutes-kokoro.chutes.ai/speak';
-const BASE_STT_URL = 'https://chutes-whisper-large-v3.chutes.ai/transcribe';
+const BASE_TTS_URL = 'https://vonkaiser-audiodojo.chutes.ai/speak';
+const BASE_STT_URL = 'https://vonkaiser-audiodojo.chutes.ai/stt/whisper';
 const BASE_MUSETALK_URL = 'https://chutes-musetalk.chutes.ai/generate';
 
 export class ChutesService {
@@ -135,7 +135,7 @@ export class ChutesService {
     // but reusing streamChat is cleaner to keep the codebase consistent.
     let fullResponse = '';
     // Use a fast model for this
-    const stream = this.streamChat(messages, systemPrompt, 'NousResearch/DeepHermes-3-Mistral-24B-Preview');
+    const stream = this.streamChat(messages, systemPrompt, 'Qwen/Qwen3-32B-TEE');
 
     for await (const chunk of stream) {
       if (chunk.type === 'content') {
@@ -505,8 +505,8 @@ export class ChutesService {
     const { width, height } = this.getImageDimensions(request.aspectRatio);
     let body: any = { prompt: request.prompt, width, height };
 
-    // Model Specific Logic
-    if (request.modelId === 'qwen-image-2.5-12b') {
+    // Model Specific Logic (updated for vonkaiser endpoints)
+    if (request.modelId === 'qwen-image-2512') {
       body = {
         model: "Qwen-Image-2512",
         prompt: request.prompt,
@@ -516,56 +516,40 @@ export class ChutesService {
         height,
         num_inference_steps: 50
       };
-    } else if (request.modelId === 'qwen-image') {
+    } else if (request.modelId === 'z-image-turbo') {
+      // Z-Image Turbo does NOT accept width/height params
       body = {
-        model: "qwen-image",
+        prompt: request.prompt
+      };
+    } else if (request.modelId === 'flux') {
+      // ImageClassic bundle — FLUX.1 schnell (1-4 steps, no negative prompt needed)
+      body = {
+        model: "flux",
         prompt: request.prompt,
-        negative_prompt: "blur, distortion, low quality, ugly, deformed",
-        guidance_scale: 7.5,
         width,
         height,
-        num_inference_steps: 50
-      };
-    } else if (request.modelId === 'juggernaut-xl') {
-      body = {
-        model: "JuggernautXL-Ragnarok",
-        prompt: request.prompt,
-        negative_prompt: "blur, distortion, low quality, ugly, deformed",
-        guidance_scale: 7.5,
-        width,
-        height,
-        num_inference_steps: 50
-      };
-    } else if (request.modelId === 'flux-schnell') {
-      body = {
-        model: "FLUX.1-schnell",
-        prompt: request.prompt,
-        negative_prompt: "blur, distortion, low quality, ugly, deformed",
-        guidance_scale: 7.5,
-        width,
-        height,
-        num_inference_steps: 50
-      };
-    } else if (request.modelId === 'hidream') {
-      body = {
         seed: null,
+        num_inference_steps: 4
+      };
+    } else if (['dreamshaper', 'ilustmix', 'juggernaut'].includes(request.modelId || '')) {
+      // ImageClassic bundle — SDXL models (25 steps, supports negative prompt)
+      body = {
+        model: request.modelId,
         prompt: request.prompt,
+        negative_prompt: "blur, distortion, low quality, ugly, deformed",
+        guidance_scale: 7.5,
         width,
         height,
-        resolution: `${width}x${height}`,
-        guidance_scale: 5,
-        num_inference_steps: 50
+        seed: null,
+        num_inference_steps: 25
       };
     } else if (!request.modelId && request.modelUrl) {
       // Custom Model Fallback "Smart Payload"
-      // We try to send a superset of common fields. 
-      // Most well-behaved APIs will ignore extra fields.
       body = {
         prompt: request.prompt,
-        model: "custom", // Some APIs require this field to be present
+        model: "custom",
         width,
         height,
-        resolution: `${width}x${height}`,
         guidance_scale: 7.5,
         num_inference_steps: 40,
         negative_prompt: "blur, low quality"

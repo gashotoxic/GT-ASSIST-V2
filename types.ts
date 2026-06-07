@@ -145,7 +145,7 @@ export const RESPONSE_FORMAT_CONTEXT = `Response format (mandatory unless the us
 
 export const DEFAULT_SYSTEM_PROMPT = "You answer concisely and clearly.";
 
-export const BRAND_STUDIO_MODEL_ID = 'moonshotai/Kimi-K2.5-TEE';
+export const BRAND_STUDIO_MODEL_ID = 'Nemotron-3-Nano-Omni-30B-TEE';
 
 export const NORMAL_CHAT_APP_FEATURES_CONTEXT = `App features and how to use them (no model names):
 - Media > Image: write a prompt, optionally enable Magic Enhance, then click Generate Image. For text-heavy posters, keep wording short and clear.
@@ -164,30 +164,25 @@ export type AvailableModel = {
 };
 
 export const AVAILABLE_MODELS: AvailableModel[] = [
-  { id: "deepseek-ai/DeepSeek-R1-0528-TEE", name: "🧠 DeepSeek R1", shortName: "DeepSeek R1" },
+  { id: "Nemotron-3-Nano-Omni-30B-TEE", name: "🧠👁️ Nemotron 3 Omni (30B)", shortName: "Nemotron 3", supportsVision: true },
   { id: "deepseek-ai/DeepSeek-V3.2-TEE", name: "🧠 DeepSeek V3.2", shortName: "DeepSeek V3.2" },
-  { id: "deepseek-ai/DeepSeek-V3.2-Speciale-TEE", name: "🧠 DeepSeek V3.2 Speciale", shortName: "DeepSeek V3.2 Sp" },
-  { id: "Qwen/Qwen2.5-VL-72B-Instruct-TEE", name: "🧠👁️ Qwen 2.5 VL (72B)", shortName: "Qwen 2.5 VL", supportsVision: true },
-  { id: "Qwen/Qwen3.5-397B-A17B-TEE", name: "🧠👁️ Qwen 3.5 (397B)", shortName: "Qwen 3.5", supportsVision: true, badge: "NEW" },
-  { id: "OpenGVLab/InternVL3-78B-TEE", name: "🧠👁️ InternVL 3 (78B)", shortName: "InternVL 3", supportsVision: true },
-  { id: "zai-org/GLM-4.6V", name: "🧠👁️ GLM 4.6V", shortName: "GLM 4.6V", supportsVision: true },
-  { id: "zai-org/GLM-4.7-TEE", name: "🧠 GLM 4.7", shortName: "GLM 4.7" },
-  { id: "zai-org/GLM-5-TEE", name: "🧠 GLM 5", shortName: "GLM 5", badge: "NEW" },
-  { id: "openai/gpt-oss-120b-TEE", name: "🧠 GPT OSS 120B", shortName: "GPT OSS 120B" },
-  { id: "moonshotai/Kimi-K2.5-TEE", name: "🧠👁️ Kimi K2.5", shortName: "Kimi K2.5", supportsVision: true, badge: "NEW" },
-  { id: "moonshotai/Kimi-K2-Thinking-TEE", name: "🧠 Kimi K2 Thinking", shortName: "Kimi K2 Thinking" },
-  { id: "MiniMaxAI/MiniMax-M2.5-TEE", name: "🧠 MiniMax M2.5", shortName: "MiniMax M2.5", badge: "NEW" },
-  { id: "MiniMaxAI/MiniMax-M2.1-TEE", name: "🧠 MiniMax M2.1", shortName: "MiniMax M2.1" },
-  { id: "NousResearch/DeepHermes-3-Mistral-24B-Preview", name: "Nous Hermes 3 Mistral", shortName: "Hermes 3 Mistral" },
-  { id: "XiaomiMiMo/MiMo-V2-Flash", name: "Xiaomi MiMo V2 Flash", shortName: "MiMo V2 Flash" }
+  { id: "moonshotai/Kimi-K2.5-TEE", name: "🧠👁️ Kimi K2.5", shortName: "Kimi K2.5", supportsVision: true },
+  { id: "moonshotai/Kimi-K2.6-TEE", name: "🧠👁️ Kimi K2.6", shortName: "Kimi K2.6", supportsVision: true, badge: "NEW" },
+  { id: "google/gemma-4-31B-turbo-TEE", name: "🧠👁️ Gemma 4 (31B)", shortName: "Gemma 4", supportsVision: true, badge: "NEW" },
+  { id: "Qwen/Qwen3.6-27B-TEE", name: "🧠👁️ Qwen 3.6 (27B)", shortName: "Qwen 3.6", supportsVision: true, badge: "NEW" },
+  { id: "Qwen/Qwen3.5-397B-A17B-TEE", name: "🧠👁️ Qwen 3.5 (397B)", shortName: "Qwen 3.5", supportsVision: true },
+  { id: "Qwen/Qwen3-32B-TEE", name: "🧠 Qwen 3 (32B)", shortName: "Qwen 3 32B" },
+  { id: "zai-org/GLM-5-TEE", name: "🧠 GLM 5", shortName: "GLM 5" },
+  { id: "zai-org/GLM-5.1-TEE", name: "🧠 GLM 5.1", shortName: "GLM 5.1", badge: "NEW" },
 ];
 
 export const BRAND_VISION_MODEL_IDS = [
+  "Nemotron-3-Nano-Omni-30B-TEE",
   "moonshotai/Kimi-K2.5-TEE",
-  "zai-org/GLM-4.6V",
-  "Qwen/Qwen2.5-VL-72B-Instruct-TEE",
+  "moonshotai/Kimi-K2.6-TEE",
+  "google/gemma-4-31B-turbo-TEE",
+  "Qwen/Qwen3.6-27B-TEE",
   "Qwen/Qwen3.5-397B-A17B-TEE",
-  "OpenGVLab/InternVL3-78B-TEE",
 ] as const;
 
 export const getModelInfo = (modelId: string) => AVAILABLE_MODELS.find(m => m.id === modelId);
@@ -201,22 +196,20 @@ export const getModelShortName = (modelId: string) => {
 };
 
 export const AVAILABLE_IMAGE_MODELS = [
-  { id: "qwen-image-2.5-12b", name: "Qwen Image 2.5 (12B)", url: "https://image.chutes.ai/generate" },
-  { id: "hunyuan", name: "Hunyuan Image 3", url: "https://chutes-hunyuan-image-3.chutes.ai/generate" },
-  { id: "qwen-image", name: "Qwen Image", url: "https://image.chutes.ai/generate" },
-  { id: "z-image-turbo", name: "Z-Image Turbo", url: "https://chutes-z-image-turbo.chutes.ai/generate", maxLength: 450 },
-  { id: "hidream", name: "HiDream", url: "https://chutes-hidream.chutes.ai/generate" },
-  { id: "juggernaut-xl", name: "Juggernaut XL Ragnarok", url: "https://image.chutes.ai/generate" },
-  { id: "flux-schnell", name: "FLUX.1 Schnell", url: "https://image.chutes.ai/generate" },
+  { id: "qwen-image-2512", name: "Qwen Image 2512", url: "https://vonkaiser-qwen-image-2512.chutes.ai/generate" },
+  { id: "z-image-turbo", name: "Z-Image Turbo", url: "https://vonkaiser-z-image-turbo.chutes.ai/generate", maxLength: 450 },
+  { id: "flux", name: "FLUX.1 Schnell", url: "https://vonkaiser-imageclassic.chutes.ai/generate" },
+  { id: "dreamshaper", name: "Dreamshaper XL", url: "https://vonkaiser-imageclassic.chutes.ai/generate" },
+  { id: "ilustmix", name: "iLustMix v80", url: "https://vonkaiser-imageclassic.chutes.ai/generate" },
+  { id: "juggernaut", name: "Juggernaut XL Ragnarok", url: "https://vonkaiser-imageclassic.chutes.ai/generate" },
 ];
 
 export const AVAILABLE_EDIT_MODELS = [
-  { id: "qwen-image-edit-2.5", name: "Qwen Magic Edit 2.5", url: "https://chutes-qwen-image-edit-2511.chutes.ai/generate" },
-  { id: "qwen-image-edit", name: "Qwen Magic Edit", url: "https://chutes-qwen-image-edit-2509.chutes.ai/generate" }
+  { id: "qwen-image-edit", name: "Qwen Magic Edit", url: "https://vonkaiser-qwen-image-edit-2511.chutes.ai/generate" }
 ];
 
 export const AVAILABLE_VIDEO_MODELS = [
-  { id: "wan-2.2-i2v", name: "Wan 2.2 I2V (Fast)", url: "https://chutes-wan-2-2-i2v-14b-fast.chutes.ai/generate", type: 'i2v' },
+  { id: "wan-2.2-i2v", name: "Wan 2.2 I2V (Fast)", url: "https://vonkaiser-turbowani2v.chutes.ai/generate", type: 'i2v' },
   { id: "wan-2.1-t2v", name: "Wan 2.1 T2V (14B)", url: "https://chutes-wan2-1-14b.chutes.ai/text2video", type: 't2v' },
   { id: "ltx-2-i2v", name: "LTX-2 (I2V)", url: "https://chutes-ltx-2.chutes.ai/generate", type: 'i2v' },
   { id: "ltx-2-t2v", name: "LTX-2 (T2V)", url: "https://chutes-ltx-2.chutes.ai/generate", type: 't2v' }
