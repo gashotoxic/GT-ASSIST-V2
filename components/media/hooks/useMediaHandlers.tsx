@@ -41,6 +41,10 @@ export const useMediaHandlers = ({
   setSelectedMediaItem,
   setCapturedFrame,
   setEditPrompt,
+  editMode,
+  stylePreset,
+  editHistory,
+  setEditHistory,
   setLipsyncVideoInput,
   setLipsyncVideoPreviewKind,
   setLipsyncVideoPreviewUrl,
@@ -88,6 +92,10 @@ export const useMediaHandlers = ({
   setLipsyncVideoPreviewKind: (v: 'video' | null) => void;
   setLipsyncVideoPreviewUrl: (v: string | null) => void;
   setLipsyncVideoUrl: (v: string) => void;
+    editMode: 'smart' | 'remove_bg' | 'upscale' | 'style_transfer';
+    stylePreset: string;
+    editHistory: string[];
+    setEditHistory: (v: string[] | ((prev: string[]) => string[])) => void;
 }) => {
   const handleImageGeneration = useCallback(async () => {
     if (!imagePrompt) return;
@@ -407,6 +415,75 @@ export const useMediaHandlers = ({
     setEditPrompt(prompt);
   }, [setEditPrompt]);
 
+  // NEW: handleAdvancedEdit — calls editImageAdvanced with editMode
+  const handleAdvancedEdit = useCallback(async (editMode: string, stylePreset?: string) => {
+    if (!editSourceImage) return;
+
+    if (!await deductCredits('edit', editMode === 'upscale' ? 'upscale' : 'qwen-image-edit')) {
+      alert('Insufficient credits. Please add more credits to continue.');
+      return;
+    }
+
+    const signal = startGeneration('edit');
+    setEditedImageUrl(null);
+    setEditedImageItem(null);
+
+    try {
+      const modelUrl = AVAILABLE_EDIT_MODELS[0].url;
+      const rawBlob = await chutesService.editImageAdvanced({
+        prompt: editPrompt,
+        image_b64: editSourceImage,
+        modelUrl,
+        aspectRatio: editAspectRatio,
+        editMode: editMode as any,
+        stylePreset: stylePreset as any,
+      }, signal);
+
+      const item = await addToHistory(rawBlob, 'image', editPrompt + ` (${editMode})`);
+      setEditedImageUrl(item.url);
+      setEditedImageItem(item);
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        updateGenStatus('edit', { error: err?.message || 'Edit failed' });
+        try { await supabaseService.refundCredits?.(userId, getCreditCost('edit', editMode === 'upscale' ? 'upscale' : 'qwen-image-edit')); } catch {}
+      }
+    } finally {
+      if (!signal.aborted) updateGenStatus('edit', { isGenerating: false, progress: 100 });
+    }
+  }, [
+    addToHistory, chutesService, deductCredits, editAspectRatio, editPrompt,
+    editSourceImage, setEditedImageItem, setEditedImageUrl,
+    startGeneration, updateGenStatus,
+  ]);
+
+  // NEW: handleEditAgain — push current result to editHistory, set as new source
+  const handleEditAgain = useCallback(() => {
+    if (!editedImageUrl) return;
+    setEditHistory((prev: string[]) => [...prev, editSourceImage || '']);
+    setEditSourceImage(editedImageUrl);
+    setEditedImageUrl(null);
+    setEditedImageItem(null);
+    updateGenStatus('edit', { error: null });
+    setActiveTab('edit');
+  }, [
+    editedImageUrl, editSourceImage, setEditHistory,
+    setEditSourceImage, setEditedImageUrl, setEditedImageItem,
+    updateGenStatus, setActiveTab,
+  ]);
+
+  // NEW: handleUndo — pop last source from editHistory
+  const handleUndo = useCallback(() => {
+    if (editHistory.length === 0) return;
+    const previousSource = editHistory[editHistory.length - 1];
+    setEditHistory((prev: string[]) => prev.slice(0, -1));
+    setEditSourceImage(previousSource);
+    setEditedImageUrl(null);
+    setEditedImageItem(null);
+  }, [
+    editHistory, setEditHistory, setEditSourceImage,
+    setEditedImageUrl, setEditedImageItem,
+  ]);
+
   return {
     handleImageGeneration,
     handleEditGeneration,
@@ -419,6 +496,9 @@ export const useMediaHandlers = ({
     handleUsePreviewVideoForLipSync,
     handleExtendVideo,
     applyQuickEdit,
+    handleAdvancedEdit,
+    handleEditAgain,
+    handleUndo,
   };
 };
 

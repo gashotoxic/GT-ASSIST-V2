@@ -14,6 +14,9 @@ export const MediaFooterActions: React.FC<{
   handleCaptureCurrentFrame: () => void;
   handleExtendVideo: () => void;
   handleUsePreviewVideoForLipSync: () => void;
+  editHistory?: string[];
+  onEditAgain?: () => void;
+  onUndo?: () => void;
 }> = ({
   activeTab,
   generatedImageUrl,
@@ -24,6 +27,9 @@ export const MediaFooterActions: React.FC<{
   handleCaptureCurrentFrame,
   handleExtendVideo,
   handleUsePreviewVideoForLipSync,
+  editHistory = [],
+  onEditAgain,
+  onUndo,
 }) => {
   return (
     <div className="mt-6 flex flex-col xs:flex-row xs:flex-wrap items-stretch xs:items-center justify-end gap-2 xs:gap-3 pb-8 lg:pb-0">
@@ -43,6 +49,14 @@ export const MediaFooterActions: React.FC<{
 
       {activeTab === 'edit' && editedImageUrl && (
         <>
+          <Button variant="glass" onClick={onEditAgain}>
+            <Scissors className="w-4 h-4 mr-2 text-purple-500" /> Edit Again{editHistory.length > 0 ? ` (${editHistory.length})` : ''}
+          </Button>
+          {editHistory.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={onUndo} className="text-xs text-gray-400">
+              <Scissors className="w-3 h-3 mr-1" /> Undo
+            </Button>
+          )}
           <Button variant="glass" onClick={() => transferToVideo(editedImageUrl)}>
             <Film className="w-4 h-4 mr-2 text-blue-500" /> Animate
           </Button>

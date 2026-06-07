@@ -33,6 +33,9 @@ export const CREDIT_COSTS = {
   },
   edit: {
     'qwen-image-edit': 1,
+    'remove_bg': 1,
+    'upscale': 2,
+    'style_transfer': 1,
     default: 1
   },
   // Media studio operations

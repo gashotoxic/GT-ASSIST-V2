@@ -23,6 +23,8 @@ export const MediaPreviewContent: React.FC<{
   onOpenItem: (item: MediaItem) => void;
   toggleFullscreen: () => void;
   handleCaptureCurrentFrame: () => void;
+  showBeforeAfter?: boolean;
+  sourceImageUrl?: string | null;
 }> = ({
   activeTab,
   genStatus,
@@ -35,6 +37,8 @@ export const MediaPreviewContent: React.FC<{
   onOpenItem,
   toggleFullscreen,
   handleCaptureCurrentFrame,
+  showBeforeAfter = false,
+  sourceImageUrl,
 }) => {
   return (
     <>
@@ -75,17 +79,48 @@ export const MediaPreviewContent: React.FC<{
           />
         </button>
       ) : activeTab === 'edit' && editedImageUrl ? (
-        <button
-          type="button"
-          onClick={() => editedImageItem && onOpenItem(editedImageItem)}
-          className="w-full sm:h-full flex items-start sm:items-center justify-center"
-        >
-          <img
-            src={editedImageUrl}
-            alt="Edited"
-            className="w-full h-auto sm:w-auto sm:max-w-full sm:max-h-full object-contain shadow-2xl rounded-lg cursor-zoom-in"
-          />
-        </button>
+        <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+          {showBeforeAfter && sourceImageUrl && (
+            <div className="flex items-center gap-4 mb-2">
+              <div className="flex items-center gap-1 text-xs text-gray-500">
+                <div className="w-3 h-3 rounded-full bg-blue-400" />
+                <span>Before</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-gray-500">
+                <div className="w-3 h-3 rounded-full bg-green-400" />
+                <span>After</span>
+              </div>
+            </div>
+          )}
+          <div className={`flex ${showBeforeAfter && sourceImageUrl ? 'gap-3 w-full' : ''} items-center justify-center`}>
+            {showBeforeAfter && sourceImageUrl && (
+              <div className="w-1/2 flex flex-col items-center">
+                <span className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide">Before</span>
+                <img
+                  src={sourceImageUrl}
+                  alt="Before"
+                  className="w-full h-auto max-h-[30vh] object-contain rounded-lg border border-blue-300/30 opacity-80"
+                />
+              </div>
+            )}
+            <div className={showBeforeAfter && sourceImageUrl ? 'w-1/2' : ''}>
+              {showBeforeAfter && sourceImageUrl && (
+                <span className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide text-center block">After</span>
+              )}
+              <button
+                type="button"
+                onClick={() => editedImageItem && onOpenItem(editedImageItem)}
+                className="w-full flex items-start sm:items-center justify-center"
+              >
+                <img
+                  src={editedImageUrl}
+                  alt="Edited"
+                  className={`${showBeforeAfter && sourceImageUrl ? 'w-full h-auto max-h-[30vh]' : 'w-full h-auto sm:w-auto sm:max-w-full sm:max-h-full'} object-contain shadow-2xl rounded-lg cursor-zoom-in`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
       ) : activeTab === 'video' && generatedVideoUrl ? (
         <div className="relative w-full h-full flex items-center justify-center bg-black/40 rounded-lg overflow-hidden group/video">
           <video

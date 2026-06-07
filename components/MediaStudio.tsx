@@ -65,6 +65,10 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
 
     // Image Edit State
     const [editPrompt, setEditPrompt] = useState('');
+    const [editMode, setEditMode] = useState<'smart' | 'remove_bg' | 'upscale' | 'style_transfer'>('smart');
+    const [stylePreset, setStylePreset] = useState('cyberpunk');
+    const [editHistory, setEditHistory] = useState<string[]>([]);
+    const [showBeforeAfter, setShowBeforeAfter] = useState(false);
     const [editSourceImage, setEditSourceImage] = useState<string | null>(null);
     const [editAspectRatio, setEditAspectRatio] = useState<ImageAspectRatio>('1:1');
     const [editedImageUrl, setEditedImageUrl] = useState<string | null>(null);
@@ -296,6 +300,9 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         handleUsePreviewVideoForLipSync,
         handleExtendVideo,
         applyQuickEdit,
+        handleAdvancedEdit,
+        handleEditAgain,
+        handleUndo,
     } = useMediaHandlers({
         chutesService,
         addToHistory,
@@ -339,6 +346,10 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         setLipsyncVideoPreviewKind,
         setLipsyncVideoPreviewUrl,
         setLipsyncVideoUrl,
+        editMode,
+        stylePreset,
+        editHistory,
+        setEditHistory,
     });
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
@@ -463,14 +474,30 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                     setEditAspectRatio={setEditAspectRatio}
                                     editPrompt={editPrompt}
                                     setEditPrompt={setEditPrompt}
+                                    editMode={editMode}
+                                    setEditMode={setEditMode}
+                                    stylePreset={stylePreset}
+                                    setStylePreset={setStylePreset}
                                     applyQuickEdit={applyQuickEdit}
                                     isAuthenticated={isAuthenticated}
                                     onRequestAuth={onRequestAuth}
-                                    onGenerate={handleEditGeneration}
+                                    onGenerate={() => {
+                                        if (editMode === 'smart') {
+                                            handleEditGeneration();
+                                        } else {
+                                            handleAdvancedEdit(editMode, stylePreset);
+                                        }
+                                    }}
                                     canAfford={canAfford}
                                     genStatus={genStatus.edit}
                                     Progress={Progress}
                                     downloadBase64={downloadBase64}
+                                    editHistory={editHistory}
+                                    onEditAgain={handleEditAgain}
+                                    onUndo={handleUndo}
+                                    onPickFromGallery={() => {
+                                        setIsMediaPickerOpen(true);
+                                    }}
                                 />
                             )}
 
@@ -601,6 +628,8 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                     onOpenItem={setSelectedMediaItem}
                                     toggleFullscreen={toggleFullscreen}
                                     handleCaptureCurrentFrame={handleCaptureCurrentFrame}
+                                    showBeforeAfter={activeTab === 'edit' && showBeforeAfter}
+                                    sourceImageUrl={editHistory.length > 0 ? editHistory[editHistory.length - 1] : null}
                                 />
                             </div>
 
@@ -614,6 +643,9 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                 handleCaptureCurrentFrame={handleCaptureCurrentFrame}
                                 handleExtendVideo={handleExtendVideo}
                                 handleUsePreviewVideoForLipSync={handleUsePreviewVideoForLipSync}
+                                editHistory={editHistory}
+                                onEditAgain={handleEditAgain}
+                                onUndo={handleUndo}
                             />
                         </div>
                     </div>
@@ -657,11 +689,24 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                 title="Select from Gallery"
                 isOpen={isMediaPickerOpen}
                 items={mediaHistory}
-                filter="video"
+                filter={activeTab === 'edit' ? 'all' : 'video'}
                 onClose={() => setIsMediaPickerOpen(false)}
                 onSelect={async (item) => {
                     setIsMediaPickerOpen(false);
-                    await transferToLipSyncFromVideo(item.url);
+                    if (activeTab === 'edit') {
+                        const url = item.url;
+                        try {
+                            const response = await fetch(url);
+                            const blob = await response.blob();
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                setEditSourceImage(reader.result as string);
+                            };
+                            reader.readAsDataURL(blob);
+                        } catch {}
+                    } else {
+                        await transferToLipSyncFromVideo(item.url);
+                    }
                 }}
             />
 

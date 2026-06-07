@@ -604,6 +604,60 @@ export class ChutesService {
     return await response.blob();
   }
 
+  async editImageAdvanced(request: ImageEditRequest, signal?: AbortSignal): Promise<Blob> {
+    let cleanImage = request.image_b64;
+    if (cleanImage.includes('base64,')) {
+      cleanImage = cleanImage.split('base64,')[1];
+    }
+
+    // Build prompt based on edit mode
+    let finalPrompt = request.prompt;
+    const mode = request.editMode || 'smart';
+    const stylePreset = request.stylePreset;
+
+    if (mode === 'remove_bg') {
+      finalPrompt = 'Remove the background from this image, keep only the subject, make background transparent or white.';
+    } else if (mode === 'upscale') {
+      finalPrompt = 'Upscale this image to higher resolution, enhance details, make it crisp, sharp and clear with no artifacts.';
+    } else if (mode === 'style_transfer' && stylePreset) {
+      const styleMap: Record<string, string> = {
+        cyberpunk: 'Apply cyberpunk style: neon lights, dark atmosphere, blue/pink color scheme, futuristic',
+        oil_painting: 'Apply oil painting style: thick brush strokes, rich textures, artistic, classical painting look',
+        sketch: 'Apply sketch style: pencil drawing, black and white, line art, hand-drawn look',
+        anime: 'Apply anime style: cel-shaded, vibrant colors, Japanese animation aesthetic, clean lines',
+        vintage: 'Apply vintage style: sepia tones, retro, old photograph look, film grain',
+        neon: 'Apply neon style: glowing neon lines, dark background, bright fluorescent colors, 80s aesthetic',
+      };
+      finalPrompt = `${styleMap[stylePreset] || 'Apply artistic style'}. ${request.prompt || ''}`.trim();
+    }
+
+    const { width, height } = this.getImageDimensions(request.aspectRatio);
+    const body = {
+      seed: null,
+      width,
+      height,
+      prompt: finalPrompt,
+      image_b64s: [cleanImage],
+      true_cfg_scale: 4,
+      negative_prompt: "",
+      num_inference_steps: mode === 'remove_bg' ? 30 : mode === 'upscale' ? 50 : 40
+    };
+
+    const response = await this.fetchWithRetry(request.modelUrl, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(body),
+      signal
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Image Edit Error: ${response.status} - ${errorText}`);
+    }
+
+    return await response.blob();
+  }
+
   async generateVideo(request: VideoGenRequest, signal?: AbortSignal): Promise<Blob> {
     let body: any = {};
     let isLtx2 = false;

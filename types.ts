@@ -277,6 +277,8 @@ export interface ImageEditRequest {
   image_b64: string;
   modelUrl: string;
   aspectRatio?: ImageAspectRatio;
+  editMode?: EditMode;
+  stylePreset?: StylePreset;
 }
 
 export interface VideoGenRequest {
@@ -305,3 +307,16 @@ export interface MuseTalkLipSyncRequest {
 }
 
 export type ImageAspectRatio = '1:1' | '16:9' | '9:16' | '4:3';
+
+export type EditMode = 'smart' | 'remove_bg' | 'upscale' | 'style_transfer';
+
+export const STYLE_PRESETS = [
+  { id: 'cyberpunk', name: 'Cyberpunk' },
+  { id: 'oil_painting', name: 'Oil Painting' },
+  { id: 'sketch', name: 'Sketch' },
+  { id: 'anime', name: 'Anime' },
+  { id: 'vintage', name: 'Vintage' },
+  { id: 'neon', name: 'Neon' },
+] as const;
+
+export type StylePreset = typeof STYLE_PRESETS[number]['id'];
