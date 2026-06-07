@@ -809,6 +809,38 @@ export class SupabaseService {
     }
   }
 
+  async refundCredits(userId: string, amount: number): Promise<void> {
+    if (!this.client) return;
+    try {
+      // Add credits back by calling deduct with negative amount
+      // or directly updating the user's credits
+      const { data: user, error: fetchError } = await this.client
+        .from('users')
+        .select('credits')
+        .eq('id', userId)
+        .single();
+      
+      if (fetchError || !user) {
+        console.error('Could not fetch user for credit refund:', fetchError);
+        return;
+      }
+      
+      const { error: updateError } = await this.client
+        .from('users')
+        .update({ credits: (user.credits || 0) + amount })
+        .eq('id', userId);
+      
+      if (updateError) {
+        console.error('Credit refund failed:', updateError);
+      } else {
+        console.log(`Refunded ${amount} credits to user ${userId}`);
+      }
+    } catch (err) {
+      console.error('Credit refund error:', err);
+    }
+  }
+
+
   async addCredits(userId: string, amount: number, action: string = 'refund', purchaseId?: string): Promise<boolean> {
     if (!this.client) throw new Error('Supabase client not initialized');
     try {

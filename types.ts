@@ -161,6 +161,8 @@ export type AvailableModel = {
   shortName: string;
   supportsVision?: boolean;
   badge?: 'NEW';
+  disabled?: boolean;
+  type?: string; // for video models: 'i2v' | 't2v'
 };
 
 export const AVAILABLE_MODELS: AvailableModel[] = [
@@ -210,9 +212,9 @@ export const AVAILABLE_EDIT_MODELS = [
 
 export const AVAILABLE_VIDEO_MODELS = [
   { id: "wan-2.2-i2v", name: "Wan 2.2 I2V (Fast)", url: "https://vonkaiser-turbowani2v.chutes.ai/generate", type: 'i2v' },
-  { id: "wan-2.1-t2v", name: "Wan 2.1 T2V (14B)", url: "https://chutes-wan2-1-14b.chutes.ai/text2video", type: 't2v' },
-  { id: "ltx-2-i2v", name: "LTX-2 (I2V)", url: "https://chutes-ltx-2.chutes.ai/generate", type: 'i2v' },
-  { id: "ltx-2-t2v", name: "LTX-2 (T2V)", url: "https://chutes-ltx-2.chutes.ai/generate", type: 't2v' }
+  { id: "wan-2.1-t2v", name: "Wan 2.1 T2V — Coming Soon", url: "https://chutes-wan2-1-14b.chutes.ai/text2video", type: 't2v', disabled: true },
+  { id: "ltx-2-i2v", name: "LTX-2 I2V — Coming Soon", url: "https://chutes-ltx-2.chutes.ai/generate", type: 'i2v', disabled: true },
+  { id: "ltx-2-t2v", name: "LTX-2 T2V — Coming Soon", url: "https://chutes-ltx-2.chutes.ai/generate", type: 't2v', disabled: true }
 ];
 
 export interface Ltx2AdvancedSettings {

@@ -125,7 +125,11 @@ export const useMediaHandlers = ({
       setGeneratedImageUrl(item.url);
       setGeneratedImageItem(item);
     } catch (err: any) {
-      if (err?.name !== 'AbortError') updateGenStatus('image', { error: err?.message || 'Image generation failed' });
+      if (err?.name !== 'AbortError') {
+        updateGenStatus('image', { error: err?.message || 'Image generation failed' });
+        // Refund credits on failure
+        try { await supabaseService.refundCredits?.(userId, getCreditCost('image', selectedImageModel)); } catch {}
+      }
     } finally {
       if (!signal.aborted) updateGenStatus('image', { isGenerating: false, progress: 100 });
     }
@@ -168,7 +172,11 @@ export const useMediaHandlers = ({
       setEditedImageUrl(item.url);
       setEditedImageItem(item);
     } catch (err: any) {
-      if (err?.name !== 'AbortError') updateGenStatus('edit', { error: err?.message || 'Edit failed' });
+      if (err?.name !== 'AbortError') {
+        updateGenStatus('edit', { error: err?.message || 'Edit failed' });
+        // Refund credits on failure
+        try { await supabaseService.refundCredits?.(userId, getCreditCost('edit')); } catch {}
+      }
     } finally {
       if (!signal.aborted) updateGenStatus('edit', { isGenerating: false, progress: 100 });
     }
@@ -220,7 +228,11 @@ export const useMediaHandlers = ({
       setGeneratedVideoUrl(item.url);
       setGeneratedVideoItem(item);
     } catch (err: any) {
-      if (err?.name !== 'AbortError') updateGenStatus('video', { error: err?.message || 'Video generation failed' });
+      if (err?.name !== 'AbortError') {
+        updateGenStatus('video', { error: err?.message || 'Video generation failed' });
+        // Refund credits on failure
+        try { await supabaseService.refundCredits?.(userId, getCreditCost('video', selectedVideoModel)); } catch {}
+      }
     } finally {
       if (!signal.aborted) updateGenStatus('video', { isGenerating: false, progress: 100 });
     }
@@ -267,7 +279,11 @@ export const useMediaHandlers = ({
       setGeneratedVideoUrl(item.url);
       setGeneratedVideoItem(item);
     } catch (err: any) {
-      if (err?.name !== 'AbortError') updateGenStatus('video', { error: err?.message || 'Lip sync failed' });
+      if (err?.name !== 'AbortError') {
+        updateGenStatus('video', { error: err?.message || 'Lip sync failed' });
+        // Refund credits on failure
+        try { await supabaseService.refundCredits?.(userId, getCreditCost('video', 'musetalk')); } catch {}
+      }
     } finally {
       if (!signal.aborted) updateGenStatus('video', { isGenerating: false, progress: 100 });
     }

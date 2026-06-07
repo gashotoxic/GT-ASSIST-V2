@@ -15,12 +15,12 @@ export const CREDIT_COSTS = {
     default: 1
   },
   image: {
-    hunyuan: 1,
-    'qwen-image': 1,
+    'qwen-image-2512': 1,
     'z-image-turbo': 1,
-    hidream: 1,
-    'juggernaut-xl': 1,
-    'flux-schnell': 1,
+    'flux': 1,
+    'dreamshaper': 1,
+    'ilustmix': 1,
+    'juggernaut': 1,
     default: 1
   },
   video: {
