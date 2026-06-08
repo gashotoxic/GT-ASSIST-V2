@@ -54,17 +54,21 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+  const dataUrlVersions = useRef<Map<string, string>>(new Map());
   const zoomOffset = useRef({ x: 0, y: 0 }); // For calibrating screenToCanvas
 
   // Pre-load images when layers change — ensures sync rendering
   useEffect(() => {
     let cancelled = false;
     const loadPromises = layers
-      .filter(l => l.dataUrl && l.dataUrl.startsWith('data:') && !imageCache.current.has(l.id))
+      .filter(l => l.dataUrl && l.dataUrl.startsWith('data:') && (!imageCache.current.has(l.id) || dataUrlVersions.current.get(l.id) !== l.dataUrl))
       .map(layer => new Promise<void>((resolve) => {
         const img = new Image();
         img.onload = () => {
-          if (!cancelled) imageCache.current.set(layer.id, img);
+          if (!cancelled) {
+            imageCache.current.set(layer.id, img);
+            dataUrlVersions.current.set(layer.id, layer.dataUrl);
+          }
           resolve();
         };
         img.onerror = () => {
@@ -77,6 +81,7 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
     for (const key of imageCache.current.keys()) {
       if (!layers.find(l => l.id === key)) {
         imageCache.current.delete(key);
+        dataUrlVersions.current.delete(key);
       }
     }
 

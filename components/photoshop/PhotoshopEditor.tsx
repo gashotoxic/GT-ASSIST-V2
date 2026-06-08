@@ -295,6 +295,43 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       img.src = layer.dataUrl;
     } catch (e) { console.error('Adjustment error:', e); }
   }, [activeLayerId, layers, pushSnapshot, updateLayer]);
+  // AI handler — receives action + prompt, calls service, updates layer
+  const handleAIAction = useCallback(async (action: AIPhotoAction, prompt: string) => {
+    if (!isAuthenticated || !activeLayerId || aiGenerating) return;
+    const layer = layers.find(l => l.id === activeLayerId);
+    if (!layer || !layer.dataUrl) return;
+    setAiGenerating(true);
+    pushSnapshot(layers, 'AI: ' + action);
+    try {
+      const { aiGenerateImage, aiEditImage, aiRemoveBackground, aiUpscaleImage, aiStyleTransfer, aiSmartFill } = await import('../../services/aiPhotoService');
+      const config = { chutesService, deductCredits: deductCredits || (async () => true), onRequestAuth, isAuthenticated };
+      let blob: Blob | null = null;
+      switch (action) {
+        case 'generate': blob = await aiGenerateImage(config, prompt, '16:9'); break;
+        case 'edit': blob = await aiEditImage(config, layer.dataUrl, prompt); break;
+        case 'remove_bg': blob = await aiRemoveBackground(config, layer.dataUrl); break;
+        case 'upscale': blob = await aiUpscaleImage(config, layer.dataUrl, 2); break;
+        case 'style_transfer': blob = await aiStyleTransfer(config, layer.dataUrl, prompt); break;
+        case 'smart_fill': blob = await aiSmartFill(config, layer.dataUrl, prompt, ''); break;
+      }
+      if (blob) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const dataUrl = e.target?.result as string;
+          const img = new Image();
+          img.onload = () => {
+            if (action === 'generate') { addImageLayer(dataUrl, img.width, img.height); }
+            else { updateLayer(activeLayerId, { dataUrl, width: img.width, height: img.height }); }
+            pushSnapshot(layers, 'AI: ' + action + ' complete');
+          };
+          img.src = dataUrl;
+        };
+        reader.readAsDataURL(blob);
+      }
+    } catch (e) { console.error('AI error:', e); }
+    finally { setAiGenerating(false); }
+  }, [isAuthenticated, activeLayerId, layers, aiGenerating, pushSnapshot, addImageLayer, updateLayer, chutesService, deductCredits, onRequestAuth]);
+
   const handleFillLayer = useCallback(() => {
     if (!activeLayerId) return;
     const layer = layers.find(l => l.id === activeLayerId);

@@ -163,7 +163,7 @@ export interface ShapeSettings {
 // Gradient settings
 export interface GradientSettings {
   type: 'linear' | 'radial' | 'conic';
-  colors: { offset: number; color: string }[];
+  colorStops: { offset: number; color: string }[];
   angle: number;
   repeat: boolean;
 }
@@ -188,7 +188,7 @@ export const DEFAULT_SHAPE_SETTINGS: ShapeSettings = {
 
 export const DEFAULT_GRADIENT_SETTINGS: GradientSettings = {
   type: 'linear',
-  colors: [
+  colorStops: [
     { offset: 0, color: '#1abc9c' },
     { offset: 1, color: '#3498db' },
   ],
