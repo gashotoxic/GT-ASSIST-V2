@@ -71,6 +71,64 @@ The existing `services/chutes.ts` already has image generation and editing. The 
 
 ---
 
+## Auth & Credits Flow
+
+### Gating Architecture
+
+Every AI operation follows this flow:
+
+```
+User clicks AI feature
+    ↓
+Is user authenticated? ──No──→ Show auth modal (onRequestAuth())
+    ↓ Yes
+Does user have credits? ──No──→ Show "Out of credits" → upsell
+    ↓ Yes
+Deduct credits via supabaseService.deductCredits(userId, amount, 'photoshop_ai', model)
+    ↓ Success
+Call Chutes API endpoint
+    ↓ Success
+Update layer with result
+    ↓
+Push snapshot to undo history
+```
+
+### Props Needed on PhotoshopEditor
+
+```typescript
+interface PhotoshopEditorProps {
+  initialImageUrl?: string | null;
+  onExport?: (blob: Blob) => void;
+  onClose?: () => void;
+  // Auth & credits (passed from parent MediaStudio)
+  isAuthenticated?: boolean;
+  onRequestAuth?: () => void;
+  userId?: string | null;
+  supabaseService?: any; // For credit deduction
+  chutesService?: any;   // For API calls
+  deductCredits?: (type: string, model?: string) => Promise<boolean>;
+}
+```
+
+### Credit Cost Configuration
+
+Add to `services/creditCosts.ts`:
+
+```typescript
+photoshop_ai: {
+  generate: 5,
+  edit: 3,
+  remove_bg: 2,
+  upscale_2x: 3,
+  upscale_4x: 4,
+  smart_fill: 3,
+  style_transfer: 3,
+  default: 3
+}
+```
+
+---
+
 ## Technical Details
 
 ### Prompt Generation
