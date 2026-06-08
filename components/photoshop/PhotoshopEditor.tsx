@@ -24,6 +24,9 @@ import { StrokeSettingsPanel } from './tools/StrokeSettingsPanel';
 import { BrushTool } from './tools/BrushTool';
 import { ShapeTool } from './tools/ShapeTool';
 import { GradientTool } from './tools/GradientTool';
+import { TextTool } from './tools/TextTool';
+import { TextInputDialog } from './tools/TextInputDialog';
+import { renderTextOnCanvas } from './tools/textUtils';
 import { applyPaintOnCanvas } from './tools/colorUtils';
 import { drawShapeOnCanvas, drawGradientOnCanvas } from './tools/shapeUtils';
 
@@ -59,6 +62,15 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [currentColor, setCurrentColor] = useState<ColorState>(DEFAULT_COLOR);
   const [shapeSettings, setShapeSettings] = useState<ShapeSettings>(DEFAULT_SHAPE_SETTINGS);
   const [gradientSettings, setGradientSettings] = useState<GradientSettings>(DEFAULT_GRADIENT_SETTINGS);
+  const [textFont, setTextFont] = useState('Arial');
+  const [textSize, setTextSize] = useState(48);
+  const [textWeight, setTextWeight] = useState<'light' | 'regular' | 'bold' | 'black'>('bold');
+  const [textStyle, setTextStyle] = useState<'normal' | 'italic'>('normal');
+  const [textColor, setTextColor] = useState('#ffffff');
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('center');
+  const [textLineHeight, setTextLineHeight] = useState(1.2);
+  const [textBgColor, setTextBgColor] = useState<string | undefined>(undefined);
+  const [textInputOpen, setTextInputOpen] = useState(false);
   const [brushMode, setBrushMode] = useState<'brush' | 'eraser' | 'fill'>('brush');
   const [isDrawing, setIsDrawing] = useState(false);
   const drawStartPos = useRef({ x: 0, y: 0 });
@@ -67,6 +79,14 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [resizeDialogOpen, setResizeDialogOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  // Open text input dialog
+  const handleAddText = useCallback(() => {
+    setTextInputOpen(true);
+  }, []);
+
+  // Handle text tool canvas click — open dialog and set position
+  // (Text is rendered on a new layer after the dialog confirms)
+
   // Open ResizeDialog when resize tool is selected in toolbar
   useEffect(() => {
     if (activeTool === 'resize') {
@@ -608,6 +628,26 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
               <ColorPicker color={currentColor} onChange={(c) => { setCurrentColor(c); setShapeSettings(s => ({ ...s, fillColor: c.hex, strokeColor: c.hex })); }} />
               <ShapeTool settings={shapeSettings} color={currentColor} onChange={setShapeSettings} />
             </div>
+          ) : activeTool === 'text' ? (
+            <div className="border-b border-slate-700/50">
+              <ColorPicker color={currentColor} onChange={(c) => { setCurrentColor(c); setTextColor(c.hex); }} />
+              <TextTool
+                fontFamily={textFont} fontSize={textSize} fontWeight={textWeight}
+                fontStyle={textStyle} color={textColor} textAlign={textAlign}
+                lineHeight={textLineHeight} bgColor={textBgColor}
+                onChange={(p) => {
+                  if (p.fontFamily !== undefined) setTextFont(p.fontFamily);
+                  if (p.fontSize !== undefined) setTextSize(p.fontSize);
+                  if (p.fontWeight !== undefined) setTextWeight(p.fontWeight as any);
+                  if (p.fontStyle !== undefined) setTextStyle(p.fontStyle as any);
+                  if (p.color !== undefined) setTextColor(p.color);
+                  if (p.textAlign !== undefined) setTextAlign(p.textAlign as any);
+                  if (p.lineHeight !== undefined) setTextLineHeight(p.lineHeight);
+                  if (p.bgColor !== undefined) setTextBgColor(p.bgColor);
+                }}
+                onAddText={handleAddText}
+              />
+            </div>
           ) : activeTool === 'gradient' ? (
             <div className="border-b border-slate-700/50">
               <GradientTool settings={gradientSettings} color={currentColor} onChange={setGradientSettings} />
@@ -686,6 +726,27 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
           >Fit</button>
         </div>
       </div>
+      {textInputOpen && (
+        <TextInputDialog
+          fontFamily={textFont} fontSize={textSize} fontWeight={textWeight}
+          fontStyle={textStyle} color={textColor} textAlign={textAlign}
+          onConfirm={(txt) => {
+            setTextInputOpen(false);
+            // Create new layer with rendered text
+            const tf = textFont; const ts = textSize; const tw = textWeight;
+            const tst = textStyle; const tc = textColor; const ta = textAlign;
+            const tlh = textLineHeight; const tbg = textBgColor;
+            try {
+              const c = renderTextOnCanvas(txt, tf, ts, tw, tst, tc, ta, tlh, tbg);
+              addImageLayer(c.toDataURL(), c.width, c.height);
+              pushSnapshot(layers, 'Add text');
+            } catch (e) {
+              console.error('Text render error:', e);
+            }
+          }}
+          onClose={() => setTextInputOpen(false)}
+        />
+      )}
       {resizeDialogOpen && (
         <ResizeDialog
           width={canvas.width}
