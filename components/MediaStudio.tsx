@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Image, Film, Loader2, Wand2, Upload, AlertCircle, Play, Scissors, ArrowRight, Video, XCircle, Camera, X, Check, Grid, Filter, Type, FileImage, Trash2 } from 'lucide-react';
+import { Image, Film, Loader2, Wand2, Upload, AlertCircle, Play, Scissors, ArrowRight, Video, XCircle, Camera, X, Check, Grid, Filter, Type, FileImage, Trash2, Layers } from 'lucide-react';
 import { Button, Input, Textarea, Select, Label } from './UI';
 import { AVAILABLE_VIDEO_MODELS, AppSettings, MediaItem, ImageAspectRatio, Ltx2AdvancedSettings } from '../types';
 import { getCreditCost } from '../services/creditCosts';
@@ -20,6 +20,7 @@ import { MediaCaptureFrameModal } from './media/MediaCaptureFrameModal';
 import { useMediaHistory } from './media/hooks/useMediaHistory';
 import { useMediaGeneration } from './media/hooks/useMediaGeneration';
 import { useMediaHandlers } from './media/hooks/useMediaHandlers';
+import { PhotoshopEditor } from './photoshop/PhotoshopEditor';
 
 interface MediaStudioProps {
     settings: AppSettings;
@@ -42,7 +43,7 @@ const Progress: React.FC<{ value: number }> = ({ value }) => (
 type GenType = 'image' | 'edit' | 'video';
 
 const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, onRequestAuth, userId, onTabChange }) => {
-    const [activeTab, setActiveTab] = useState<GenType | 'gallery'>('image');
+    const [activeTab, setActiveTab] = useState<GenType | 'gallery' | 'photoshop'>('image');
     const { refetch, credits, dailyCredits, subscriptionTier, canAfford } = useCredits();
 
     // Notify parent when tab changes
@@ -396,6 +397,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                     { id: 'image', label: 'Image', icon: Image },
                     { id: 'edit', label: 'Editor', icon: Scissors },
                     { id: 'video', label: 'Animator', icon: Film },
+                    { id: 'photoshop', label: 'PS', icon: Layers },
                     { id: 'gallery', label: 'Gallery', icon: Grid }
                 ].map((tab) => (
                     <button
@@ -422,7 +424,14 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar min-h-0">
-                {activeTab === 'gallery' ? (
+                {activeTab === 'gallery' || activeTab === 'photoshop' ? activeTab === 'photoshop' ? (
+                            <div className="w-full h-full min-h-[500px]">
+                                <PhotoshopEditor
+                                    initialImageUrl={generatedImageUrl || editedImageUrl}
+                                    onClose={() => setActiveTab('image')}
+                                />
+                            </div>
+                        ) : (
                     <MediaGalleryPanel
                         filteredHistory={filteredHistory}
                         galleryFilter={galleryFilter}
