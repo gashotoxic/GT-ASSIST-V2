@@ -46,6 +46,15 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [resizeDialogOpen, setResizeDialogOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  // Open ResizeDialog when resize tool is selected in toolbar
+  useEffect(() => {
+    if (activeTool === 'resize') {
+      setResizeDialogOpen(true);
+      setActiveTool('move');
+    }
+  }, [activeTool]);
+
+
   // Move tool dragging state
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
