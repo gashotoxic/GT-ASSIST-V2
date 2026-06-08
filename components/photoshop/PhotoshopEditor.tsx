@@ -643,7 +643,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
             </div>
           ) : activeTool === 'brush' || activeTool === 'eraser' ? (
             <div className="border-b border-slate-700/50">
-              <ColorPicker color={currentColor} onChange={setCurrentColor} />
+              <ColorPicker color={currentColor} onChange={(c) => { setCurrentColor(c); setBrush(b => ({ ...b, color: c.hex })); }} />
               <StrokeSettingsPanel settings={brush} onChange={setBrush} />
               <BrushTool
                 brushSettings={brush}
@@ -654,7 +654,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
             </div>
           ) : activeTool === 'fill' ? (
             <div className="border-b border-slate-700/50">
-              <ColorPicker color={currentColor} onChange={setCurrentColor} />
+              <ColorPicker color={currentColor} onChange={(c) => { setCurrentColor(c); setBrush(b => ({ ...b, color: c.hex })); }} />
               <BrushTool
                 brushSettings={brush}
                 activeMode="fill"
