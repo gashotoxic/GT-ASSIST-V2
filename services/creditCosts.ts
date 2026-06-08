@@ -43,6 +43,17 @@ export const CREDIT_COSTS = {
     image: 1,
     edit: 1,
     video: 1
+  },
+  // Photoshop Corner AI operations
+  photoshop_ai: {
+    generate: 5,
+    edit: 3,
+    remove_bg: 2,
+    upscale_2x: 3,
+    upscale_4x: 4,
+    smart_fill: 3,
+    style_transfer: 3,
+    default: 3
   }
 };
 

@@ -12,7 +12,8 @@ export type PhotoshopTool =
   | 'gradient'
   | 'shape'
   | 'eyedropper'
-  | 'pan';
+  | 'pan'
+  | 'ai';
 
 export type PhotoshopShapeType = 'rectangle' | 'rounded-rect' | 'ellipse' | 'line' | 'arrow' | 'polygon';
 

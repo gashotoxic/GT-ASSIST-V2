@@ -429,6 +429,9 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                 <PhotoshopEditor
                                     initialImageUrl={generatedImageUrl || editedImageUrl}
                                     onClose={() => setActiveTab('image')}
+                                    isAuthenticated={isAuthenticated}
+                                    onRequestAuth={onRequestAuth}
+                                    userId={userId}
                                 />
                             </div>
                         ) : (

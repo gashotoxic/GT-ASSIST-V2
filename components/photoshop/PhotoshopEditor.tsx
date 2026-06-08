@@ -27,6 +27,8 @@ import { GradientTool } from './tools/GradientTool';
 import { TextTool } from './tools/TextTool';
 import { TextInputDialog } from './tools/TextInputDialog';
 import { Cheatsheet } from './Cheatsheet';
+import { AIPanel } from './ai/AIPanel';
+import { AIPhotoAction } from '../../services/aiPhotoService';
 import { AdjustmentsPanel } from './adjustments/AdjustmentsPanel';
 import { FilterGallery } from './adjustments/FilterGallery';
 import { compositeAdjustment } from '../../utils/canvasFilters';
@@ -38,6 +40,11 @@ interface PhotoshopEditorProps {
   initialImageUrl?: string | null;
   onExport?: (blob: Blob) => void;
   onClose?: () => void;
+  isAuthenticated?: boolean;
+  onRequestAuth?: () => void;
+  userId?: string | null;
+  chutesService?: any;
+  deductCredits?: (type: string, model?: string) => Promise<boolean>;
 }
 
 const TOOLS: { id: PhotoshopTool; label: string; shortcut: string; icon: string }[] = [
@@ -53,14 +60,21 @@ const TOOLS: { id: PhotoshopTool; label: string; shortcut: string; icon: string 
   { id: 'shape', label: 'Shape', shortcut: 'U', icon: '⬡' },
   { id: 'gradient', label: 'Gradient', shortcut: 'Y', icon: '◈' },
   { id: 'eyedropper', label: 'Eyedrop', shortcut: 'I', icon: '◉' },
+  { id: 'ai', label: 'AI', shortcut: 'K', icon: '⚡' },
 ];
 
 export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   initialImageUrl,
   onExport,
   onClose,
+  isAuthenticated = false,
+  onRequestAuth,
+  userId,
+  chutesService,
+  deductCredits,
 }) => {
   const [activeTool, setActiveTool] = useState<PhotoshopTool>('move');
+  const [aiGenerating, setAiGenerating] = useState(false);
   const [brush, setBrush] = useState(DEFAULT_BRUSH);
   const [gridVisible, setGridVisible] = useState(false);
   const [currentColor, setCurrentColor] = useState<ColorState>(DEFAULT_COLOR);
@@ -210,7 +224,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
 
       const toolMap: Record<string, PhotoshopTool> = {
         v: 'move', h: 'pan', m: 'select', c: 'crop', r: 'resize',
-        t: 'text', b: 'brush', e: 'eraser', g: 'fill', u: 'shape', y: 'gradient', i: 'eyedropper',
+        t: 'text', b: 'brush', e: 'eraser', g: 'fill', u: 'shape', y: 'gradient', i: 'eyedropper', k: 'ai',
       };
       if (toolMap[key]) {
         setActiveTool(toolMap[key]);
@@ -690,6 +704,15 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
           ) : activeTool === 'gradient' ? (
             <div className="border-b border-slate-700/50">
               <GradientTool settings={gradientSettings} color={currentColor} onChange={setGradientSettings} />
+            </div>
+          ) : activeTool === 'ai' ? (
+            <div className="border-b border-slate-700/50">
+              <AIPanel
+                isAuthenticated={isAuthenticated}
+                isGenerating={aiGenerating}
+                onGenerate={handleAIAction}
+                onRequestAuth={() => onRequestAuth?.()}
+              />
             </div>
           ) : null}
           <div className="flex-1 min-h-0 overflow-y-auto">
