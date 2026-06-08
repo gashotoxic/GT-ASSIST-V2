@@ -12,6 +12,11 @@ interface CanvasEngineProps {
   activeTool: string;
   gridVisible: boolean;
   gridType: 'none' | 'thirds' | 'golden' | 'square';
+  // Move tool — canvas-space coordinates
+  onMouseDownCanvas?: (canvasX: number, canvasY: number, layerId: string | null) => void;
+  onMouseMoveCanvas?: (canvasX: number, canvasY: number) => void;
+  onMouseUpCanvas?: () => void;
+  screenToCanvas?: (sx: number, sy: number, rect: DOMRect) => { x: number; y: number };
 }
 
 function applyBlendMode(ctx: CanvasRenderingContext2D, mode: BlendMode) {
@@ -41,10 +46,15 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
   activeTool,
   gridVisible,
   gridType,
+  onMouseDownCanvas,
+  onMouseMoveCanvas,
+  onMouseUpCanvas,
+  screenToCanvas: screenToCanvasProp,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+  const zoomOffset = useRef({ x: 0, y: 0 }); // For calibrating screenToCanvas
 
   // Pre-load images when layers change — ensures sync rendering
   useEffect(() => {
@@ -190,16 +200,35 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (activeTool === 'pan' || e.button === 1) {
       onStartPan(e.clientX, e.clientY);
+      return;
     }
-  }, [activeTool, onStartPan]);
+    // Fire tool-specific canvas callbacks
+    if (onMouseDownCanvas && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const cx = (e.clientX - rect.left - canvas.panX) / canvas.zoom;
+      const cy = (e.clientY - rect.top - canvas.panY) / canvas.zoom;
+      // Find if clicking on active layer
+      const active = layers.find(l => l.id === activeLayerId);
+      const hitLayer = active && cx >= active.x && cx <= active.x + active.width && cy >= active.y && cy <= active.y + active.height
+        ? activeLayerId : null;
+      onMouseDownCanvas(Math.round(cx), Math.round(cy), hitLayer);
+    }
+  }, [activeTool, onStartPan, onMouseDownCanvas, canvas, layers, activeLayerId]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     onDoPan(e.clientX, e.clientY);
-  }, [onDoPan]);
+    if (onMouseMoveCanvas && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const cx = (e.clientX - rect.left - canvas.panX) / canvas.zoom;
+      const cy = (e.clientY - rect.top - canvas.panY) / canvas.zoom;
+      onMouseMoveCanvas(Math.round(cx), Math.round(cy));
+    }
+  }, [onDoPan, onMouseMoveCanvas, canvas]);
 
   const handleMouseUp = useCallback(() => {
     onEndPan();
-  }, [onEndPan]);
+    if (onMouseUpCanvas) onMouseUpCanvas();
+  }, [onEndPan, onMouseUpCanvas]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {

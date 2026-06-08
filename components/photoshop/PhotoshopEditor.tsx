@@ -9,6 +9,10 @@ import {
   DEFAULT_BRUSH,
   ZOOM_LEVELS,
 } from '../../types/photoshop';
+import { CropTool } from './tools/CropTool';
+import { SelectTool } from './tools/SelectTool';
+import { ResizeDialog } from './tools/ResizeDialog';
+import { ExportDialog } from './tools/ExportDialog';
 
 interface PhotoshopEditorProps {
   initialImageUrl?: string | null;
@@ -40,6 +44,12 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [gridVisible, setGridVisible] = useState(false);
   const [gridType, setGridType] = useState<'none' | 'thirds' | 'golden' | 'square'>('thirds');
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [resizeDialogOpen, setResizeDialogOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  // Move tool dragging state
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const layerStartPos = useRef({ x: 0, y: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -190,17 +200,90 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     else zoomIn();
   }, [zoomIn, zoomOut]);
 
-  // Export as blob
-  const handleExport = useCallback(async (format: 'png' | 'jpeg' | 'webp' = 'png') => {
-    // Composite all layers into a single canvas at full resolution
+  // Move tool: canvas mouse down
+  const handleMouseDownCanvas = useCallback((cx: number, cy: number, hitLayerId: string | null) => {
+    if (activeTool === 'move') {
+      if (!hitLayerId) return;
+      setActiveLayerId(hitLayerId);
+      isDragging.current = true;
+      dragStart.current = { x: cx, y: cy };
+      const layer = layers.find(l => l.id === hitLayerId);
+      if (layer) layerStartPos.current = { x: layer.x, y: layer.y };
+      pushSnapshot(layers, 'Move layer');
+    }
+  }, [activeTool, layers, pushSnapshot, setActiveLayerId]);
+
+  // Move tool: canvas mouse move
+  const handleMouseMoveCanvas = useCallback((cx: number, cy: number) => {
+    if (activeTool === 'move' && isDragging.current && activeLayerId) {
+      const dx = cx - dragStart.current.x;
+      const dy = cy - dragStart.current.y;
+      updateLayer(activeLayerId, {
+        x: layerStartPos.current.x + dx,
+        y: layerStartPos.current.y + dy,
+      });
+    }
+  }, [activeTool, activeLayerId, updateLayer]);
+
+  // Move/select tool: canvas mouse up
+  const handleMouseUpCanvas = useCallback(() => {
+    isDragging.current = false;
+  }, []);
+
+  // Apply crop
+  const handleApplyCrop = useCallback((x: number, y: number, w: number, h: number) => {
+    // Adjust all layer positions relative to crop area
+    setLayers(prev => prev.map(l => ({
+      ...l,
+      x: Math.max(0, l.x - x),
+      y: Math.max(0, l.y - y),
+      width: Math.min(w, l.width),
+      height: Math.min(h, l.height),
+    })));
+    setCanvas(prev => ({ ...prev, width: w, height: h }));
+    setActiveTool('move');
+    pushSnapshot(layers, 'Crop');
+  }, [setCanvas, setLayers, pushSnapshot]);
+
+  // Resize handler
+  const handleResizeCanvas = useCallback((newW: number, newH: number, _label: string) => {
+    const scaleX = newW / canvas.width;
+    const scaleY = newH / canvas.height;
+    setLayers(prev => prev.map(l => ({
+      ...l,
+      x: Math.round(l.x * scaleX),
+      y: Math.round(l.y * scaleY),
+      width: Math.round(l.width * scaleX),
+      height: Math.round(l.height * scaleY),
+    })));
+    setCanvas(prev => ({ ...prev, width: newW, height: newH }));
+    setResizeDialogOpen(false);
+    pushSnapshot(layers, 'Resize canvas');
+  }, [canvas, setCanvas, setLayers, pushSnapshot]);
+
+  // Export handler
+  const handleExport = useCallback(async (format: 'png' | 'jpeg' | 'webp', quality: number) => {
+    setExportDialogOpen(false);
+    await doExport(format, quality);
+  }, []);
+
+  // Blog export handler
+  const handleExportBlog = useCallback(async (size: 'og-card' | 'blog-inline' | 'original-webp') => {
+    setExportDialogOpen(false);
+    const blogSizes: Record<string, { w: number; h: number }> = {
+      'og-card': { w: 1200, h: 630 },
+      'blog-inline': { w: 800, h: 600 },
+      'original-webp': { w: canvas.width, h: canvas.height },
+    };
+    const { w, h } = blogSizes[size];
     const exportCanvas = document.createElement('canvas');
-    exportCanvas.width = canvas.width;
-    exportCanvas.height = canvas.height;
+    exportCanvas.width = w;
+    exportCanvas.height = h;
     const ctx = exportCanvas.getContext('2d');
     if (!ctx) return;
 
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, w, h);
 
     const visibleLayers = layers.filter(l => l.visible);
     for (const layer of visibleLayers) {
@@ -209,7 +292,11 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         await new Promise<void>((resolve) => {
           const img = new Image();
           img.onload = () => {
-            ctx.drawImage(img, layer.x, layer.y, layer.width, layer.height);
+            const sx = layer.x * (w / canvas.width);
+            const sy = layer.y * (h / canvas.height);
+            const sw = layer.width * (w / canvas.width);
+            const sh = layer.height * (h / canvas.height);
+            ctx.drawImage(img, sx, sy, sw, sh);
             resolve();
           };
           img.onerror = () => resolve();
@@ -218,15 +305,21 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       }
     }
 
-    const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
-    const quality = format === 'jpeg' ? 0.92 : format === 'webp' ? 0.9 : undefined;
     exportCanvas.toBlob((blob) => {
-      if (blob && onExport) onExport(blob);
-    }, mimeType, quality);
-  }, [canvas, layers, onExport]);
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `blog-${size}-${Date.now()}.webp`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/webp', 0.9);
+  }, [canvas, layers]);
 
-  // Download exported image
-  const handleDownload = useCallback(async (format: 'png' | 'jpeg' | 'webp' = 'png') => {
+  // Extracted export logic for reuse
+  const doExport = useCallback(async (format: 'png' | 'jpeg' | 'webp', quality: number) => {
     const exportCanvas = document.createElement('canvas');
     exportCanvas.width = canvas.width;
     exportCanvas.height = canvas.height;
@@ -254,7 +347,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
 
     const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
     const ext = format;
-    const quality = format === 'jpeg' ? 0.92 : format === 'webp' ? 0.9 : undefined;
+    const q = format === 'png' ? undefined : quality;
     exportCanvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
@@ -265,8 +358,15 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    }, mimeType, quality);
+    }, mimeType, q);
   }, [canvas, layers]);
+
+
+
+  // Quick export button
+  const handleDownload = useCallback(async (format: 'png' | 'jpeg' | 'webp' = 'png') => {
+    await doExport(format, format === 'png' ? 1 : 0.9);
+  }, [doExport]);
 
   // Get current zoom level display
   const zoomPercent = Math.round(canvas.zoom * 100);
@@ -282,11 +382,10 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         <div className="flex items-center gap-1">
           <button onClick={handleNewCanvas} className="text-[11px] px-2 py-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">New</button>
           <button onClick={() => fileInputRef.current?.click()} className="text-[11px] px-2 py-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">Open</button>
+          <button onClick={() => setResizeDialogOpen(true)} className="text-[11px] px-2 py-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">Resize</button>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileOpen} />
           <div className="w-px h-4 bg-slate-700 mx-1" />
-          <button onClick={() => handleDownload('png')} className="text-[11px] px-2 py-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">PNG</button>
-          <button onClick={() => handleDownload('jpeg')} className="text-[11px] px-2 py-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">JPEG</button>
-          <button onClick={() => handleDownload('webp')} className="text-[11px] px-2 py-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">WebP</button>
+          <button onClick={() => setExportDialogOpen(true)} className="text-[11px] px-2 py-1 rounded bg-primary/20 text-primary hover:bg-primary/30 transition-colors font-medium">Export</button>
         </div>
       </div>
 
@@ -325,29 +424,48 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
             activeTool={activeTool}
             gridVisible={gridVisible}
             gridType={gridType}
+            onMouseDownCanvas={handleMouseDownCanvas}
+            onMouseMoveCanvas={handleMouseMoveCanvas}
+            onMouseUpCanvas={handleMouseUpCanvas}
           />
         </div>
 
         {/* Right panels */}
         <div className="w-60 flex flex-col bg-slate-900 border-l border-slate-800">
-          <LayerPanel
-            layers={layers}
-            activeLayerId={activeLayerId}
-            onSelectLayer={setActiveLayerId}
-            onToggleVisibility={(id) => {
-              const l = layers.find(x => x.id === id);
-              if (l) setLayerVisibility(id, !l.visible);
-            }}
-            onChangeOpacity={setLayerOpacity}
-            onChangeBlendMode={setLayerBlendMode}
-            onToggleLock={(id) => {
-              const l = layers.find(x => x.id === id);
-              if (l) setLayerLocked(id, !l.locked);
-            }}
-            onDuplicate={duplicateLayer}
-            onRemove={removeLayer}
-            onReorder={reorderLayer}
-          />
+          {activeTool === 'crop' ? (
+            <div className="p-2 border-b border-slate-700/50">
+              <CropTool
+                canvasWidth={canvas.width}
+                canvasHeight={canvas.height}
+                onApplyCrop={handleApplyCrop}
+                onCancel={() => setActiveTool('move')}
+              />
+            </div>
+          ) : activeTool === 'select' ? (
+            <div className="p-2 border-b border-slate-700/50">
+              <SelectTool onSelect={(mode) => console.log('Selection mode:', mode)} />
+            </div>
+          ) : null}
+          <div className="flex-1 min-h-0">
+            <LayerPanel
+              layers={layers}
+              activeLayerId={activeLayerId}
+              onSelectLayer={setActiveLayerId}
+              onToggleVisibility={(id) => {
+                const l = layers.find(x => x.id === id);
+                if (l) setLayerVisibility(id, !l.visible);
+              }}
+              onChangeOpacity={setLayerOpacity}
+              onChangeBlendMode={setLayerBlendMode}
+              onToggleLock={(id) => {
+                const l = layers.find(x => x.id === id);
+                if (l) setLayerLocked(id, !l.locked);
+              }}
+              onDuplicate={duplicateLayer}
+              onRemove={removeLayer}
+              onReorder={reorderLayer}
+            />
+          </div>
         </div>
       </div>
 
@@ -401,6 +519,23 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
           >Fit</button>
         </div>
       </div>
+      {resizeDialogOpen && (
+        <ResizeDialog
+          width={canvas.width}
+          height={canvas.height}
+          onConfirm={handleResizeCanvas}
+          onClose={() => setResizeDialogOpen(false)}
+        />
+      )}
+      {exportDialogOpen && (
+        <ExportDialog
+          canvasWidth={canvas.width}
+          canvasHeight={canvas.height}
+          onExport={handleExport}
+          onExportBlog={handleExportBlog}
+          onClose={() => setExportDialogOpen(false)}
+        />
+      )}
     </div>
   );
 };
