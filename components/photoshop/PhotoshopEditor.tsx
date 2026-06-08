@@ -44,6 +44,7 @@ const TOOLS: { id: PhotoshopTool; label: string; shortcut: string; icon: string 
   { id: 'eraser', label: 'Eraser', shortcut: 'E', icon: '○' },
   { id: 'fill', label: 'Fill', shortcut: 'G', icon: '▣' },
   { id: 'shape', label: 'Shape', shortcut: 'U', icon: '⬡' },
+  { id: 'gradient', label: 'Gradient', shortcut: 'Y', icon: '◈' },
   { id: 'eyedropper', label: 'Eyedrop', shortcut: 'I', icon: '◉' },
 ];
 
@@ -61,6 +62,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [brushMode, setBrushMode] = useState<'brush' | 'eraser' | 'fill'>('brush');
   const [isDrawing, setIsDrawing] = useState(false);
   const drawStartPos = useRef({ x: 0, y: 0 });
+  const lastMousePos = useRef({ x: 0, y: 0 });
   const [gridType, setGridType] = useState<'none' | 'thirds' | 'golden' | 'square'>('thirds');
   const [imageLoaded, setImageLoaded] = useState(false);
   const [resizeDialogOpen, setResizeDialogOpen] = useState(false);
@@ -182,7 +184,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
 
       const toolMap: Record<string, PhotoshopTool> = {
         v: 'move', h: 'pan', m: 'select', c: 'crop', r: 'resize',
-        t: 'text', b: 'brush', e: 'eraser', g: 'fill', u: 'shape', i: 'eyedropper',
+        t: 'text', b: 'brush', e: 'eraser', g: 'fill', u: 'shape', y: 'gradient', i: 'eyedropper',
       };
       if (toolMap[key]) {
         setActiveTool(toolMap[key]);
@@ -285,6 +287,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       if (!activeLayerId) return;
       setIsDrawing(true);
       drawStartPos.current = { x: cx, y: cy };
+      lastMousePos.current = { x: cx, y: cy };
       return;
     }
   }, [activeTool, layers, activeLayerId, pushSnapshot, setActiveLayerId, brush, brushMode, updateLayer]);
@@ -301,6 +304,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       return;
     }
     // Brush/eraser drawing while moving
+    lastMousePos.current = { x: cx, y: cy };
     if ((activeTool === 'brush' || activeTool === 'eraser') && isDrawing && activeLayerId) {
       const layer = layers.find(l => l.id === activeLayerId);
       if (!layer || !layer.dataUrl) return;
@@ -324,14 +328,43 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const handleMouseUpCanvas = useCallback(() => {
     isDragging.current = false;
     setIsDrawing(false);
-    // Finalize shape/gradient
+    // Finalize shape/gradient — actually draw on the layer
     if (activeTool === 'shape' || activeTool === 'gradient') {
       if (!activeLayerId) return;
       const layer = layers.find(l => l.id === activeLayerId);
-      if (!layer) return;
-      pushSnapshot(layers, activeTool === 'shape' ? 'Draw shape' : 'Apply gradient');
+      if (!layer || !layer.dataUrl) return;
+      const start = drawStartPos.current;
+      const end = { x: lastMousePos.current.x, y: lastMousePos.current.y };
+      const x = Math.min(start.x, end.x);
+      const y = Math.min(start.y, end.y);
+      const w = Math.abs(end.x - start.x) || 1;
+      const h = Math.abs(end.y - start.y) || 1;
+
+      const img = new Image();
+      img.onload = () => {
+        const offscreen = document.createElement('canvas');
+        offscreen.width = canvas.width;
+        offscreen.height = canvas.height;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0);
+
+        if (activeTool === 'shape') {
+          drawShapeOnCanvas(ctx, shapeSettings.type, x, y, w, h,
+            shapeSettings.fill, shapeSettings.fillColor,
+            shapeSettings.stroke, shapeSettings.strokeWidth, shapeSettings.strokeColor,
+            shapeSettings.sides, shapeSettings.starRatio);
+        } else {
+          drawGradientOnCanvas(ctx, gradientSettings.type, x, y, w, h,
+            gradientSettings.colorStops, gradientSettings.angle, gradientSettings.repeat);
+        }
+
+        updateLayer(activeLayerId, { dataUrl: offscreen.toDataURL() });
+        pushSnapshot(layers, activeTool === 'shape' ? 'Draw shape' : 'Apply gradient');
+      };
+      img.src = layer.dataUrl;
     }
-  }, [activeTool, activeLayerId, layers, pushSnapshot]);
+  }, [activeTool, activeLayerId, layers, canvas, pushSnapshot, updateLayer, shapeSettings, gradientSettings]);
 
   // Apply crop
   const handleApplyCrop = useCallback((x: number, y: number, w: number, h: number) => {
