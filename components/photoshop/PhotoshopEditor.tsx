@@ -26,6 +26,7 @@ import { ShapeTool } from './tools/ShapeTool';
 import { GradientTool } from './tools/GradientTool';
 import { TextTool } from './tools/TextTool';
 import { TextInputDialog } from './tools/TextInputDialog';
+import { Cheatsheet } from './Cheatsheet';
 import { renderTextOnCanvas } from './tools/textUtils';
 import { applyPaintOnCanvas } from './tools/colorUtils';
 import { drawShapeOnCanvas, drawGradientOnCanvas } from './tools/shapeUtils';
@@ -71,6 +72,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [textLineHeight, setTextLineHeight] = useState(1.2);
   const [textBgColor, setTextBgColor] = useState<string | undefined>(undefined);
   const [textInputOpen, setTextInputOpen] = useState(false);
+  const [cheatsheetOpen, setCheatsheetOpen] = useState(false);
   const [brushMode, setBrushMode] = useState<'brush' | 'eraser' | 'fill'>('brush');
   const [isDrawing, setIsDrawing] = useState(false);
   const drawStartPos = useRef({ x: 0, y: 0 });
@@ -208,6 +210,9 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       };
       if (toolMap[key]) {
         setActiveTool(toolMap[key]);
+      }
+      if (key === '?' || key === '/') {
+        setCheatsheetOpen(prev => !prev);
       }
     };
     window.addEventListener('keydown', handler);
@@ -542,6 +547,8 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileOpen} />
           <div className="w-px h-4 bg-slate-700 mx-1" />
           <button onClick={() => setExportDialogOpen(true)} className="text-[11px] px-2 py-1 rounded bg-primary/20 text-primary hover:bg-primary/30 transition-colors font-medium">Export</button>
+          <div className="w-px h-4 bg-slate-700 mx-1" />
+          <button onClick={() => setCheatsheetOpen(true)} className="text-[11px] w-6 h-6 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors font-bold flex items-center justify-center" title="Shortcuts (?)">?</button>
         </div>
       </div>
 
@@ -726,6 +733,9 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
           >Fit</button>
         </div>
       </div>
+      {cheatsheetOpen && (
+        <Cheatsheet onClose={() => setCheatsheetOpen(false)} />
+      )}
       {textInputOpen && (
         <TextInputDialog
           fontFamily={textFont} fontSize={textSize} fontWeight={textWeight}
