@@ -27,6 +27,9 @@ import { GradientTool } from './tools/GradientTool';
 import { TextTool } from './tools/TextTool';
 import { TextInputDialog } from './tools/TextInputDialog';
 import { Cheatsheet } from './Cheatsheet';
+import { AdjustmentsPanel } from './adjustments/AdjustmentsPanel';
+import { FilterGallery } from './adjustments/FilterGallery';
+import { compositeAdjustment } from '../../utils/canvasFilters';
 import { renderTextOnCanvas } from './tools/textUtils';
 import { applyPaintOnCanvas } from './tools/colorUtils';
 import { drawShapeOnCanvas, drawGradientOnCanvas } from './tools/shapeUtils';
@@ -73,6 +76,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [textBgColor, setTextBgColor] = useState<string | undefined>(undefined);
   const [textInputOpen, setTextInputOpen] = useState(false);
   const [cheatsheetOpen, setCheatsheetOpen] = useState(false);
+  const [adjustmentsOpen, setAdjustmentsOpen] = useState(false);
   const [brushMode, setBrushMode] = useState<'brush' | 'eraser' | 'fill'>('brush');
   const [isDrawing, setIsDrawing] = useState(false);
   const drawStartPos = useRef({ x: 0, y: 0 });
@@ -249,7 +253,34 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     setCanvas(prev => ({ ...prev, width: 1920, height: 1080, zoom: 0.5, panX: 0, panY: 0 }));
   }, [clearLayers, clearHistory, setCanvas]);
 
-  // Fill active layer with solid color
+    // Apply image adjustment/filter to active layer
+  const handleAdjustment = useCallback(async (type: string, params: any) => {
+    if (!activeLayerId) return;
+    const layer = layers.find(l => l.id === activeLayerId);
+    if (!layer || !layer.dataUrl) return;
+    pushSnapshot(layers, type);
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = async () => {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = img.width;
+        tempCanvas.height = img.height;
+        const ctx = tempCanvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0);
+        // Apply filter preset
+        if (type === 'filterPreset' && params.preset && params.preset !== 'normal') {
+          const result = await compositeAdjustment(tempCanvas, 'filterPreset', { preset: params.preset });
+          updateLayer(activeLayerId, { dataUrl: result });
+        } else if (type !== 'filterPreset') {
+          const result = await compositeAdjustment(tempCanvas, type, params);
+          updateLayer(activeLayerId, { dataUrl: result });
+        }
+      };
+      img.src = layer.dataUrl;
+    } catch (e) { console.error('Adjustment error:', e); }
+  }, [activeLayerId, layers, pushSnapshot, updateLayer]);
   const handleFillLayer = useCallback(() => {
     if (!activeLayerId) return;
     const layer = layers.find(l => l.id === activeLayerId);
@@ -547,6 +578,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileOpen} />
           <div className="w-px h-4 bg-slate-700 mx-1" />
           <button onClick={() => setExportDialogOpen(true)} className="text-[11px] px-2 py-1 rounded bg-primary/20 text-primary hover:bg-primary/30 transition-colors font-medium">Export</button>
+          <button onClick={() => setAdjustmentsOpen(true)} className="text-[11px] px-2 py-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors">Adjust</button>
           <div className="w-px h-4 bg-slate-700 mx-1" />
           <button onClick={() => setCheatsheetOpen(true)} className="text-[11px] w-6 h-6 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors font-bold flex items-center justify-center" title="Shortcuts (?)">?</button>
         </div>
@@ -733,6 +765,19 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
           >Fit</button>
         </div>
       </div>
+      {adjustmentsOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 bg-black/50 backdrop-blur-sm" onClick={() => setAdjustmentsOpen(false)}>
+          <div className="w-[380px] max-h-[85vh] overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-xl shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/50">
+              <h3 className="text-xs font-semibold text-slate-200">Adjustments &amp; Filters</h3>
+              <button onClick={() => setAdjustmentsOpen(false)} className="text-slate-500 hover:text-slate-300 text-lg leading-none">&times;</button>
+            </div>
+            <FilterGallery onApplyFilter={(preset) => { handleAdjustment('filterPreset', { preset }); setAdjustmentsOpen(false); }} disabled={!activeLayerId} />
+            <div className="border-t border-slate-700/50" />
+            <AdjustmentsPanel onAdjust={(type, params) => { handleAdjustment(type, params); }} />
+          </div>
+        </div>
+      )}
       {cheatsheetOpen && (
         <Cheatsheet onClose={() => setCheatsheetOpen(false)} />
       )}
