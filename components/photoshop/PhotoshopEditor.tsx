@@ -232,7 +232,8 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
 
   // Apply crop
   const handleApplyCrop = useCallback((x: number, y: number, w: number, h: number) => {
-    // Adjust all layer positions relative to crop area
+    // Snap current state before modifying (so undo returns to exact pre-crop state)
+    pushSnapshot(layers, 'Crop');
     setLayers(prev => prev.map(l => ({
       ...l,
       x: Math.max(0, l.x - x),
@@ -242,11 +243,11 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     })));
     setCanvas(prev => ({ ...prev, width: w, height: h }));
     setActiveTool('move');
-    pushSnapshot(layers, 'Crop');
-  }, [setCanvas, setLayers, pushSnapshot]);
+  }, [setCanvas, setLayers, pushSnapshot, layers]);
 
   // Resize handler
   const handleResizeCanvas = useCallback((newW: number, newH: number, _label: string) => {
+    pushSnapshot(layers, 'Resize canvas');
     const scaleX = newW / canvas.width;
     const scaleY = newH / canvas.height;
     setLayers(prev => prev.map(l => ({
@@ -258,8 +259,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     })));
     setCanvas(prev => ({ ...prev, width: newW, height: newH }));
     setResizeDialogOpen(false);
-    pushSnapshot(layers, 'Resize canvas');
-  }, [canvas, setCanvas, setLayers, pushSnapshot]);
+  }, [canvas, setCanvas, setLayers, pushSnapshot, layers]);
 
   // Export handler
   const handleExport = useCallback(async (format: 'png' | 'jpeg' | 'webp', quality: number) => {
