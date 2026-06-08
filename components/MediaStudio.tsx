@@ -411,7 +411,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                         <div className="relative">
                             <tab.icon className={`w-4 h-4 transition-transform group-hover:scale-110 ${activeTab === tab.id ? 'text-primary' : ''}`} />
                             {/* Show tiny dot if this tab is generating in background */}
-                            {tab.id !== 'gallery' && genStatus[tab.id as GenType].isGenerating && activeTab !== tab.id && (
+                            {tab.id !== 'gallery' && tab.id !== 'photoshop' && genStatus[tab.id as GenType]?.isGenerating && activeTab !== tab.id && (
                                 <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 rounded-full bg-primary animate-pulse border border-white dark:border-slate-900"></span>
                             )}
                         </div>
@@ -611,7 +611,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                 </div>
                             )}
 
-                            {genStatus[activeTab as GenType]?.error && !genStatus[activeTab as GenType].isGenerating && (
+                            {genStatus[activeTab as GenType]?.error && !genStatus[activeTab as GenType]?.isGenerating && (
                                 <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-300 text-sm flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 shadow-sm">
                                     <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                                     <span>{genStatus[activeTab as GenType].error}</span>
