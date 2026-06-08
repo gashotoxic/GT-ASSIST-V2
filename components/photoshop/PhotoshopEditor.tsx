@@ -8,11 +8,24 @@ import {
   PhotoshopTool,
   DEFAULT_BRUSH,
   ZOOM_LEVELS,
+  DEFAULT_COLOR,
+  DEFAULT_SHAPE_SETTINGS,
+  DEFAULT_GRADIENT_SETTINGS,
+  ColorState,
+  ShapeSettings,
+  GradientSettings,
 } from '../../types/photoshop';
 import { CropTool } from './tools/CropTool';
 import { SelectTool } from './tools/SelectTool';
 import { ResizeDialog } from './tools/ResizeDialog';
 import { ExportDialog } from './tools/ExportDialog';
+import { ColorPicker } from './tools/ColorPicker';
+import { StrokeSettingsPanel } from './tools/StrokeSettingsPanel';
+import { BrushTool } from './tools/BrushTool';
+import { ShapeTool } from './tools/ShapeTool';
+import { GradientTool } from './tools/GradientTool';
+import { applyPaintOnCanvas } from './tools/colorUtils';
+import { drawShapeOnCanvas, drawGradientOnCanvas } from './tools/shapeUtils';
 
 interface PhotoshopEditorProps {
   initialImageUrl?: string | null;
@@ -42,6 +55,12 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [activeTool, setActiveTool] = useState<PhotoshopTool>('move');
   const [brush, setBrush] = useState(DEFAULT_BRUSH);
   const [gridVisible, setGridVisible] = useState(false);
+  const [currentColor, setCurrentColor] = useState<ColorState>(DEFAULT_COLOR);
+  const [shapeSettings, setShapeSettings] = useState<ShapeSettings>(DEFAULT_SHAPE_SETTINGS);
+  const [gradientSettings, setGradientSettings] = useState<GradientSettings>(DEFAULT_GRADIENT_SETTINGS);
+  const [brushMode, setBrushMode] = useState<'brush' | 'eraser' | 'fill'>('brush');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const drawStartPos = useRef({ x: 0, y: 0 });
   const [gridType, setGridType] = useState<'none' | 'thirds' | 'golden' | 'square'>('thirds');
   const [imageLoaded, setImageLoaded] = useState(false);
   const [resizeDialogOpen, setResizeDialogOpen] = useState(false);
@@ -203,6 +222,22 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     setCanvas(prev => ({ ...prev, width: 1920, height: 1080, zoom: 0.5, panX: 0, panY: 0 }));
   }, [clearLayers, clearHistory, setCanvas]);
 
+  // Fill active layer with solid color
+  const handleFillLayer = useCallback(() => {
+    if (!activeLayerId) return;
+    const layer = layers.find(l => l.id === activeLayerId);
+    if (!layer) return;
+    pushSnapshot(layers, 'Fill layer');
+    const offscreen = document.createElement('canvas');
+    offscreen.width = canvas.width;
+    offscreen.height = canvas.height;
+    const ctx = offscreen.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = brush.color;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    updateLayer(activeLayerId, { dataUrl: offscreen.toDataURL() });
+  }, [activeLayerId, layers, canvas, brush, pushSnapshot, updateLayer]);
+
   // Handle zoom wheel
   const handleWheelZoom = useCallback((deltaY: number) => {
     if (deltaY > 0) zoomOut();
@@ -219,8 +254,40 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       const layer = layers.find(l => l.id === hitLayerId);
       if (layer) layerStartPos.current = { x: layer.x, y: layer.y };
       pushSnapshot(layers, 'Move layer');
+      return;
     }
-  }, [activeTool, layers, pushSnapshot, setActiveLayerId]);
+    // Brush/eraser drawing
+    if (activeTool === 'brush' || activeTool === 'eraser') {
+      if (!activeLayerId) return;
+      const layer = layers.find(l => l.id === activeLayerId);
+      if (!layer || !layer.dataUrl) return;
+      // Get the canvas from the image cache or create one
+      const img = new Image();
+      img.onload = () => {
+        const offscreen = document.createElement('canvas');
+        offscreen.width = layer.width;
+        offscreen.height = layer.height;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0);
+        const mode = activeTool === 'brush' ? brushMode === 'eraser' ? 'eraser' as const : 'brush' as const : 'eraser' as const;
+        applyPaintOnCanvas(offscreen, cx - layer.x, cy - layer.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
+        updateLayer(activeLayerId, { dataUrl: offscreen.toDataURL() });
+        setIsDrawing(true);
+        drawStartPos.current = { x: cx, y: cy };
+        pushSnapshot(layers, 'Paint stroke');
+      };
+      img.src = layer.dataUrl;
+      return;
+    }
+    // Shape/gradient drawing
+    if (activeTool === 'shape' || activeTool === 'gradient') {
+      if (!activeLayerId) return;
+      setIsDrawing(true);
+      drawStartPos.current = { x: cx, y: cy };
+      return;
+    }
+  }, [activeTool, layers, activeLayerId, pushSnapshot, setActiveLayerId, brush, brushMode, updateLayer]);
 
   // Move tool: canvas mouse move
   const handleMouseMoveCanvas = useCallback((cx: number, cy: number) => {
@@ -231,13 +298,40 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         x: layerStartPos.current.x + dx,
         y: layerStartPos.current.y + dy,
       });
+      return;
     }
-  }, [activeTool, activeLayerId, updateLayer]);
+    // Brush/eraser drawing while moving
+    if ((activeTool === 'brush' || activeTool === 'eraser') && isDrawing && activeLayerId) {
+      const layer = layers.find(l => l.id === activeLayerId);
+      if (!layer || !layer.dataUrl) return;
+      const img = new Image();
+      img.onload = () => {
+        const offscreen = document.createElement('canvas');
+        offscreen.width = layer.width;
+        offscreen.height = layer.height;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0);
+        const mode = activeTool === 'brush' ? brushMode === 'eraser' ? 'eraser' as const : 'brush' as const : 'eraser' as const;
+        applyPaintOnCanvas(offscreen, cx - layer.x, cy - layer.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
+        updateLayer(activeLayerId, { dataUrl: offscreen.toDataURL() });
+      };
+      img.src = layer.dataUrl;
+    }
+  }, [activeTool, activeLayerId, updateLayer, layers, isDrawing, brush, brushMode]);
 
   // Move/select tool: canvas mouse up
   const handleMouseUpCanvas = useCallback(() => {
     isDragging.current = false;
-  }, []);
+    setIsDrawing(false);
+    // Finalize shape/gradient
+    if (activeTool === 'shape' || activeTool === 'gradient') {
+      if (!activeLayerId) return;
+      const layer = layers.find(l => l.id === activeLayerId);
+      if (!layer) return;
+      pushSnapshot(layers, activeTool === 'shape' ? 'Draw shape' : 'Apply gradient');
+    }
+  }, [activeTool, activeLayerId, layers, pushSnapshot]);
 
   // Apply crop
   const handleApplyCrop = useCallback((x: number, y: number, w: number, h: number) => {
@@ -441,6 +535,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
 
         {/* Right panels */}
         <div className="w-60 flex flex-col bg-slate-900 border-l border-slate-800">
+          {/* Phase 1 tool panels */}
           {activeTool === 'crop' ? (
             <div className="p-2 border-b border-slate-700/50">
               <CropTool
@@ -454,8 +549,38 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
             <div className="p-2 border-b border-slate-700/50">
               <SelectTool onSelect={(mode) => console.log('Selection mode:', mode)} />
             </div>
+          ) : activeTool === 'brush' || activeTool === 'eraser' ? (
+            <div className="border-b border-slate-700/50">
+              <ColorPicker color={currentColor} onChange={setCurrentColor} />
+              <StrokeSettingsPanel settings={brush} onChange={setBrush} />
+              <BrushTool
+                brushSettings={brush}
+                activeMode={brushMode}
+                onModeChange={setBrushMode}
+                onFillLayer={handleFillLayer}
+              />
+            </div>
+          ) : activeTool === 'fill' ? (
+            <div className="border-b border-slate-700/50">
+              <ColorPicker color={currentColor} onChange={setCurrentColor} />
+              <BrushTool
+                brushSettings={brush}
+                activeMode="fill"
+                onModeChange={setBrushMode}
+                onFillLayer={handleFillLayer}
+              />
+            </div>
+          ) : activeTool === 'shape' ? (
+            <div className="border-b border-slate-700/50">
+              <ColorPicker color={currentColor} onChange={(c) => { setCurrentColor(c); setShapeSettings(s => ({ ...s, fillColor: c.hex, strokeColor: c.hex })); }} />
+              <ShapeTool settings={shapeSettings} color={currentColor} onChange={setShapeSettings} />
+            </div>
+          ) : activeTool === 'gradient' ? (
+            <div className="border-b border-slate-700/50">
+              <GradientTool settings={gradientSettings} color={currentColor} onChange={setGradientSettings} />
+            </div>
           ) : null}
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             <LayerPanel
               layers={layers}
               activeLayerId={activeLayerId}
