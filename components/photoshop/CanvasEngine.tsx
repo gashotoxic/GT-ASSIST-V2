@@ -44,8 +44,45 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
 
-  // Main render loop — composite all layers
+  // Pre-load images when layers change — ensures sync rendering
+  useEffect(() => {
+    let cancelled = false;
+    const loadPromises = layers
+      .filter(l => l.dataUrl && l.dataUrl.startsWith('data:') && !imageCache.current.has(l.id))
+      .map(layer => new Promise<void>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          if (!cancelled) imageCache.current.set(layer.id, img);
+          resolve();
+        };
+        img.onerror = () => {
+          resolve(); // Don't cache on error
+        };
+        img.src = layer.dataUrl;
+      }));
+
+    // Clean up removed layers from cache
+    for (const key of imageCache.current.keys()) {
+      if (!layers.find(l => l.id === key)) {
+        imageCache.current.delete(key);
+      }
+    }
+
+    if (loadPromises.length > 0) {
+      Promise.all(loadPromises).then(() => {
+        if (!cancelled) requestAnimationFrame(() => render());
+      });
+    } else {
+      // Still need to re-render for property changes (opacity, etc.)
+      requestAnimationFrame(() => render());
+    }
+
+    return () => { cancelled = true; };
+  }, [layers]); // Only re-run when layers identity changes
+
+  // Sync render — draws everything immediately from cache
   const render = useCallback(() => {
     const cvs = canvasRef.current;
     if (!cvs) return;
@@ -55,13 +92,10 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
     const w = cvs.width;
     const h = cvs.height;
 
-    // Clear
+    // Clear entire canvas
     ctx.clearRect(0, 0, w, h);
 
-    // Background (checkerboard for transparency)
-    ctx.fillStyle = '#1e1e2e';
-    ctx.fillRect(0, 0, w, h);
-    // Draw checkerboard
+    // Draw checkerboard background
     const tileSize = 16;
     for (let y = 0; y < h; y += tileSize) {
       for (let x = 0; x < w; x += tileSize) {
@@ -76,35 +110,19 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
     ctx.translate(canvas.panX, canvas.panY);
     ctx.scale(canvas.zoom, canvas.zoom);
 
-    // Composite each visible layer
-    const loadImage = (dataUrl: string): Promise<HTMLImageElement> => {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => resolve(img);
-        img.src = dataUrl;
-      });
-    };
-
-    // Sync render — draw all layers immediately
+    // Composite each visible layer — SYNC from cache
     const visibleLayers = layers.filter(l => l.visible);
-    visibleLayers.forEach(layer => {
+    for (const layer of visibleLayers) {
       ctx.save();
       ctx.globalAlpha = layer.opacity;
       applyBlendMode(ctx, layer.blendMode);
 
-      if (layer.dataUrl && layer.dataUrl.startsWith('data:')) {
-        const img = new Image();
-        img.onload = () => {
-          ctx.drawImage(img, layer.x, layer.y, layer.width, layer.height);
-          ctx.restore();
-        };
-        img.onerror = () => ctx.restore();
-        img.src = layer.dataUrl;
-      } else {
-        ctx.restore();
+      const cached = imageCache.current.get(layer.id);
+      if (cached) {
+        ctx.drawImage(cached, layer.x, layer.y, layer.width, layer.height);
       }
-    });
+      ctx.restore(); // restore per-layer
+    }
 
     // Draw selection highlight on active layer
     if (activeLayerId) {
@@ -144,12 +162,12 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
       }
     }
 
-    ctx.restore();
+    ctx.restore(); // match the outer save() for zoom/pan
   }, [canvas, layers, activeLayerId, gridVisible, gridType]);
 
-  // Re-render on state changes
+  // Re-render on state changes (zoom, pan, opacity, etc.)
   useEffect(() => {
-    render();
+    requestAnimationFrame(() => render());
   }, [render]);
 
   // Handle resize
@@ -162,14 +180,13 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
       if (cvs) {
         cvs.width = rect.width;
         cvs.height = rect.height;
-        render();
+        requestAnimationFrame(() => render());
       }
     });
     observer.observe(container);
     return () => observer.disconnect();
   }, [render]);
 
-  // Mouse handlers for pan
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (activeTool === 'pan' || e.button === 1) {
       onStartPan(e.clientX, e.clientY);

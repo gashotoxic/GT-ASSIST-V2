@@ -103,7 +103,22 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     img.src = initialImageUrl;
   }, [initialImageUrl, imageLoaded, setCanvas, addImageLayer, zoomToFit]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — stable listener via refs
+  const undoRef = useRef(undo);
+  const redoRef = useRef(redo);
+  const loadLayersRef = useRef(loadLayers);
+  const zoomInRef = useRef(zoomIn);
+  const zoomOutRef = useRef(zoomOut);
+  const zoomToRef = useRef(zoomTo);
+  const layersRef = useRef(layers);
+  undoRef.current = undo;
+  redoRef.current = redo;
+  loadLayersRef.current = loadLayers;
+  zoomInRef.current = zoomIn;
+  zoomOutRef.current = zoomOut;
+  zoomToRef.current = zoomTo;
+  layersRef.current = layers;
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -114,20 +129,19 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       if (ctrl && key === 'z') {
         e.preventDefault();
         if (e.shiftKey) {
-          const result = redo();
-          if (result) loadLayers(result);
+          const result = redoRef.current();
+          if (result) loadLayersRef.current(result);
         } else {
-          const result = undo(layers);
-          if (result) loadLayers(result);
+          const result = undoRef.current(layersRef.current);
+          if (result) loadLayersRef.current(result);
         }
         return;
       }
 
-      if (ctrl && key === '0') { e.preventDefault(); zoomTo(1); return; }
-      if (key === '+' || key === '=') { e.preventDefault(); zoomIn(); return; }
-      if (key === '-') { e.preventDefault(); zoomOut(); return; }
+      if (ctrl && key === '0') { e.preventDefault(); zoomToRef.current(1); return; }
+      if (key === '+' || key === '=') { e.preventDefault(); zoomInRef.current(); return; }
+      if (key === '-') { e.preventDefault(); zoomOutRef.current(); return; }
 
-      // Tool shortcuts
       const toolMap: Record<string, PhotoshopTool> = {
         v: 'move', h: 'pan', m: 'select', c: 'crop', r: 'resize',
         t: 'text', b: 'brush', e: 'eraser', g: 'fill', u: 'shape', i: 'eyedropper',
@@ -138,7 +152,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [zoomIn, zoomOut, zoomTo, undo, redo, layers, loadLayers]);
+  }, []); // Empty deps — refs keep it fresh
 
   // Load image from file
   const handleFileOpen = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

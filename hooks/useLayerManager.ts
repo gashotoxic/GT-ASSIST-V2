@@ -4,6 +4,17 @@ import { PhotoshopLayer, BlendMode, LayerType } from '../types/photoshop';
 let layerCounter = 0;
 function nextId(): string { return `layer-${++layerCounter}-${Date.now()}`; }
 
+function cloneLayer(source: PhotoshopLayer, overrides?: Partial<PhotoshopLayer>): PhotoshopLayer {
+  return {
+    ...source,
+    ...overrides,
+    id: overrides?.id || nextId(),
+    text: source.text ? { ...source.text } : undefined,
+    shape: source.shape ? { ...source.shape, polygonPoints: source.shape.polygonPoints ? [...source.shape.polygonPoints] : undefined } : undefined,
+    selectionMask: source.selectionMask,
+  };
+}
+
 function createLayer(
   type: LayerType,
   dataUrl: string,
@@ -49,9 +60,12 @@ export function useLayerManager(initialWidth = 1920, initialHeight = 1080) {
     setLayers(prev => {
       const idx = prev.findIndex(l => l.id === layerId);
       const next = prev.filter(l => l.id !== layerId);
-      if (activeLayerId === layerId) {
+      // Read active layer ID from prev state to avoid stale closure
+      const currentActive = activeLayerId;
+      if (currentActive === layerId) {
         const newIdx = Math.min(idx, next.length - 1);
-        setActiveLayerId(next[newIdx]?.id || null);
+        // Schedule outside the setLayers callback to avoid nested state update
+        setTimeout(() => setActiveLayerId(next[newIdx]?.id || null), 0);
       }
       return next;
     });
@@ -90,14 +104,13 @@ export function useLayerManager(initialWidth = 1920, initialHeight = 1080) {
     setLayers(prev => {
       const source = prev.find(l => l.id === layerId);
       if (!source) return prev;
-      const dup = { ...source, id: nextId(), name: `${source.name} (copy)` };
+      const dup = cloneLayer(source, { name: `${source.name} (copy)` });
       return [...prev, dup];
     });
   }, []);
 
   const mergeVisible = useCallback(() => {
-    // Placeholder — actual merge requires canvas compositing
-    // For Phase 0, just returns layers as-is
+    // Placeholder — Phase 0
   }, []);
 
   const loadLayers = useCallback((newLayers: PhotoshopLayer[]) => {

@@ -102,7 +102,7 @@ export const LayerPanel: React.FC<LayerPanelProps> = ({
               {/* Layer name + type */}
               <div className="flex-1 min-w-0">
                 <div className="text-[12px] font-medium text-slate-300 truncate">{layer.name}</div>
-                <div className="text-[10px] text-slate-500">{layer.type} &middot; {Math.round(layer.opacity * 100)}%</div>
+                <div className="text-[10px] text-slate-500">{layer.type} · {Math.round(layer.opacity * 100)}%</div>
               </div>
 
               {/* Lock toggle */}
