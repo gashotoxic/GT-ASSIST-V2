@@ -1,81 +1,86 @@
-# GT Assistant - Agent Guidelines
+# DOX framework — GT-ASSIST-V2
 
-This document provides essential information for AI agents working on the GT Assistant codebase.
+**GT Assistant V2 — flagship web app for GashoTech at create.gashotech.com**
+**Stack:** TypeScript, Web App
 
-## 1. Toolchain & Commands
+- DOX is highly performant AGENTS.md hierarchy installed here
+- Agent must follow DOX instructions across any edits
 
-*   **Runtime**: Node.js
-*   **Package Manager**: npm
-*   **Build**: `npm run build` (uses Vite)
-*   **Dev Server**: `npm run dev`
-*   **Lint**: `npm run lint` (uses ESLint)
-*   **Type Check**: Run `npx tsc --noEmit` manually (no script in package.json).
-*   **Tests**: 
-    *   **WARNING**: There is NO automated test runner (no `npm test`, `jest`, or `vitest`).
-    *   **Do not** attempt to run `npm test` or install test runners unless explicitly tasked.
-    *   Tests are manual/interactive components located in the `tests/` directory (e.g., `tests/ClerkSupabaseIntegrationTest.tsx`).
-    *   To test changes, you may need to verify manually via the UI or create a temporary test component if needed.
+## Core Contract
 
-## 2. Project Structure
+- AGENTS.md files are binding work contracts for their subtrees
+- Work products, source materials, instructions, records, assets, and durable docs must stay understandable from the nearest applicable AGENTS.md plus every parent AGENTS.md above it
 
-The project uses a root-based structure (no single `src` root for all code).
+## Read Before Editing
 
-*   `App.tsx`, `index.tsx`: Entry points in the **root** directory.
-*   `components/`: React UI components.
-*   `context/`: React Context providers (Auth, Credits).
-*   `services/`: Business logic and API integrations (Supabase, Chutes, Search).
-*   `hooks/`: Custom React hooks.
-*   `lib/`: Third-party library configurations (Paystack).
-*   `database/`: SQL schemas and migration files.
-*   `types.ts`: Shared TypeScript definitions.
+1. Read the root AGENTS.md
+2. Identify every file or folder you expect to touch
+3. Walk from the repository root to each target path
+4. Read every AGENTS.md found along each route
+5. If a parent AGENTS.md lists a child AGENTS.md whose scope contains the path, read that child and continue from there
+6. Use the nearest AGENTS.md as the local contract and parent docs for repo-wide rules
+7. If docs conflict, the closer doc controls local work details, but no child doc may weaken DOX
 
-## 3. Code Style & Conventions
+Do not rely on memory. Re-read the applicable DOX chain in the current session before editing.
 
-*   **Language**: TypeScript (Strict mode preferred, `ES2022`).
-*   **Framework**: React 18+ (Functional Components with Hooks).
-*   **Styling**: Tailwind CSS.
-    *   Use `lucide-react` for icons.
-    *   Follow the "Glassmorphism" design language (transparency, blurs).
-*   **State Management**: 
-    *   Use React Context (`AuthContext`, `CreditContext`) for global state.
-    *   Use local state (`useState`) for component-specific logic.
-*   **Imports**:
-    *   Use **relative paths** (e.g., `./components/UI`) as seen in `App.tsx`.
-    *   Avoid using `@/` aliases unless verified in the specific file context, even if configured in tsconfig.
-*   **Formatting**:
-    *   Use standard Prettier formatting (2 spaces indentation, semicolons, single quotes preferred).
-*   **Naming**:
-    *   Components: `PascalCase` (e.g., `ChatInterface.tsx`).
-    *   Hooks: `camelCase` (e.g., `useAudioRecorder.ts`).
-    *   Functions/Variables: `camelCase`.
+## Update After Editing
 
-## 4. Key Technologies
+Every meaningful change requires a DOX pass before the task is done.
 
-*   **Backend**: Supabase (PostgreSQL, Edge Functions, Storage).
-    *   **RLS**: Respect Row Level Security policies.
-*   **Auth**: Clerk (User management).
-*   **Payments**: Paystack (KES currency, unified credit system).
-*   **AI Inference**: Chutes.ai (DeepSeek, Flux, Hunyuan, etc.).
+Update the closest owning AGENTS.md when a change affects:
 
-## 5. Agent Rules & Best Practices
+- purpose, scope, ownership, or responsibilities
+- durable structure, contracts, workflows, or operating rules
+- required inputs, outputs, permissions, constraints, side effects, or artifacts
+- user preferences about behavior, communication, process, organization, or quality
+- AGENTS.md creation, deletion, move, rename, or index contents
 
-1.  **Safety First**: 
-    *   NEVER commit secrets, API keys, or `.env` files.
-    *   Always verify file paths exist before reading/writing.
-2.  **No Hallucinations**:
-    *   Do not invent scripts that don't exist (like `npm test`).
-    *   Do not import non-existent libraries.
-3.  **Verification**:
-    *   Always run `npm run lint` and `npm run build` after making significant changes to ensure no regressions.
-    *   If fixing a bug, verify the fix if possible (or explain how the user can verify).
-4.  **Documentation**:
-    *   Read `PROJECT_CONTEXT.md` for deep architectural details before architectural changes.
-    *   Read `IMPLEMENTATION_STATUS.md` to know the current phase.
-5.  **File Operations**:
-    *   Use **absolute paths** for all file tools.
-    *   Check directory contents (`ls -R`) if unsure of file location.
+Update parent docs when parent-level structure, ownership, workflow, or child index changes. Update child docs when parent changes alter local rules. Remove stale or contradictory text immediately. Small edits that do not change behavior or contracts may leave docs unchanged, but the DOX pass still must happen.
 
-## 6. Contextual Notes
+## Hierarchy
 
-*   **Tests Directory**: Files in `tests/` are NOT unit tests. They are React components meant to be rendered in the app for manual integration testing.
-*   **Supabase Types**: If modifying database schema, ensure TypeScript types in `types.ts` or `services/` are updated to match.
+- Root AGENTS.md is the DOX rail: project-wide instructions, global preferences, durable workflow rules, and the top-level Child DOX Index
+- Child AGENTS.md files own domain-specific instructions and their own Child DOX Index
+- Each parent explains what its direct children cover and what stays owned by the parent
+- The closer a doc is to the work, the more specific and practical it must be
+
+## Child Doc Shape
+
+- Create a child AGENTS.md when a folder becomes a durable boundary with its own purpose, rules, responsibilities, workflow, materials, or quality standards
+- Work Guidance must reflect the current standards of the project or user instructions; if there are no specific standards or instructions yet, leave it empty
+- Verification must reflect an existing check; if no verification framework exists yet, leave it empty and update it when one exists
+
+Default section order:
+- Purpose
+- Ownership
+- Local Contracts
+- Work Guidance
+- Verification
+- Child DOX Index
+
+## Style
+
+- Keep docs concise, current, and operational
+- Document stable contracts, not diary entries
+- Put broad rules in parent docs and concrete details in child docs
+- Prefer direct bullets with explicit names
+- Do not duplicate rules across many files unless each scope needs a specific version
+- Delete stale notes instead of explaining history
+- Trim obvious statements, repeated rules, misplaced detail, and warnings for risks that no longer exist
+
+## Closeout
+
+1. Re-check changed paths against the DOX chain
+2. Update nearest owning docs and any affected parents or children
+3. Refresh every affected Child DOX Index
+4. Remove stale or contradictory text
+5. Run existing verification when relevant
+6. Report any docs intentionally left unchanged and why
+
+## User Preferences
+
+When the user requests a durable behavior change, record it here or in the relevant child AGENTS.md
+
+## Child DOX Index
+
+This project is not yet indexed. Before continuing you must scan the project, build the DOX tree and replace this message with the actual index. Go deep and scan files recursively to properly evaluate complexity and create nested DOX files where needed.
