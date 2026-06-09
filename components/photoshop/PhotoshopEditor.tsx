@@ -29,10 +29,13 @@ import { TextInputDialog } from './tools/TextInputDialog';
 import { Cheatsheet } from './Cheatsheet';
 import { AIPanel } from './ai/AIPanel';
 import { AIPhotoAction } from '../../services/aiPhotoService';
+
+let layerIdCounter = 0;
+function nextLayerId(): string { return `ps-layer-${++layerIdCounter}-${Date.now()}`; }
 import { AdjustmentsPanel } from './adjustments/AdjustmentsPanel';
 import { FilterGallery } from './adjustments/FilterGallery';
 import { compositeAdjustment } from '../../utils/canvasFilters';
-import { renderTextOnCanvas } from './tools/textUtils';
+import { renderTextToDataUrl, rerenderTextLayer, TextLayerData } from './tools/textUtils';
 import { drawBrushStroke, fillCanvas } from './tools/colorUtils';
 import { drawShapeOnCanvas, drawGradientOnCanvas } from './tools/shapeUtils';
 
@@ -88,7 +91,10 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('center');
   const [textLineHeight, setTextLineHeight] = useState(1.2);
   const [textBgColor, setTextBgColor] = useState<string | undefined>(undefined);
+
+
   const [textInputOpen, setTextInputOpen] = useState(false);
+  const [editingTextLayer, setEditingTextLayer] = useState<string | null>(null);
   const [cheatsheetOpen, setCheatsheetOpen] = useState(false);
   const [adjustmentsOpen, setAdjustmentsOpen] = useState(false);
   const [brushMode, setBrushMode] = useState<'brush' | 'eraser' | 'fill'>('brush');
@@ -101,14 +107,15 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [resizeDialogOpen, setResizeDialogOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   // Open text input dialog
-  const handleAddText = useCallback(() => {
+  const openTextDialog = useCallback(() => {
     setTextInputOpen(true);
   }, []);
 
   // Handle text tool canvas click — open dialog and set position
   // (Text is rendered on a new layer after the dialog confirms)
 
-  // Open ResizeDialog when resize tool is selected in toolbar
+    
+// Open ResizeDialog when resize tool is selected in toolbar
   useEffect(() => {
     if (activeTool === 'resize') {
       setResizeDialogOpen(true);
@@ -138,20 +145,64 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     loadLayers, clearLayers, setLayers,
   } = useLayerManager(canvas.width, canvas.height);
 
+  // Handle text confirmation from TextInputDialog — create or update text layer
+  const handleTextConfirm = useCallback((text: string, editLayerId?: string) => {
+    if (!text.trim()) return;
+    const textData: TextLayerData = {
+      content: text,
+      fontFamily: textFont,
+      fontSize: textSize,
+      fontWeight: textWeight,
+      fontStyle: textStyle,
+      color: textColor,
+      bgColor: textBgColor || undefined,
+      textAlign: textAlign,
+      lineHeight: textLineHeight,
+      letterSpacing: 0,
+    };
+    if (editLayerId) {
+      const result = rerenderTextLayer(textData);
+      updateLayer(editLayerId, {
+        dataUrl: result.dataUrl,
+        width: result.width,
+        height: result.height,
+        text: textData,
+      });
+      setActiveLayerId(editLayerId);
+    } else {
+      const result = renderTextToDataUrl(
+        text, textFont, textSize, textWeight, textStyle,
+        textColor, textBgColor, textAlign, textLineHeight, 400
+      );
+      const id = 'ps-layer-text-' + Date.now();
+      setLayers(prev => [...prev, {
+        id,
+        name: 'Text ' + (prev.length + 1),
+        type: 'text' as const,
+        visible: true,
+        locked: false,
+        opacity: 1,
+        blendMode: 'normal' as const,
+        dataUrl: result.dataUrl,
+        x: 0, y: 0,
+        width: result.width,
+        height: result.height,
+        text: textData,
+      }]);
+      setActiveLayerId(id);
+    }
+    setTextInputOpen(false);
+    setActiveTool('move');
+    setEditingTextLayer(null);
+  }, [textFont, textSize, textWeight, textStyle, textColor, textBgColor, textAlign, textLineHeight, setLayers, setActiveLayerId, updateLayer, setActiveTool]);
+
+
+
   const {
     pushSnapshot, undo, redo, canUndo, canRedo, clearHistory,
   } = useHistory();
 
-  // Push snapshot when layers change (debounced)
-  const lastSnapshot = useRef(0);
-  useEffect(() => {
-    if (layers.length === 0) return;
-    const now = Date.now();
-    if (now - lastSnapshot.current > 500) {
-      lastSnapshot.current = now;
-      pushSnapshot(layers, `Layer change`);
-    }
-  }, [layers, pushSnapshot]);
+
 
   // Load initial image
   useEffect(() => {
@@ -192,6 +243,8 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const zoomOutRef = useRef(zoomOut);
   const zoomToRef = useRef(zoomTo);
   const layersRef = useRef(layers);
+  const removeLayerRef = useRef(removeLayer);
+  const activeLayerIdRef = useRef(activeLayerId);
   undoRef.current = undo;
   redoRef.current = redo;
   loadLayersRef.current = loadLayers;
@@ -199,6 +252,8 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   zoomOutRef.current = zoomOut;
   zoomToRef.current = zoomTo;
   layersRef.current = layers;
+  removeLayerRef.current = removeLayer;
+  activeLayerIdRef.current = activeLayerId;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -229,6 +284,11 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       };
       if (toolMap[key]) {
         setActiveTool(toolMap[key]);
+      }
+      if (key === 'delete' || key === 'backspace') {
+        e.preventDefault();
+        if (activeLayerIdRef.current) removeLayerRef.current(activeLayerIdRef.current);
+        return;
       }
       if (key === '?' || key === '/') {
         setCheatsheetOpen(prev => !prev);
@@ -288,6 +348,10 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         if (type === 'filterPreset' && params.preset && params.preset !== 'normal') {
           const result = await compositeAdjustment(tempCanvas, 'filterPreset', { preset: params.preset });
           updateLayer(activeLayerId, { dataUrl: result });
+        } else if (type === 'filterPreset' && params.preset === 'normal') {
+          // Normal = revert to pre-adjustment state (undo)
+          const snapResult = undoRef.current(layers);
+          if (snapResult) loadLayersRef.current(snapResult);
         } else if (type !== 'filterPreset') {
           const result = await compositeAdjustment(tempCanvas, type, params);
           updateLayer(activeLayerId, { dataUrl: result });
@@ -295,7 +359,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       };
       img.src = layer.dataUrl;
     } catch (e) { console.error('Adjustment error:', e); }
-  }, [activeLayerId, layers, pushSnapshot, updateLayer]);
+  }, [activeLayerId, layers, pushSnapshot, updateLayer, undoRef, loadLayersRef]);
   // AI handler — receives action + prompt, calls service, updates layer
   const handleAIAction = useCallback(async (action: AIPhotoAction, prompt: string) => {
     if (!isAuthenticated || !activeLayerId || aiGenerating) return;
@@ -370,6 +434,10 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       if (!activeLayerId || isDrawing) return;
       const layer = layers.find(l => l.id === activeLayerId);
       if (!layer || !layer.dataUrl) return;
+      setIsDrawing(true);
+      pushSnapshot(layers, 'Paint stroke');
+      drawStartPos.current = { x: cx - layer.x, y: cy - layer.y };
+      lastMousePos.current = { x: cx - layer.x, y: cy - layer.y };
       // Pre-load layer image into a persistent offscreen canvas
       const img = new Image();
       img.onload = () => {
@@ -384,11 +452,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         ctx.clearRect(0, 0, strokeCanvas.current.width, strokeCanvas.current.height);
         ctx.drawImage(img, 0, 0);
         const mode = activeTool === 'brush' ? brushMode === 'eraser' ? 'eraser' as const : 'brush' as const : 'eraser' as const;
-        drawBrushStroke(ctx, cx - layer.x, cy - layer.y, cx - layer.x, cy - layer.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
-        setIsDrawing(true);
-        drawStartPos.current = { x: cx - layer.x, y: cy - layer.y };
-        lastMousePos.current = { x: cx - layer.x, y: cy - layer.y };
-        pushSnapshot(layers, 'Paint stroke');
+        drawBrushStroke(ctx, drawStartPos.current.x, drawStartPos.current.y, drawStartPos.current.x, drawStartPos.current.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
       };
       img.src = layer.dataUrl;
       return;
@@ -739,7 +803,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
                   if (p.lineHeight !== undefined) setTextLineHeight(p.lineHeight);
                   if (p.bgColor !== undefined) setTextBgColor(p.bgColor);
                 }}
-                onAddText={handleAddText}
+                onAddText={openTextDialog}
               />
             </div>
           ) : activeTool === 'gradient' ? (
@@ -848,22 +912,14 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       {textInputOpen && (
         <TextInputDialog
           fontFamily={textFont} fontSize={textSize} fontWeight={textWeight}
-          fontStyle={textStyle} color={textColor} textAlign={textAlign}
+          fontStyle={textStyle} textColor={textColor} textAlign={textAlign}
+          lineHeight={textLineHeight}
+          existingText={layers.find(l => l.id === editingTextLayer)?.text?.content || ''}
           onConfirm={(txt) => {
             setTextInputOpen(false);
-            // Create new layer with rendered text
-            const tf = textFont; const ts = textSize; const tw = textWeight;
-            const tst = textStyle; const tc = textColor; const ta = textAlign;
-            const tlh = textLineHeight; const tbg = textBgColor;
-            try {
-              const c = renderTextOnCanvas(txt, tf, ts, tw, tst, tc, ta, tlh, tbg);
-              addImageLayer(c.toDataURL(), c.width, c.height);
-              pushSnapshot(layers, 'Add text');
-            } catch (e) {
-              console.error('Text render error:', e);
-            }
+            handleTextConfirm(txt, editingTextLayer || undefined);
           }}
-          onClose={() => setTextInputOpen(false)}
+          onClose={() => { setTextInputOpen(false); setEditingTextLayer(null); }}
         />
       )}
       {resizeDialogOpen && (

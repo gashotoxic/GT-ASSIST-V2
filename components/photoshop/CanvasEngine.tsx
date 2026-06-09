@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { CanvasState, PhotoshopLayer, BlendMode } from '../../types/photoshop';
+import { renderTextOnCtx, TextLayerData } from './tools/textUtils';
 
 interface CanvasEngineProps {
   canvas: CanvasState;
@@ -132,9 +133,21 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
       ctx.globalAlpha = layer.opacity;
       applyBlendMode(ctx, layer.blendMode);
 
-      const cached = imageCache.current.get(layer.id);
-      if (cached) {
-        ctx.drawImage(cached, layer.x, layer.y, layer.width, layer.height);
+      // Text layers: render live from text data (re-editable)
+      if (layer.text && layer.text.content) {
+        renderTextOnCtx(
+          ctx, layer.text.content, layer.text.fontFamily, layer.text.fontSize,
+          layer.text.fontWeight, layer.text.fontStyle,
+          layer.text.color, layer.text.bgColor,
+          layer.text.textAlign,
+          layer.text.lineHeight,
+          layer.x, layer.y, layer.width, layer.height
+        );
+      } else {
+        const cached = imageCache.current.get(layer.id);
+        if (cached) {
+          ctx.drawImage(cached, layer.x, layer.y, layer.width, layer.height);
+        }
       }
       ctx.restore(); // restore per-layer
     }
