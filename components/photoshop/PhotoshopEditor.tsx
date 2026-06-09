@@ -33,7 +33,7 @@ import { AdjustmentsPanel } from './adjustments/AdjustmentsPanel';
 import { FilterGallery } from './adjustments/FilterGallery';
 import { compositeAdjustment } from '../../utils/canvasFilters';
 import { renderTextOnCanvas } from './tools/textUtils';
-import { applyPaintOnCanvas } from './tools/colorUtils';
+import { drawBrushStroke, fillCanvas } from './tools/colorUtils';
 import { drawShapeOnCanvas, drawGradientOnCanvas } from './tools/shapeUtils';
 
 interface PhotoshopEditorProps {
@@ -95,6 +95,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const drawStartPos = useRef({ x: 0, y: 0 });
   const lastMousePos = useRef({ x: 0, y: 0 });
+  const strokeCanvas = useRef<HTMLCanvasElement | null>(null); // persistent offscreen for brush strokes
   const [gridType, setGridType] = useState<'none' | 'thirds' | 'golden' | 'square'>('thirds');
   const [imageLoaded, setImageLoaded] = useState(false);
   const [resizeDialogOpen, setResizeDialogOpen] = useState(false);
@@ -342,8 +343,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     offscreen.height = canvas.height;
     const ctx = offscreen.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = brush.color;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    fillCanvas(offscreen, brush.color);
     updateLayer(activeLayerId, { dataUrl: offscreen.toDataURL() });
   }, [activeLayerId, layers, canvas, brush, pushSnapshot, updateLayer]);
 
@@ -365,25 +365,29 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       pushSnapshot(layers, 'Move layer');
       return;
     }
-    // Brush/eraser drawing
+    // Brush/eraser drawing — persistent canvas, no async Image() per pixel
     if (activeTool === 'brush' || activeTool === 'eraser') {
-      if (!activeLayerId) return;
+      if (!activeLayerId || isDrawing) return;
       const layer = layers.find(l => l.id === activeLayerId);
       if (!layer || !layer.dataUrl) return;
-      // Get the canvas from the image cache or create one
+      // Pre-load layer image into a persistent offscreen canvas
       const img = new Image();
       img.onload = () => {
-        const offscreen = document.createElement('canvas');
-        offscreen.width = layer.width;
-        offscreen.height = layer.height;
-        const ctx = offscreen.getContext('2d');
+        if (!strokeCanvas.current || strokeCanvas.current.width !== layer.width || strokeCanvas.current.height !== layer.height) {
+          const cvs = document.createElement('canvas');
+          cvs.width = layer.width;
+          cvs.height = layer.height;
+          strokeCanvas.current = cvs;
+        }
+        const ctx = strokeCanvas.current.getContext('2d');
         if (!ctx) return;
+        ctx.clearRect(0, 0, strokeCanvas.current.width, strokeCanvas.current.height);
         ctx.drawImage(img, 0, 0);
         const mode = activeTool === 'brush' ? brushMode === 'eraser' ? 'eraser' as const : 'brush' as const : 'eraser' as const;
-        applyPaintOnCanvas(offscreen, cx - layer.x, cy - layer.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
-        updateLayer(activeLayerId, { dataUrl: offscreen.toDataURL() });
+        drawBrushStroke(ctx, cx - layer.x, cy - layer.y, cx - layer.x, cy - layer.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
         setIsDrawing(true);
-        drawStartPos.current = { x: cx, y: cy };
+        drawStartPos.current = { x: cx - layer.x, y: cy - layer.y };
+        lastMousePos.current = { x: cx - layer.x, y: cy - layer.y };
         pushSnapshot(layers, 'Paint stroke');
       };
       img.src = layer.dataUrl;
@@ -410,30 +414,30 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       });
       return;
     }
-    // Brush/eraser drawing while moving
+    // Brush/eraser drawing while moving — paint ONTO persistent canvas (no Image loading)
     lastMousePos.current = { x: cx, y: cy };
-    if ((activeTool === 'brush' || activeTool === 'eraser') && isDrawing && activeLayerId) {
+    if ((activeTool === 'brush' || activeTool === 'eraser') && isDrawing && activeLayerId && strokeCanvas.current) {
       const layer = layers.find(l => l.id === activeLayerId);
-      if (!layer || !layer.dataUrl) return;
-      const img = new Image();
-      img.onload = () => {
-        const offscreen = document.createElement('canvas');
-        offscreen.width = layer.width;
-        offscreen.height = layer.height;
-        const ctx = offscreen.getContext('2d');
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0);
-        const mode = activeTool === 'brush' ? brushMode === 'eraser' ? 'eraser' as const : 'brush' as const : 'eraser' as const;
-        applyPaintOnCanvas(offscreen, cx - layer.x, cy - layer.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
-        updateLayer(activeLayerId, { dataUrl: offscreen.toDataURL() });
-      };
-      img.src = layer.dataUrl;
+      if (!layer) return;
+      const ctx = strokeCanvas.current.getContext('2d');
+      if (!ctx) return;
+      const prev = drawStartPos.current;
+      const cur = { x: cx - layer.x, y: cy - layer.y };
+      const mode = activeTool === 'brush' ? brushMode === 'eraser' ? 'eraser' as const : 'brush' as const : 'eraser' as const;
+      drawBrushStroke(ctx, prev.x, prev.y, cur.x, cur.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
+      drawStartPos.current = cur;
     }
   }, [activeTool, activeLayerId, updateLayer, layers, isDrawing, brush, brushMode]);
 
   // Move/select tool: canvas mouse up
   const handleMouseUpCanvas = useCallback(() => {
     isDragging.current = false;
+    // Finalize brush/eraser stroke — commit to layer
+    if ((activeTool === 'brush' || activeTool === 'eraser') && activeLayerId && strokeCanvas.current) {
+      const dataUrl = strokeCanvas.current.toDataURL();
+      updateLayer(activeLayerId, { dataUrl });
+      strokeCanvas.current = null;
+    }
     setIsDrawing(false);
     // Finalize shape/gradient — actually draw on the layer
     if (activeTool === 'shape' || activeTool === 'gradient') {

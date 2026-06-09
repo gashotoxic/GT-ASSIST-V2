@@ -1,6 +1,7 @@
 /**
- * Color utilities for the Photoshop drawing tools.
+ * Color and brush utilities for Photoshop drawing tools.
  */
+
 export function hexToRgba(hex: string, alpha: number): string {
   const clean = hex.replace('#', '');
   const r = parseInt(clean.slice(0, 2), 16);
@@ -10,75 +11,82 @@ export function hexToRgba(hex: string, alpha: number): string {
 }
 
 /**
- * Creates a circle brush alpha mask (1D array).
+ * Draw a single brush dab at (x, y) using arc() — fast and hardware-accelerated.
  */
-export function createCircleBrush(size: number, hardness: number): Uint8ClampedArray {
-  const mask = new Uint8ClampedArray(size * size);
-  const radius = size / 2;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = x - radius + 0.5;
-      const dy = y - radius + 0.5;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist >= radius) {
-        mask[y * size + x] = 0;
-      } else {
-        const t = dist / radius;
-        let alpha: number;
-        if (t <= hardness) {
-          alpha = 255;
-        } else {
-          const s = (t - hardness) / (1 - hardness);
-          alpha = Math.round((1 - s * s * (3 - 2 * s)) * 255);
-        }
-        mask[y * size + x] = Math.max(0, alpha);
-      }
-    }
-  }
-  return mask;
-}
-
-/**
- * Paint a dab on a canvas at (x, y) with brush parameters.
- */
-export function applyPaintOnCanvas(
-  canvas: HTMLCanvasElement,
+export function drawDab(
+  ctx: CanvasRenderingContext2D,
   x: number, y: number,
-  size: number, hardness: number, opacity: number,
+  size: number, hardness: number,
   color: string,
   mode: 'brush' | 'eraser'
 ): void {
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-
-  const mask = createCircleBrush(size, hardness);
-  const radius = size / 2;
-  const sx = Math.round(x - radius);
-  const sy = Math.round(y - radius);
-  const startX = Math.max(0, sx);
-  const startY = Math.max(0, sy);
-  const endX = Math.min(canvas.width, sx + size);
-  const endY = Math.min(canvas.height, sy + size);
+  ctx.save();
 
   if (mode === 'eraser') {
     ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'white';
   } else {
-    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = color;
   }
 
-  for (let py = startY; py < endY; py++) {
-    for (let px = startX; px < endX; px++) {
-      const mx = px - sx;
-      const my = py - sy;
-      const a = mask[my * size + mx] / 255;
-      if (a > 0) {
-        ctx.globalAlpha = a * opacity;
-        ctx.fillRect(px, py, 1, 1);
-      }
-    }
+  // Soft brush: use radial gradient for smooth falloff
+  if (hardness < 1 && mode === 'brush') {
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, size / 2);
+    grad.addColorStop(0, color);
+    grad.addColorStop(hardness, color);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
   }
 
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Draw a brush stroke segment between two points using interpolated dabs.
+ */
+export function drawBrushStroke(
+  ctx: CanvasRenderingContext2D,
+  fromX: number, fromY: number,
+  toX: number, toY: number,
+  size: number, hardness: number,
+  opacity: number,
+  color: string,
+  mode: 'brush' | 'eraser'
+): void {
+  const dist = Math.sqrt((toX - fromX) ** 2 + (toY - fromY) ** 2);
+  if (dist < 0.5) {
+    // Single dot
+    ctx.globalAlpha = opacity;
+    drawDab(ctx, toX, toY, size, hardness, color, mode);
+    ctx.globalAlpha = 1;
+    return;
+  }
+
+  const step = Math.max(1, size * 0.3);
+  const steps = Math.max(1, Math.floor(dist / step));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const px = fromX + (toX - fromX) * t;
+    const py = fromY + (toY - fromY) * t;
+    ctx.globalAlpha = opacity;
+    drawDab(ctx, px, py, size, hardness, color, mode);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/**
+ * Fill the entire canvas with a solid color (for Fill tool).
+ */
+export function fillCanvas(
+  canvas: HTMLCanvasElement,
+  color: string
+): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
