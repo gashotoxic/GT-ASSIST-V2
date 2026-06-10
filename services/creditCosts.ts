@@ -15,12 +15,12 @@ export const CREDIT_COSTS = {
     default: 1
   },
   image: {
-    hunyuan: 1,
-    'qwen-image': 1,
+    'qwen-image-2512': 1,
     'z-image-turbo': 1,
-    hidream: 1,
-    'juggernaut-xl': 1,
-    'flux-schnell': 1,
+    'flux': 1,
+    'dreamshaper': 1,
+    'ilustmix': 1,
+    'juggernaut': 1,
     default: 1
   },
   video: {
@@ -33,6 +33,9 @@ export const CREDIT_COSTS = {
   },
   edit: {
     'qwen-image-edit': 1,
+    'remove_bg': 1,
+    'upscale': 2,
+    'style_transfer': 1,
     default: 1
   },
   // Media studio operations
@@ -40,6 +43,17 @@ export const CREDIT_COSTS = {
     image: 1,
     edit: 1,
     video: 1
+  },
+  // Photoshop Corner AI operations
+  photoshop_ai: {
+    generate: 5,
+    edit: 3,
+    remove_bg: 2,
+    upscale_2x: 3,
+    upscale_4x: 4,
+    smart_fill: 3,
+    style_transfer: 3,
+    default: 3
   }
 };
 

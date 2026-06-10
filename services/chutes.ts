@@ -4,8 +4,8 @@ import { SearchAgent } from './searchAgent';
 import { isLtx2Model, buildLtx2GenerationInput } from './chutesLtx2';
 
 const BASE_LLM_URL = 'https://llm.chutes.ai/v1/chat/completions';
-const BASE_TTS_URL = 'https://chutes-kokoro.chutes.ai/speak';
-const BASE_STT_URL = 'https://chutes-whisper-large-v3.chutes.ai/transcribe';
+const BASE_TTS_URL = 'https://vonkaiser-audiodojo.chutes.ai/speak';
+const BASE_STT_URL = 'https://vonkaiser-audiodojo.chutes.ai/stt/whisper';
 const BASE_MUSETALK_URL = 'https://chutes-musetalk.chutes.ai/generate';
 
 export class ChutesService {
@@ -135,7 +135,7 @@ export class ChutesService {
     // but reusing streamChat is cleaner to keep the codebase consistent.
     let fullResponse = '';
     // Use a fast model for this
-    const stream = this.streamChat(messages, systemPrompt, 'NousResearch/DeepHermes-3-Mistral-24B-Preview');
+    const stream = this.streamChat(messages, systemPrompt, 'Qwen/Qwen3-32B-TEE');
 
     for await (const chunk of stream) {
       if (chunk.type === 'content') {
@@ -505,8 +505,8 @@ export class ChutesService {
     const { width, height } = this.getImageDimensions(request.aspectRatio);
     let body: any = { prompt: request.prompt, width, height };
 
-    // Model Specific Logic
-    if (request.modelId === 'qwen-image-2.5-12b') {
+    // Model Specific Logic (updated for vonkaiser endpoints)
+    if (request.modelId === 'qwen-image-2512') {
       body = {
         model: "Qwen-Image-2512",
         prompt: request.prompt,
@@ -516,56 +516,40 @@ export class ChutesService {
         height,
         num_inference_steps: 50
       };
-    } else if (request.modelId === 'qwen-image') {
+    } else if (request.modelId === 'z-image-turbo') {
+      // Z-Image Turbo does NOT accept width/height params
       body = {
-        model: "qwen-image",
+        prompt: request.prompt
+      };
+    } else if (request.modelId === 'flux') {
+      // ImageClassic bundle — FLUX.1 schnell (1-4 steps, no negative prompt needed)
+      body = {
+        model: "flux",
         prompt: request.prompt,
-        negative_prompt: "blur, distortion, low quality, ugly, deformed",
-        guidance_scale: 7.5,
         width,
         height,
-        num_inference_steps: 50
-      };
-    } else if (request.modelId === 'juggernaut-xl') {
-      body = {
-        model: "JuggernautXL-Ragnarok",
-        prompt: request.prompt,
-        negative_prompt: "blur, distortion, low quality, ugly, deformed",
-        guidance_scale: 7.5,
-        width,
-        height,
-        num_inference_steps: 50
-      };
-    } else if (request.modelId === 'flux-schnell') {
-      body = {
-        model: "FLUX.1-schnell",
-        prompt: request.prompt,
-        negative_prompt: "blur, distortion, low quality, ugly, deformed",
-        guidance_scale: 7.5,
-        width,
-        height,
-        num_inference_steps: 50
-      };
-    } else if (request.modelId === 'hidream') {
-      body = {
         seed: null,
+        num_inference_steps: 4
+      };
+    } else if (['dreamshaper', 'ilustmix', 'juggernaut'].includes(request.modelId || '')) {
+      // ImageClassic bundle — SDXL models (25 steps, supports negative prompt)
+      body = {
+        model: request.modelId,
         prompt: request.prompt,
+        negative_prompt: "blur, distortion, low quality, ugly, deformed",
+        guidance_scale: 7.5,
         width,
         height,
-        resolution: `${width}x${height}`,
-        guidance_scale: 5,
-        num_inference_steps: 50
+        seed: null,
+        num_inference_steps: 25
       };
     } else if (!request.modelId && request.modelUrl) {
       // Custom Model Fallback "Smart Payload"
-      // We try to send a superset of common fields. 
-      // Most well-behaved APIs will ignore extra fields.
       body = {
         prompt: request.prompt,
-        model: "custom", // Some APIs require this field to be present
+        model: "custom",
         width,
         height,
-        resolution: `${width}x${height}`,
         guidance_scale: 7.5,
         num_inference_steps: 40,
         negative_prompt: "blur, low quality"
@@ -603,6 +587,60 @@ export class ChutesService {
       true_cfg_scale: 4,
       negative_prompt: "",
       num_inference_steps: 40
+    };
+
+    const response = await this.fetchWithRetry(request.modelUrl, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(body),
+      signal
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Image Edit Error: ${response.status} - ${errorText}`);
+    }
+
+    return await response.blob();
+  }
+
+  async editImageAdvanced(request: ImageEditRequest, signal?: AbortSignal): Promise<Blob> {
+    let cleanImage = request.image_b64;
+    if (cleanImage.includes('base64,')) {
+      cleanImage = cleanImage.split('base64,')[1];
+    }
+
+    // Build prompt based on edit mode
+    let finalPrompt = request.prompt;
+    const mode = request.editMode || 'smart';
+    const stylePreset = request.stylePreset;
+
+    if (mode === 'remove_bg') {
+      finalPrompt = 'Remove the background from this image, keep only the subject, make background transparent or white.';
+    } else if (mode === 'upscale') {
+      finalPrompt = 'Upscale this image to higher resolution, enhance details, make it crisp, sharp and clear with no artifacts.';
+    } else if (mode === 'style_transfer' && stylePreset) {
+      const styleMap: Record<string, string> = {
+        cyberpunk: 'Apply cyberpunk style: neon lights, dark atmosphere, blue/pink color scheme, futuristic',
+        oil_painting: 'Apply oil painting style: thick brush strokes, rich textures, artistic, classical painting look',
+        sketch: 'Apply sketch style: pencil drawing, black and white, line art, hand-drawn look',
+        anime: 'Apply anime style: cel-shaded, vibrant colors, Japanese animation aesthetic, clean lines',
+        vintage: 'Apply vintage style: sepia tones, retro, old photograph look, film grain',
+        neon: 'Apply neon style: glowing neon lines, dark background, bright fluorescent colors, 80s aesthetic',
+      };
+      finalPrompt = `${styleMap[stylePreset] || 'Apply artistic style'}. ${request.prompt || ''}`.trim();
+    }
+
+    const { width, height } = this.getImageDimensions(request.aspectRatio);
+    const body = {
+      seed: null,
+      width,
+      height,
+      prompt: finalPrompt,
+      image_b64s: [cleanImage],
+      true_cfg_scale: 4,
+      negative_prompt: "",
+      num_inference_steps: mode === 'remove_bg' ? 30 : mode === 'upscale' ? 50 : 40
     };
 
     const response = await this.fetchWithRetry(request.modelUrl, {
@@ -658,12 +696,7 @@ export class ChutesService {
 
       body = {
         prompt: request.prompt,
-        image: cleanImage,
-        frames: 81,
-        resolution: "480p",
-        seed: null,
-        negative_prompt: "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
-        guidance_scale_2: 1
+        image_b64: cleanImage
       };
     }
 

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Image, Film, Loader2, Wand2, Upload, AlertCircle, Play, Scissors, ArrowRight, Video, XCircle, Camera, X, Check, Grid, Filter, Type, FileImage, Trash2 } from 'lucide-react';
+import { Image, Film, Loader2, Wand2, Upload, AlertCircle, Play, Scissors, ArrowRight, Video, XCircle, Camera, X, Check, Grid, Filter, Type, FileImage, Trash2, Layers } from 'lucide-react';
 import { Button, Input, Textarea, Select, Label } from './UI';
 import { AVAILABLE_VIDEO_MODELS, AppSettings, MediaItem, ImageAspectRatio, Ltx2AdvancedSettings } from '../types';
 import { getCreditCost } from '../services/creditCosts';
@@ -20,6 +20,7 @@ import { MediaCaptureFrameModal } from './media/MediaCaptureFrameModal';
 import { useMediaHistory } from './media/hooks/useMediaHistory';
 import { useMediaGeneration } from './media/hooks/useMediaGeneration';
 import { useMediaHandlers } from './media/hooks/useMediaHandlers';
+import { PhotoshopEditor } from './photoshop/PhotoshopEditor';
 
 interface MediaStudioProps {
     settings: AppSettings;
@@ -42,7 +43,7 @@ const Progress: React.FC<{ value: number }> = ({ value }) => (
 type GenType = 'image' | 'edit' | 'video';
 
 const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, onRequestAuth, userId, onTabChange }) => {
-    const [activeTab, setActiveTab] = useState<GenType | 'gallery'>('image');
+    const [activeTab, setActiveTab] = useState<GenType | 'gallery' | 'photoshop'>('image');
     const { refetch, credits, dailyCredits, subscriptionTier, canAfford } = useCredits();
 
     // Notify parent when tab changes
@@ -65,6 +66,10 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
 
     // Image Edit State
     const [editPrompt, setEditPrompt] = useState('');
+    const [editMode, setEditMode] = useState<'smart' | 'remove_bg' | 'upscale' | 'style_transfer'>('smart');
+    const [stylePreset, setStylePreset] = useState('cyberpunk');
+    const [editHistory, setEditHistory] = useState<string[]>([]);
+    const [showBeforeAfter, setShowBeforeAfter] = useState(false);
     const [editSourceImage, setEditSourceImage] = useState<string | null>(null);
     const [editAspectRatio, setEditAspectRatio] = useState<ImageAspectRatio>('1:1');
     const [editedImageUrl, setEditedImageUrl] = useState<string | null>(null);
@@ -296,6 +301,9 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         handleUsePreviewVideoForLipSync,
         handleExtendVideo,
         applyQuickEdit,
+        handleAdvancedEdit,
+        handleEditAgain,
+        handleUndo,
     } = useMediaHandlers({
         chutesService,
         addToHistory,
@@ -315,6 +323,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         editAspectRatio,
         setEditedImageUrl,
         setEditedImageItem,
+        editedImageUrl,
         videoPrompt,
         videoMode,
         sourceImage,
@@ -339,6 +348,10 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         setLipsyncVideoPreviewKind,
         setLipsyncVideoPreviewUrl,
         setLipsyncVideoUrl,
+        editMode,
+        stylePreset,
+        editHistory,
+        setEditHistory,
     });
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
@@ -384,6 +397,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                     { id: 'image', label: 'Image', icon: Image },
                     { id: 'edit', label: 'Editor', icon: Scissors },
                     { id: 'video', label: 'Animator', icon: Film },
+                    { id: 'photoshop', label: 'PS', icon: Layers },
                     { id: 'gallery', label: 'Gallery', icon: Grid }
                 ].map((tab) => (
                     <button
@@ -397,7 +411,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                         <div className="relative">
                             <tab.icon className={`w-4 h-4 transition-transform group-hover:scale-110 ${activeTab === tab.id ? 'text-primary' : ''}`} />
                             {/* Show tiny dot if this tab is generating in background */}
-                            {tab.id !== 'gallery' && genStatus[tab.id as GenType].isGenerating && activeTab !== tab.id && (
+                            {tab.id !== 'gallery' && tab.id !== 'photoshop' && genStatus[tab.id as GenType]?.isGenerating && activeTab !== tab.id && (
                                 <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 rounded-full bg-primary animate-pulse border border-white dark:border-slate-900"></span>
                             )}
                         </div>
@@ -410,7 +424,17 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar min-h-0">
-                {activeTab === 'gallery' ? (
+                {activeTab === 'gallery' || activeTab === 'photoshop' ? activeTab === 'photoshop' ? (
+                            <div className="w-full h-full min-h-[500px]">
+                                <PhotoshopEditor
+                                    initialImageUrl={generatedImageUrl || editedImageUrl}
+                                    onClose={() => setActiveTab('image')}
+                                    isAuthenticated={isAuthenticated}
+                                    onRequestAuth={onRequestAuth}
+                                    userId={userId}
+                                />
+                            </div>
+                        ) : (
                     <MediaGalleryPanel
                         filteredHistory={filteredHistory}
                         galleryFilter={galleryFilter}
@@ -463,14 +487,30 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                     setEditAspectRatio={setEditAspectRatio}
                                     editPrompt={editPrompt}
                                     setEditPrompt={setEditPrompt}
+                                    editMode={editMode}
+                                    setEditMode={setEditMode}
+                                    stylePreset={stylePreset}
+                                    setStylePreset={setStylePreset}
                                     applyQuickEdit={applyQuickEdit}
                                     isAuthenticated={isAuthenticated}
                                     onRequestAuth={onRequestAuth}
-                                    onGenerate={handleEditGeneration}
+                                    onGenerate={() => {
+                                        if (editMode === 'smart') {
+                                            handleEditGeneration();
+                                        } else {
+                                            handleAdvancedEdit(editMode, stylePreset);
+                                        }
+                                    }}
                                     canAfford={canAfford}
                                     genStatus={genStatus.edit}
                                     Progress={Progress}
                                     downloadBase64={downloadBase64}
+                                    editHistory={editHistory}
+                                    onEditAgain={handleEditAgain}
+                                    onUndo={handleUndo}
+                                    onPickFromGallery={() => {
+                                        setIsMediaPickerOpen(true);
+                                    }}
                                 />
                             )}
 
@@ -574,7 +614,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                 </div>
                             )}
 
-                            {genStatus[activeTab as GenType]?.error && !genStatus[activeTab as GenType].isGenerating && (
+                            {genStatus[activeTab as GenType]?.error && !genStatus[activeTab as GenType]?.isGenerating && (
                                 <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30 text-red-600 dark:text-red-300 text-sm flex items-start gap-3 animate-in fade-in slide-in-from-bottom-2 shadow-sm">
                                     <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                                     <span>{genStatus[activeTab as GenType].error}</span>
@@ -601,6 +641,8 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                     onOpenItem={setSelectedMediaItem}
                                     toggleFullscreen={toggleFullscreen}
                                     handleCaptureCurrentFrame={handleCaptureCurrentFrame}
+                                    showBeforeAfter={activeTab === 'edit' && showBeforeAfter}
+                                    sourceImageUrl={editHistory.length > 0 ? editHistory[editHistory.length - 1] : null}
                                 />
                             </div>
 
@@ -614,6 +656,9 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                 handleCaptureCurrentFrame={handleCaptureCurrentFrame}
                                 handleExtendVideo={handleExtendVideo}
                                 handleUsePreviewVideoForLipSync={handleUsePreviewVideoForLipSync}
+                                editHistory={editHistory}
+                                onEditAgain={handleEditAgain}
+                                onUndo={handleUndo}
                             />
                         </div>
                     </div>
@@ -657,11 +702,24 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                 title="Select from Gallery"
                 isOpen={isMediaPickerOpen}
                 items={mediaHistory}
-                filter="video"
+                filter={activeTab === 'edit' ? 'all' : 'video'}
                 onClose={() => setIsMediaPickerOpen(false)}
                 onSelect={async (item) => {
                     setIsMediaPickerOpen(false);
-                    await transferToLipSyncFromVideo(item.url);
+                    if (activeTab === 'edit') {
+                        const url = item.url;
+                        try {
+                            const response = await fetch(url);
+                            const blob = await response.blob();
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                setEditSourceImage(reader.result as string);
+                            };
+                            reader.readAsDataURL(blob);
+                        } catch {}
+                    } else {
+                        await transferToLipSyncFromVideo(item.url);
+                    }
                 }}
             />
 

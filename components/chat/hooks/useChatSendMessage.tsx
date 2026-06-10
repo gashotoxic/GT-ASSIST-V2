@@ -108,6 +108,16 @@ export const useChatSendMessage = ({
           { type: 'text', text: textInput || "Describe this image." },
           { type: 'image_url', image_url: { url: activeAttachment.data } }
         ];
+      } else if (activeAttachment.type === 'video') {
+        userContent = [
+          { type: 'text', text: textInput || "Describe this video." },
+          { type: 'video_url', video_url: { url: activeAttachment.data } }
+        ];
+      } else if (activeAttachment.type === 'audio') {
+        userContent = [
+          { type: 'text', text: textInput || "Transcribe or describe this audio." },
+          { type: 'audio_url', audio_url: { url: activeAttachment.data } }
+        ];
       } else {
         userContent = `${textInput}\n\n[Attached File: ${activeAttachment.name}]\n\`\`\`\n${activeAttachment.data}\n\`\`\``;
       }

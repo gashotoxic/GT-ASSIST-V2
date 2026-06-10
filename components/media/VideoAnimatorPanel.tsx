@@ -78,9 +78,9 @@ export function VideoAnimatorPanel(props: {
 
       <div id="tour-video-model" className="bg-white/30 dark:bg-slate-800/30 p-3 rounded-xl border border-white/40 dark:border-white/5">
         <Label className="mb-2 block text-xs uppercase text-gray-500 font-bold">Model Engine</Label>
-        <Select value={props.selectedVideoModel} onChange={(e) => props.setSelectedVideoModel(e.target.value)}>
+        <Select value={props.selectedVideoModel} onChange={(e) => { const model = AVAILABLE_VIDEO_MODELS.find(v => v.id === e.target.value); if (!(model as any)?.disabled) props.setSelectedVideoModel(e.target.value); }}>
           {AVAILABLE_VIDEO_MODELS.filter(m => m.type === props.videoMode).map(m => (
-            <option key={m.id} value={m.id}>{m.name}</option>
+            <option key={m.id} value={m.id} disabled={(m as any).disabled}>{m.name}</option>
           ))}
         </Select>
       </div>

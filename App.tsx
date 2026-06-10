@@ -18,8 +18,8 @@ const AccountSettingsModal = React.lazy(() => import('./components/AccountSettin
 
 const DEFAULT_SETTINGS: AppSettings = {
   apiKey: 'internal', // Use internal default key
-  model: 'moonshotai/Kimi-K2-Thinking-TEE',
-  brandModel: 'moonshotai/Kimi-K2.5-TEE',
+  model: 'Nemotron-3-Nano-Omni-30B-TEE',
+  brandModel: 'Nemotron-3-Nano-Omni-30B-TEE',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   ttsVoice: 'af_heart',
   ttsSpeed: 1.0,
