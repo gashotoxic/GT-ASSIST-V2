@@ -1,7 +1,7 @@
 # DOX framework — GT-ASSIST-V2
 
 **GT Assistant V2 — flagship web app for GashoTech at create.gashotech.com**
-**Stack:** TypeScript, Web App
+**Stack:** Vite + React SPA, Clerk Auth, Supabase Storage, Chutes API
 
 - DOX is highly performant AGENTS.md hierarchy installed here
 - Agent must follow DOX instructions across any edits
@@ -79,8 +79,23 @@ Default section order:
 
 ## User Preferences
 
-When the user requests a durable behavior change, record it here or in the relevant child AGENTS.md
+- **Git author for Vercel:** gashotoxic <denismugo101@gmail.com>
+- **Vercel projects:** gashochat = GT-ASSIST-V2, gasho-tech = gasho.tech
+- **Design:** pixel-perfect matching, dark theme, slate/green (#1abc9c) accents
+- **AI features must be credit-gated behind auth/subscription**
+- **Coding style:** conventional commits, tests before pushing, DOX pass after changes
+- **Photoshop Corner v2:** manual client-side editing is primary, AI is secondary
 
 ## Child DOX Index
 
-This project is not yet indexed. Before continuing you must scan the project, build the DOX tree and replace this message with the actual index. Go deep and scan files recursively to properly evaluate complexity and create nested DOX files where needed.
+- [components/](./components/AGENTS.md) -- React UI components
+  - [chat/](./components/chat/AGENTS.md) -- Chat Interface
+  - [media/](./components/media/AGENTS.md) -- Media Studio
+  - [photoshop/](./components/photoshop/AGENTS.md) -- Photoshop Corner
+    - [tools/](./components/photoshop/tools/AGENTS.md) -- Photoshop tools
+- [context/](./context/AGENTS.md) -- React context providers
+- [hooks/](./hooks/AGENTS.md) -- Shared React hooks
+- [services/](./services/AGENTS.md) -- External API services
+- [types/](./types/AGENTS.md) -- TypeScript type definitions
+- [utils/](./utils/AGENTS.md) -- Utility functions
+- [supabase/](./supabase/AGENTS.md) -- Supabase backend configuration
