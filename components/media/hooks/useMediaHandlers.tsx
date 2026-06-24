@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { AVAILABLE_EDIT_MODELS, AVAILABLE_IMAGE_MODELS, AVAILABLE_VIDEO_MODELS, ImageAspectRatio, Ltx2AdvancedSettings, MediaItem, MuseTalkLipSyncRequest } from '../../../types';
+import { AVAILABLE_EDIT_MODELS, AVAILABLE_IMAGE_MODELS, AVAILABLE_VIDEO_MODELS, ImageAspectRatio, Ltx23AdvancedSettings, MediaItem, MuseTalkLipSyncRequest } from '../../../types';
 import type { ChutesService } from '../../../services/chutes';
 
 export const useMediaHandlers = ({
@@ -26,7 +26,7 @@ export const useMediaHandlers = ({
   videoMode,
   sourceImage,
   selectedVideoModel,
-  ltx2Settings,
+  ltx23Settings,
   ltx2VideoUrl,
   ltx2KeyframeStart,
   ltx2KeyframeEnd,
@@ -74,7 +74,7 @@ export const useMediaHandlers = ({
   videoMode: 'i2v' | 't2v';
   sourceImage: string | null;
   selectedVideoModel: string;
-  ltx2Settings: Ltx2AdvancedSettings;
+  ltx23Settings: Ltx23AdvancedSettings;
   ltx2VideoUrl: string;
   ltx2KeyframeStart: string | null;
   ltx2KeyframeEnd: string | null;
@@ -227,7 +227,7 @@ export const useMediaHandlers = ({
         modelUrl,
         modelId: selectedVideoModel,
         ltx2Params: model.id.includes('ltx-2') ? {
-          settings: ltx2Settings,
+          settings: ltx23Settings,
           videoUrl: ltx2VideoUrl,
           keyframeStart: ltx2KeyframeStart,
           keyframeEnd: ltx2KeyframeEnd
@@ -252,7 +252,7 @@ export const useMediaHandlers = ({
     deductCredits,
     ltx2KeyframeEnd,
     ltx2KeyframeStart,
-    ltx2Settings,
+    ltx23Settings,
     ltx2VideoUrl,
     selectedVideoModel,
     setGeneratedVideoItem,
