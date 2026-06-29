@@ -26,8 +26,8 @@ export const CREDIT_COSTS = {
   video: {
     'wan-2.2-i2v': 1,
     'wan-2.1-t2v': 1,
-    'ltx-2-i2v': 1,
-    'ltx-2-t2v': 1,
+    'ltx-23-i2v': 1,
+    'ltx-23-t2v': 1,
     musetalk: 1,
     default: 1
   },

@@ -1,8 +1,8 @@
 import React, { useRef } from 'react';
 import { FileImage, Type, Upload, Download, Video, Wand2, Loader2, Film } from 'lucide-react';
 import { Button, Textarea, Select, Label } from '../UI';
-import { AVAILABLE_VIDEO_MODELS, Ltx2AdvancedSettings } from '../../types';
-import { Ltx2AdvancedOptions } from './Ltx2AdvancedOptions';
+import { AVAILABLE_VIDEO_MODELS, Ltx23AdvancedSettings } from '../../types';
+import { Ltx23AdvancedOptions } from './Ltx23AdvancedOptions';
 
 export function VideoAnimatorPanel(props: {
   isAuthenticated: boolean;
@@ -22,8 +22,8 @@ export function VideoAnimatorPanel(props: {
   onGenerate: () => void;
   onDownloadBase64: (base64Data: string, filename: string) => void;
   // LTX-2 Props
-  ltx2Settings: Ltx2AdvancedSettings;
-  setLtx2Settings: (settings: Ltx2AdvancedSettings) => void;
+  ltx23Settings: Ltx23AdvancedSettings;
+  setLtx2Settings: (settings: Ltx23AdvancedSettings) => void;
   ltx2VideoUrl: string;
   setLtx2VideoUrl: (url: string) => void;
   ltx2KeyframeStart: string | null;
@@ -35,16 +35,13 @@ export function VideoAnimatorPanel(props: {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLtx2Open, setIsLtx2Open] = React.useState(false);
 
-  const isLtx2 = props.selectedVideoModel.includes('ltx-2');
-  const isKeyframeMode =
-    props.ltx2Settings.pipeline === 'keyframe_interp' || props.ltx2Settings.conditioning === 'keyframes';
-  const hasKeyframeStart = Boolean(props.ltx2KeyframeStart || (props.videoMode === 'i2v' ? props.sourceImage : null));
+  const isLtx2 = props.selectedVideoModel.includes('ltx-23');
+  const isKeyframeMode = Boolean(props.ltx2KeyframeStart && props.ltx2KeyframeEnd);
+  const hasKeyframeStart = Boolean(props.ltx2KeyframeStart);
   const hasKeyframeEnd = Boolean(props.ltx2KeyframeEnd);
   const ltx2MissingRequiredInputs =
     isLtx2 &&
-    ((props.ltx2Settings.conditioning === 'video_url' && !props.ltx2VideoUrl.trim()) ||
-      (isKeyframeMode && (!hasKeyframeStart || !hasKeyframeEnd)) ||
-      (props.videoMode === 't2v' && props.ltx2Settings.conditioning === 'image'));
+    ((isKeyframeMode && (!hasKeyframeStart || !hasKeyframeEnd)));
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -144,11 +141,11 @@ export function VideoAnimatorPanel(props: {
         />
 
         {isLtx2 && (
-            <Ltx2AdvancedOptions
+            <Ltx23AdvancedOptions
                 isOpen={isLtx2Open}
                 setIsOpen={setIsLtx2Open}
                 videoMode={props.videoMode}
-                settings={props.ltx2Settings}
+                settings={props.ltx23Settings}
                 setSettings={props.setLtx2Settings}
                 videoUrl={props.ltx2VideoUrl}
                 setVideoUrl={props.setLtx2VideoUrl}

@@ -1,12 +1,12 @@
-import { Ltx2AdvancedSettings } from '../types';
+import { Ltx23AdvancedSettings } from '../types';
 
-export const isLtx2Model = (modelId?: string): boolean => {
-    return !!modelId && (modelId.startsWith('ltx-2') || modelId.includes('ltx-2'));
+export const isLtx23Model = (modelId?: string): boolean => {
+    return !!modelId && (modelId.startsWith('ltx-23') || modelId.includes('ltx-23'));
 };
 
 export const normalizeWidthHeight = (val: number): number => {
-    const clamped = Math.max(128, Math.min(1920, val));
-    return Math.round(clamped / 32) * 32;
+    const clamped = Math.max(256, Math.min(3840, val));
+    return Math.round(clamped / 64) * 64;
 };
 
 export const normalizeNumFrames = (val: number): number => {
@@ -17,6 +17,10 @@ export const normalizeNumFrames = (val: number): number => {
     return Math.max(1, result);
 };
 
+export const normalizeFps = (val: number): number => {
+    return Math.max(8, Math.min(50, val));
+};
+
 export const stripDataUrlPrefix = (b64: string | null | undefined): string | null => {
     if (!b64) return null;
     if (b64.includes('base64,')) {
@@ -25,68 +29,51 @@ export const stripDataUrlPrefix = (b64: string | null | undefined): string | nul
     return b64;
 };
 
-export const buildLtx2GenerationInput = (
+export const buildLtx23GenerationInput = (
     prompt: string,
-    settings: Ltx2AdvancedSettings,
+    settings: Ltx23AdvancedSettings,
     conditioningImage?: string | null,
-    conditioningVideoUrl?: string | null,
-    conditioningKeyframeStart?: string | null,
-    conditioningKeyframeEnd?: string | null
+    _conditioningVideoUrl?: string | null,
+    _conditioningKeyframeStart?: string | null,
+    _conditioningKeyframeEnd?: string | null
 ): any => {
-    const args: any = {
+    const input: any = {
         prompt,
+        negative_prompt: settings.negative_prompt || 'shaky, glitchy, low quality, worst quality, deformed, distorted',
         width: normalizeWidthHeight(settings.width ?? 768),
         height: normalizeWidthHeight(settings.height ?? 512),
-        distilled: true,
-        image_url: null,
-        video_url: null,
-        image_b64: null,
-        video_b64: null,
-        frame_rate: settings.frame_rate ?? 25,
-        num_frames: normalizeNumFrames(settings.num_frames ?? 121),
-        image_strength: settings.image_strength ?? 1,
-        video_strength: settings.video_strength ?? 1,
-        negative_prompt: settings.negative_prompt ?? 'low-res, morphing, distortion, warping, flicker, jitter, stutter, shaky camera, erratic motion, temporal artifacts, frame blending, low quality, jpeg artifacts',
-        image_frame_index: 0,
-        cfg_guidance_scale: settings.cfg_guidance_scale ?? 3,
-        num_inference_steps: settings.num_inference_steps ?? 40,
-        enhance_prompt: settings.enhance_prompt ?? false
+        num_frames: settings.num_frames ?? null,
+        fps: normalizeFps(settings.fps ?? 24),
+        duration: settings.duration ?? null,
+        guidance_scale: settings.guidance_scale ?? 3.1,
+        seed: settings.seed ?? null,
+        use_random_seed: settings.use_random_seed ?? true,
+        input_image_b64: null,
+        keyframes: null,
+        enhance_prompt: settings.enhance_prompt ?? false,
+        generate_audio: settings.generate_audio ?? true,
+        video_format: 'mp4',
+        return_json: false
     };
 
-    if (settings.seed !== undefined) {
-        args.seed = settings.seed;
-    }
-
-    if (settings.pipeline && settings.pipeline !== 'distilled') {
-        args.pipeline = settings.pipeline;
-        args.distilled = false;
-    }
-
-    // Conditioning Logic
-    // 'auto' | 'none' | 'image' | 'video_url' | 'keyframes'
-    const cond = settings.conditioning;
-
-    if (cond === 'image' || (cond === 'auto' && conditioningImage)) {
+    // Conditioning: if we have a single image, pass as input_image_b64
+    if (conditioningImage) {
         const b64 = stripDataUrlPrefix(conditioningImage);
         if (b64) {
-            args.image_b64 = b64;
-            args.image_frame_index = 0; // default start
+            input.input_image_b64 = b64;
         }
-    } else if (cond === 'video_url' && conditioningVideoUrl) {
-        args.video_url = conditioningVideoUrl;
-    } else if (cond === 'keyframes' || settings.pipeline === 'keyframe_interp') {
-        // If pipeline is keyframe_interp, we expect images array
-        // or if user explicitly selected keyframes mode
-        const start = stripDataUrlPrefix(conditioningKeyframeStart || conditioningImage);
-        const end = stripDataUrlPrefix(conditioningKeyframeEnd);
-        
+    }
+
+    // Keyframe interpolation: if we have start and end keyframes
+    if (_conditioningKeyframeStart && _conditioningKeyframeEnd) {
+        const start = stripDataUrlPrefix(_conditioningKeyframeStart);
+        const end = stripDataUrlPrefix(_conditioningKeyframeEnd);
         if (start && end) {
-            args.pipeline = 'keyframe_interp';
-            args.distilled = false;
-            args.images = [
-                { image_b64: start, frame_index: 0 },
-                { image_b64: end, frame_index: args.num_frames - 1 }
+            input.keyframes = [
+                { image_b64: start, frame_idx: 0 },
+                { image_b64: end, frame_idx: (input.num_frames || 97) - 1 }
             ];
+            input.input_image_b64 = null; // keyframes overrides single image
         }
     }
 
@@ -94,15 +81,15 @@ export const buildLtx2GenerationInput = (
     if (settings.json_override && settings.json_override.trim()) {
         try {
             const override = JSON.parse(settings.json_override);
-            Object.assign(args, override);
+            Object.assign(input, override);
         } catch (e) {
-            console.warn("Failed to parse LTX-2 JSON override", e);
+            console.warn("Failed to parse LTX 2.3 JSON override", e);
         }
     }
 
-    return args;
+    return input;
 };
 
-export const wrapLtx2Args = (generationInput: any): any => {
-    return { args: generationInput };
+export const wrapLtx23Args = (generationInput: any): any => {
+    return generationInput;
 };

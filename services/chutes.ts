@@ -1,7 +1,7 @@
 
 import { Message, TTSRequest, STTRequest, ImageGenRequest, VideoGenRequest, ImageEditRequest, MuseTalkLipSyncRequest, SearchSource, ImageAspectRatio } from '../types';
 import { SearchAgent } from './searchAgent';
-import { isLtx2Model, buildLtx2GenerationInput } from './chutesLtx2';
+import { isLtx23Model, buildLtx23GenerationInput } from './chutesLtx2';
 
 const BASE_LLM_URL = 'https://llm.chutes.ai/v1/chat/completions';
 const BASE_TTS_URL = 'https://vonkaiser-audiodojo.chutes.ai/speak';
@@ -660,16 +660,13 @@ export class ChutesService {
 
   async generateVideo(request: VideoGenRequest, signal?: AbortSignal): Promise<Blob> {
     let body: any = {};
-    let isLtx2 = false;
-    let ltx2GenInput: any = null;
 
-    if (isLtx2Model(request.modelId)) {
-      isLtx2 = true;
+    if (isLtx23Model(request.modelId)) {
       if (!request.ltx2Params) {
-        throw new Error("LTX-2 model selected but no LTX-2 settings provided");
+        throw new Error("LTX 2.3 model selected but no settings provided");
       }
       const { settings, videoUrl, keyframeStart, keyframeEnd } = request.ltx2Params;
-      ltx2GenInput = buildLtx2GenerationInput(
+      body = buildLtx23GenerationInput(
         request.prompt,
         settings,
         request.image,
@@ -677,9 +674,7 @@ export class ChutesService {
         keyframeStart,
         keyframeEnd
       );
-      body = ltx2GenInput;
     } else if (request.modelId === 'wan-2.1-t2v') {
-      // Text to Video Logic
       body = {
         prompt: request.prompt,
         seed: 42,
@@ -688,60 +683,22 @@ export class ChutesService {
         guidance_scale: 5
       };
     } else {
-      // Default / I2V Logic (Wan 2.2 I2V)
       let cleanImage = request.image || '';
       if (cleanImage.includes('base64,')) {
         cleanImage = cleanImage.split('base64,')[1];
       }
-
       body = {
         prompt: request.prompt,
         image_b64: cleanImage
       };
     }
 
-    const doRequest = async (payload: any) => {
-      return this.fetchWithRetry(request.modelUrl, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(payload),
-        signal
-      });
-    };
-
-    const shouldRetryWithDifferentWrapper = (status: number, errorText: string) => {
-      if (status === 400 || status === 404 || status === 422) return true;
-      return /invalid input parameters|input_args|args|wrapper/i.test(errorText);
-    };
-
-    if (isLtx2) {
-      const candidates = [
-        ltx2GenInput,
-        { args: ltx2GenInput },
-        { input_args: ltx2GenInput }
-      ];
-
-      let lastStatus = 0;
-      let lastErrorText = '';
-
-      for (let i = 0; i < candidates.length; i++) {
-        const response = await doRequest(candidates[i]);
-        if (response.ok) {
-          return await response.blob();
-        }
-
-        lastStatus = response.status;
-        lastErrorText = await response.text().catch(() => '');
-
-        if (!shouldRetryWithDifferentWrapper(lastStatus, lastErrorText)) {
-          break;
-        }
-      }
-
-      throw new Error(`Video Gen Error: ${lastStatus} - ${lastErrorText}`);
-    }
-
-    const response = await doRequest(body);
+    const response = await this.fetchWithRetry(request.modelUrl, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(body),
+      signal
+    });
 
     if (!response.ok) {
       const errorText = await response.text();

@@ -176,6 +176,7 @@ export const AVAILABLE_MODELS: AvailableModel[] = [
   { id: "Qwen/Qwen3-32B-TEE", name: "🧠 Qwen 3 (32B)", shortName: "Qwen 3 32B" },
   { id: "zai-org/GLM-5-TEE", name: "🧠 GLM 5", shortName: "GLM 5" },
   { id: "zai-org/GLM-5.1-TEE", name: "🧠 GLM 5.1", shortName: "GLM 5.1", badge: "NEW" },
+  { id: "zai-org/GLM-5.2-TEE", name: "🧠 GLM 5.2", shortName: "GLM 5.2", badge: "NEW" },
 ];
 
 export const BRAND_VISION_MODEL_IDS = [
@@ -213,24 +214,22 @@ export const AVAILABLE_EDIT_MODELS = [
 export const AVAILABLE_VIDEO_MODELS = [
   { id: "wan-2.2-i2v", name: "Wan 2.2 I2V (Fast)", url: "https://vonkaiser-turbowani2v.chutes.ai/generate", type: 'i2v' },
   { id: "wan-2.1-t2v", name: "Wan 2.1 T2V — Coming Soon", url: "https://chutes-wan2-1-14b.chutes.ai/text2video", type: 't2v', disabled: true },
-  { id: "ltx-2-i2v", name: "LTX-2 I2V — Coming Soon", url: "https://chutes-ltx-2.chutes.ai/generate", type: 'i2v', disabled: true },
-  { id: "ltx-2-t2v", name: "LTX-2 T2V — Coming Soon", url: "https://chutes-ltx-2.chutes.ai/generate", type: 't2v', disabled: true }
+  { id: "ltx-23-i2v", name: "LTX 2.3 I2V", url: "https://vonkaiser-ltx-23-video.chutes.ai/generate", type: 'i2v' },
+  { id: "ltx-23-t2v", name: "LTX 2.3 T2V", url: "https://vonkaiser-ltx-23-video.chutes.ai/generate", type: 't2v' }
 ];
 
-export interface Ltx2AdvancedSettings {
-  pipeline: 'distilled' | 'two_stage' | 'ic_lora' | 'keyframe_interp';
-  conditioning: 'auto' | 'none' | 'image' | 'video_url' | 'keyframes';
+export interface Ltx23AdvancedSettings {
   width: number;
   height: number;
-  frame_rate: number;
-  num_frames: number;
-  seed?: number;
-  image_strength: number;
-  video_strength: number;
-  cfg_guidance_scale: number;
-  num_inference_steps: number;
-  negative_prompt: string;
+  fps: number;
+  num_frames: number | null;
+  duration: number | null;
+  guidance_scale: number;
+  seed: number | null;
+  use_random_seed: boolean;
   enhance_prompt: boolean;
+  generate_audio: boolean;
+  negative_prompt: string;
   json_override: string;
 }
 
@@ -287,7 +286,7 @@ export interface VideoGenRequest {
   modelUrl: string;
   modelId?: string;
   ltx2Params?: {
-    settings: Ltx2AdvancedSettings;
+    settings: Ltx23AdvancedSettings;
     videoUrl?: string;
     keyframeStart?: string | null;
     keyframeEnd?: string | null;
