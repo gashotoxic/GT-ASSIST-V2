@@ -6,11 +6,19 @@
 // All actions cost 1 credit
 export const CREDIT_COSTS = {
   chat: {
-    'zai-org/GLM-4.6': 1,
-    'moonshotai/Kimi-K2-Thinking': 1,
-    'moonshotai/Kimi-K2.5': 1,
-    'moonshotai/Kimi-K2.5-TEE': 1,
-    'deepseek-ai/DeepSeek-R1-0528': 1,
+    'Nemotron-3-Nano-Omni-30B-TEE': 1,
+    'deepseek-ai/DeepSeek-V3.2-TEE': 1,
+    'deepseek-ai/DeepSeek-V4-Flash-0731-TEE': 1,
+    'moonshotai/Kimi-K2.6-TEE': 1,
+    'moonshotai/Kimi-K3-TEE': 1,
+    'google/gemma-4-31B-turbo-TEE': 1,
+    'Qwen/Qwen3.6-27B-TEE': 1,
+    'Qwen/Qwen3.5-397B-A17B-TEE': 1,
+    'Qwen/Qwen3-32B-TEE': 1,
+    'Qwen/Qwen3-235B-A22B-Thinking-2507-TEE': 1,
+    'zai-org/GLM-5.1-TEE': 1,
+    'zai-org/GLM-5.2-TEE': 1,
+    'unsloth/Mistral-Nemo-Instruct-2407-TEE': 1,
     // Default cost for unknown models
     default: 1
   },

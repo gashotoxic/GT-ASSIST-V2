@@ -23,7 +23,7 @@ export class UserSyncService {
       supabaseUrl: this.supabaseUrl,
       supabaseKey: this.supabaseKey,
       apiKey: '',
-      model: 'zai-org/GLM-4.6',
+      model: 'zai-org/GLM-5.2-TEE',
       systemPrompt: '',
       ttsVoice: 'af_heart',
       ttsSpeed: 1.0,
