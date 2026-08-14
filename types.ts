@@ -248,6 +248,8 @@ export interface Ltx25AdvancedSettings {
   enhance_prompt: boolean;
   generate_audio: boolean;
   auto_duration: boolean;
+  auto_duration_min_seconds?: number;
+  auto_duration_max_seconds?: number;
   generated_keyframes: number | null; // int = evenly spaced slots, null = disabled
   stage_1_sigmas: number[];
   stage_2_sigmas: number[];
