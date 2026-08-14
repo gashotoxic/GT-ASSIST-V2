@@ -269,13 +269,110 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   selectionClipboardRef.current = selectionClipboard;
   layersForSelectionRef.current = layers;
 
-  // Selection handler stubs (from concurrent selection feature)
+  // Selection handler implementations
   const handleSelectAllRef = useRef(() => {});
   const handleSelectNoneRef = useRef(() => {});
   const handleSelectInvertRef = useRef(() => {});
   const handleCopyRef = useRef(() => {});
   const handleCutRef = useRef(() => {});
   const handlePasteRef = useRef(() => {});
+
+  // Sync selection handler refs on each render so keyboard handler gets latest closures
+  handleSelectAllRef.current = () => {
+    setSelection({
+      type: 'rectangle',
+      x: 0, y: 0,
+      width: canvas.width, height: canvas.height,
+      isDrawing: false,
+      lassoPoints: [],
+      startPoint: null, currentPoint: null,
+      rect: { x: 0, y: 0, width: canvas.width, height: canvas.height },
+    });
+  };
+
+  handleSelectNoneRef.current = () => {
+    setSelection(DEFAULT_SELECTION);
+  };
+
+  handleSelectInvertRef.current = () => {
+    // Full inversion is complex — for now, clear the selection
+    setSelection(DEFAULT_SELECTION);
+  };
+
+  handleCopyRef.current = () => {
+    if (!activeLayerId || !selection.rect) return;
+    const layer = layers.find(l => l.id === activeLayerId);
+    if (!layer || !layer.dataUrl) return;
+    const rect = selection.rect;
+    const img = new Image();
+    img.onload = () => {
+      const offscreen = document.createElement('canvas');
+      offscreen.width = Math.max(1, Math.round(rect.width));
+      offscreen.height = Math.max(1, Math.round(rect.height));
+      const ctx = offscreen.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(
+        img,
+        rect.x - layer.x, rect.y - layer.y, rect.width, rect.height,
+        0, 0, rect.width, rect.height
+      );
+      selectionClipboard.current = ctx.getImageData(0, 0, offscreen.width, offscreen.height);
+    };
+    img.src = layer.dataUrl;
+  };
+
+  handleCutRef.current = () => {
+    if (!activeLayerId || !selection.rect) return;
+    const layer = layers.find(l => l.id === activeLayerId);
+    if (!layer || !layer.dataUrl) return;
+    const rect = selection.rect;
+
+    // Copy first
+    handleCopyRef.current();
+
+    // Then delete the selected area
+    pushSnapshot(layers, 'Cut selection');
+    const img = new Image();
+    img.onload = () => {
+      const offscreen = document.createElement('canvas');
+      offscreen.width = canvas.width;
+      offscreen.height = canvas.height;
+      const ctx = offscreen.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(img, layer.x, layer.y, layer.width, layer.height);
+      ctx.clearRect(rect.x - layer.x, rect.y - layer.y, rect.width, rect.height);
+      updateLayer(activeLayerId, { dataUrl: offscreen.toDataURL() });
+    };
+    img.src = layer.dataUrl;
+  };
+
+  handlePasteRef.current = () => {
+    if (!selectionClipboard.current) return;
+    const clip = selectionClipboard.current;
+    const offscreen = document.createElement('canvas');
+    offscreen.width = clip.width;
+    offscreen.height = clip.height;
+    const ctx = offscreen.getContext('2d');
+    if (!ctx) return;
+    ctx.putImageData(clip, 0, 0);
+    const dataUrl = offscreen.toDataURL();
+    const id = 'ps-layer-paste-' + Date.now();
+    setLayers(prev => [...prev, {
+      id,
+      name: 'Pasted',
+      type: 'image' as const,
+      visible: true,
+      locked: false,
+      opacity: 1,
+      blendMode: 'normal' as const,
+      dataUrl,
+      x: selection.rect?.x ?? 0,
+      y: selection.rect?.y ?? 0,
+      width: clip.width,
+      height: clip.height,
+    }]);
+    setActiveLayerId(id);
+  };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -851,6 +948,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
             onMouseDownCanvas={handleMouseDownCanvas}
             onMouseMoveCanvas={handleMouseMoveCanvas}
             onMouseUpCanvas={handleMouseUpCanvas}
+            selection={selection}
           />
         </div>
 
@@ -868,7 +966,12 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
             </div>
           ) : activeTool === 'select' ? (
             <div className="p-2 border-b border-slate-700/50">
-              <SelectTool onSelect={(mode) => console.log('Selection mode:', mode)} />
+              <SelectTool
+              selectionType={selection.type}
+              onSelectionTypeChange={(type) => setSelection(prev => ({ ...prev, type, rect: null, lassoPoints: [], startPoint: null, currentPoint: null }))}
+              selection={selection}
+              onDeselect={() => setSelection(DEFAULT_SELECTION)}
+            />
             </div>
           ) : activeTool === 'brush' || activeTool === 'eraser' ? (
             <div className="border-b border-slate-700/50">

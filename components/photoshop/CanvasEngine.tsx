@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { CanvasState, PhotoshopLayer, BlendMode } from '../../types/photoshop';
+import { CanvasState, PhotoshopLayer, BlendMode, SelectionState, SelectionRect } from '../../types/photoshop';
 import { renderTextOnCtx, TextLayerData } from './tools/textUtils';
 
 interface CanvasEngineProps {
@@ -18,6 +18,7 @@ interface CanvasEngineProps {
   onMouseMoveCanvas?: (canvasX: number, canvasY: number) => void;
   onMouseUpCanvas?: () => void;
   screenToCanvas?: (sx: number, sy: number, rect: DOMRect) => { x: number; y: number };
+  selection?: SelectionState;
 }
 
 function applyBlendMode(ctx: CanvasRenderingContext2D, mode: BlendMode) {
@@ -51,12 +52,16 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
   onMouseMoveCanvas,
   onMouseUpCanvas,
   screenToCanvas: screenToCanvasProp,
+  selection,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
   const dataUrlVersions = useRef<Map<string, string>>(new Map());
   const zoomOffset = useRef({ x: 0, y: 0 }); // For calibrating screenToCanvas
+  const marchOffset = useRef(0);
+  const animFrameRef = useRef<number | null>(null);
+  const renderRef = useRef<() => void>(() => {});
 
   // Pre-load images when layers change — ensures sync rendering
   useEffect(() => {
@@ -152,12 +157,65 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
       ctx.restore(); // restore per-layer
     }
 
-    // Draw selection highlight on active layer
-    if (activeLayerId) {
+    // Draw selection marching ants overlay
+    if (selection && selection.type !== 'none') {
+      let sx = 0, sy = 0, sw = 0, sh = 0;
+      let hasRect = false;
+
+      if (selection.rect) {
+        sx = selection.rect.x; sy = selection.rect.y;
+        sw = selection.rect.width; sh = selection.rect.height;
+        hasRect = sw > 0 && sh > 0;
+      } else if (selection.startPoint && selection.currentPoint) {
+        // In-progress drawing — compute preview rect
+        sx = Math.min(selection.startPoint.x, selection.currentPoint.x);
+        sy = Math.min(selection.startPoint.y, selection.currentPoint.y);
+        sw = Math.abs(selection.currentPoint.x - selection.startPoint.x);
+        sh = Math.abs(selection.currentPoint.y - selection.startPoint.y);
+        hasRect = sw > 2 && sh > 2;
+      }
+
+      if (hasRect) {
+        ctx.save();
+        const lineWidth = 1 / canvas.zoom;
+        const dashSize = 4 / canvas.zoom;
+        const offset = marchOffset.current;
+
+        // White outline (background)
+        ctx.lineWidth = lineWidth;
+        ctx.setLineDash([dashSize, dashSize]);
+        ctx.lineDashOffset = -offset / canvas.zoom;
+        ctx.strokeStyle = '#ffffff';
+        if (selection.type === 'ellipse' && sw > 0 && sh > 0) {
+          ctx.beginPath();
+          ctx.ellipse(sx + sw / 2, sy + sh / 2, sw / 2, sh / 2, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          ctx.strokeRect(sx, sy, sw, sh);
+        }
+
+        // Black dashes (foreground, offset by half dash for marching effect)
+        ctx.lineDashOffset = -(offset + dashSize) / canvas.zoom;
+        ctx.strokeStyle = '#000000';
+        if (selection.type === 'ellipse' && sw > 0 && sh > 0) {
+          ctx.beginPath();
+          ctx.ellipse(sx + sw / 2, sy + sh / 2, sw / 2, sh / 2, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          ctx.strokeRect(sx, sy, sw, sh);
+        }
+
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+    }
+
+    // Draw active layer highlight (subtle blue border)
+    if (activeLayerId && !(selection && selection.type !== 'none')) {
       const active = layers.find(l => l.id === activeLayerId);
       if (active && active.visible) {
-        ctx.strokeStyle = '#1abc9c';
-        ctx.lineWidth = 2 / canvas.zoom;
+        ctx.strokeStyle = 'rgba(26, 188, 156, 0.4)';
+        ctx.lineWidth = 1 / canvas.zoom;
         ctx.setLineDash([4 / canvas.zoom, 4 / canvas.zoom]);
         ctx.strokeRect(active.x, active.y, active.width, active.height);
         ctx.setLineDash([]);
@@ -191,12 +249,40 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
     }
 
     ctx.restore(); // match the outer save() for zoom/pan
-  }, [canvas, layers, activeLayerId, gridVisible, gridType]);
+  }, [canvas, layers, activeLayerId, gridVisible, gridType, selection]);
 
   // Re-render on state changes (zoom, pan, opacity, etc.)
   useEffect(() => {
     requestAnimationFrame(() => render());
   }, [render]);
+
+  // Sync renderRef so animation loop always calls latest render
+  renderRef.current = render;
+
+  // Marching ants animation loop
+  useEffect(() => {
+    const hasSelection = selection && selection.type !== 'none' && (
+      selection.rect || (selection.startPoint && selection.currentPoint)
+    );
+    if (!hasSelection) {
+      marchOffset.current = 0;
+      return;
+    }
+
+    let running = true;
+    const tick = () => {
+      if (!running) return;
+      marchOffset.current = (marchOffset.current + 0.5) % 20;
+      renderRef.current();
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+    animFrameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      running = false;
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [selection?.rect, selection?.type, selection?.startPoint, selection?.currentPoint]);
 
   // Handle resize
   useEffect(() => {

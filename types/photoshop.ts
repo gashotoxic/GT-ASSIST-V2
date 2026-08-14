@@ -198,6 +198,13 @@ export const DEFAULT_GRADIENT_SETTINGS: GradientSettings = {
 
 
 // Selection types
+export interface SelectionRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface SelectionState {
   type: 'none' | 'rectangle' | 'ellipse' | 'lasso';
   x: number;
@@ -208,6 +215,7 @@ export interface SelectionState {
   lassoPoints: { x: number; y: number }[];
   startPoint: { x: number; y: number } | null;
   currentPoint: { x: number; y: number } | null;
+  rect: SelectionRect | null;
 }
 
 export const DEFAULT_SELECTION: SelectionState = {
@@ -220,6 +228,7 @@ export const DEFAULT_SELECTION: SelectionState = {
   lassoPoints: [],
   startPoint: null,
   currentPoint: null,
+  rect: null,
 };
 
 // Transform tool types
