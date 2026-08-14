@@ -11,6 +11,8 @@ import {
   DEFAULT_COLOR,
   DEFAULT_SHAPE_SETTINGS,
   DEFAULT_GRADIENT_SETTINGS,
+  DEFAULT_SELECTION,
+  SelectionState,
   ColorState,
   ShapeSettings,
   GradientSettings,
@@ -99,6 +101,8 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [adjustmentsOpen, setAdjustmentsOpen] = useState(false);
   const [brushMode, setBrushMode] = useState<'brush' | 'eraser' | 'fill'>('brush');
   const [isDrawing, setIsDrawing] = useState(false);
+  const [selection, setSelection] = useState<SelectionState>(DEFAULT_SELECTION);
+  const selectionClipboard = useRef<ImageData | null>(null);
   const drawStartPos = useRef({ x: 0, y: 0 });
   const lastMousePos = useRef({ x: 0, y: 0 });
   const strokeCanvas = useRef<HTMLCanvasElement | null>(null); // persistent offscreen for brush strokes
@@ -255,6 +259,24 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   removeLayerRef.current = removeLayer;
   activeLayerIdRef.current = activeLayerId;
 
+  // Selection refs for keyboard handler
+  const selectionRef = useRef(selection);
+  const setSelectionRef = useRef(setSelection);
+  const selectionClipboardRef = useRef(selectionClipboard);
+  const layersForSelectionRef = useRef(layers);
+  selectionRef.current = selection;
+  setSelectionRef.current = setSelection;
+  selectionClipboardRef.current = selectionClipboard;
+  layersForSelectionRef.current = layers;
+
+  // Selection handler stubs (from concurrent selection feature)
+  const handleSelectAllRef = useRef(() => {});
+  const handleSelectNoneRef = useRef(() => {});
+  const handleSelectInvertRef = useRef(() => {});
+  const handleCopyRef = useRef(() => {});
+  const handleCutRef = useRef(() => {});
+  const handlePasteRef = useRef(() => {});
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -277,6 +299,38 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       if (ctrl && key === '0') { e.preventDefault(); zoomToRef.current(1); return; }
       if (key === '+' || key === '=') { e.preventDefault(); zoomInRef.current(); return; }
       if (key === '-') { e.preventDefault(); zoomOutRef.current(); return; }
+
+      // Selection shortcuts
+      if (ctrl && key === 'a') {
+        e.preventDefault();
+        handleSelectAllRef.current();
+        return;
+      }
+      if (ctrl && key === 'd') {
+        e.preventDefault();
+        handleSelectNoneRef.current();
+        return;
+      }
+      if (ctrl && e.shiftKey && key === 'i') {
+        e.preventDefault();
+        handleSelectInvertRef.current();
+        return;
+      }
+      if (ctrl && key === 'c') {
+        e.preventDefault();
+        handleCopyRef.current();
+        return;
+      }
+      if (ctrl && key === 'x') {
+        e.preventDefault();
+        handleCutRef.current();
+        return;
+      }
+      if (ctrl && key === 'v') {
+        e.preventDefault();
+        handlePasteRef.current();
+        return;
+      }
 
       const toolMap: Record<string, PhotoshopTool> = {
         v: 'move', h: 'pan', m: 'select', c: 'crop', r: 'resize',
@@ -457,6 +511,18 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       img.src = layer.dataUrl;
       return;
     }
+    // Select tool — draw selection marquee
+    if (activeTool === 'select') {
+      setSelection(prev => ({
+        ...prev,
+        isDrawing: true,
+        startPoint: { x: cx, y: cy },
+        currentPoint: { x: cx, y: cy },
+        rect: null,
+        lassoPoints: prev.type === 'lasso' ? [{ x: cx, y: cy }] : [],
+      }));
+      return;
+    }
     // Shape/gradient drawing
     if (activeTool === 'shape' || activeTool === 'gradient') {
       if (!activeLayerId) return;
@@ -491,7 +557,17 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       drawBrushStroke(ctx, prev.x, prev.y, cur.x, cur.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
       drawStartPos.current = cur;
     }
-  }, [activeTool, activeLayerId, updateLayer, layers, isDrawing, brush, brushMode]);
+    // Select tool — update selection preview while drawing
+    if (activeTool === 'select' && selection.isDrawing) {
+      setSelection(prev => ({
+        ...prev,
+        currentPoint: { x: cx, y: cy },
+        lassoPoints: prev.type === 'lasso'
+          ? [...prev.lassoPoints, { x: cx, y: cy }]
+          : prev.lassoPoints,
+      }));
+    }
+  }, [activeTool, activeLayerId, updateLayer, layers, isDrawing, brush, brushMode, selection.isDrawing]);
 
   // Move/select tool: canvas mouse up
   const handleMouseUpCanvas = useCallback(() => {
@@ -503,6 +579,40 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       strokeCanvas.current = null;
     }
     setIsDrawing(false);
+    // Finalize selection — compute bounding rect
+    if (activeTool === 'select') {
+      setSelection(prev => {
+        if (!prev.startPoint || !prev.currentPoint) return { ...prev, isDrawing: false };
+        if (prev.type === 'lasso') {
+          // Lasso: close the path, compute bounding rect
+          const points = prev.lassoPoints;
+          if (points.length < 3) return { ...prev, isDrawing: false, lassoPoints: [] };
+          const minX = Math.min(...points.map(p => p.x));
+          const minY = Math.min(...points.map(p => p.y));
+          const maxX = Math.max(...points.map(p => p.x));
+          const maxY = Math.max(...points.map(p => p.y));
+          return {
+            ...prev,
+            isDrawing: false,
+            rect: { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
+          };
+        }
+        // Rectangle/ellipse: compute bounding rect from start and current
+        const x = Math.min(prev.startPoint.x, prev.currentPoint.x);
+        const y = Math.min(prev.startPoint.y, prev.currentPoint.y);
+        const w = Math.abs(prev.currentPoint.x - prev.startPoint.x);
+        const h = Math.abs(prev.currentPoint.y - prev.startPoint.y);
+        if (w < 2 && h < 2) return { ...prev, isDrawing: false, rect: null, startPoint: null, currentPoint: null };
+        return {
+          ...prev,
+          isDrawing: false,
+          rect: { x, y, width: w, height: h },
+          startPoint: null,
+          currentPoint: null,
+        };
+      });
+      return;
+    }
     // Finalize shape/gradient — actually draw on the layer
     if (activeTool === 'shape' || activeTool === 'gradient') {
       if (!activeLayerId) return;

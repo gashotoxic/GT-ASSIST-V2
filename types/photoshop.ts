@@ -196,6 +196,82 @@ export const DEFAULT_GRADIENT_SETTINGS: GradientSettings = {
   repeat: false,
 };
 
+
+// Selection types
+export interface SelectionState {
+  type: 'none' | 'rectangle' | 'ellipse' | 'lasso';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  isDrawing: boolean;
+  lassoPoints: { x: number; y: number }[];
+  startPoint: { x: number; y: number } | null;
+  currentPoint: { x: number; y: number } | null;
+}
+
+export const DEFAULT_SELECTION: SelectionState = {
+  type: 'none',
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+  isDrawing: false,
+  lassoPoints: [],
+  startPoint: null,
+  currentPoint: null,
+};
+
+// Transform tool types
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface TransformState {
+  active: boolean;
+  mode: 'free' | 'perspective';
+  // Original layer bounds (read when transform starts)
+  originalX: number;
+  originalY: number;
+  originalWidth: number;
+  originalHeight: number;
+  // Current transform values
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;   // degrees
+  scaleX: number;     // 1 = no change
+  scaleY: number;
+  skewX: number;      // degrees
+  // Perspective: 4 independent corner positions (null = not in perspective mode)
+  perspective: {
+    tl: Point;
+    tr: Point;
+    br: Point;
+    bl: Point;
+  } | null;
+}
+
+export const DEFAULT_TRANSFORM_STATE: TransformState = {
+  active: false,
+  mode: 'free',
+  originalX: 0,
+  originalY: 0,
+  originalWidth: 0,
+  originalHeight: 0,
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+  rotation: 0,
+  scaleX: 1,
+  scaleY: 1,
+  skewX: 0,
+  perspective: null,
+};
+
 // Color utilities
 export function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
