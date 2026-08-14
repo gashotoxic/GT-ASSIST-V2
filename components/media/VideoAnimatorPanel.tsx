@@ -162,6 +162,16 @@ export function VideoAnimatorPanel(props: {
                 onPickVideoFromGallery={props.onPickVideoFromGallery}
             />
         )}
+
+        {isLtx25 && (
+            <Ltx25AdvancedOptions
+                isOpen={isLtx25Open}
+                setIsOpen={setIsLtx25Open}
+                videoMode={props.videoMode}
+                settings={props.ltx25Settings}
+                setSettings={props.setLtx25Settings}
+            />
+        )}
       </div>
 
 
