@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Image, Film, Loader2, Wand2, Upload, AlertCircle, Play, Scissors, ArrowRight, Video, XCircle, Camera, X, Check, Grid, Filter, Type, FileImage, Trash2, Layers } from 'lucide-react';
 import { Button, Input, Textarea, Select, Label } from './UI';
-import { AVAILABLE_VIDEO_MODELS, AppSettings, MediaItem, ImageAspectRatio, Ltx23AdvancedSettings } from '../types';
+import { AVAILABLE_VIDEO_MODELS, AppSettings, MediaItem, ImageAspectRatio, Ltx23AdvancedSettings, Ltx25AdvancedSettings } from '../types';
 import { getCreditCost } from '../services/creditCosts';
 import { useCredits } from '../context/CreditContext';
 import { useServices } from '../context/ServicesContext';
@@ -102,6 +102,24 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
     const [ltx2VideoUrl, setLtx2VideoUrl] = useState('');
     const [ltx2KeyframeStart, setLtx2KeyframeStart] = useState<string | null>(null);
     const [ltx2KeyframeEnd, setLtx2KeyframeEnd] = useState<string | null>(null);
+
+    // LTX-2.5 State
+    const [ltx25Settings, setLtx25Settings] = useState<Ltx25AdvancedSettings>({
+        width: 768,
+        height: 512,
+        fps: 24,
+        num_frames: null,
+        duration: null,
+        seed: null,
+        use_random_seed: true,
+        enhance_prompt: false,
+        generate_audio: true,
+        auto_duration: false,
+        generated_keyframes: false,
+        stage_1_sigmas: [1.0, 0.9999, 0.9995, 0.999, 0.998, 0.994, 0.978, 0.923],
+        stage_2_sigmas: [0.0, 0.368, 0.599],
+        json_override: ''
+    });
 
     // Lip Sync State
     const [lipsyncVideoInput, setLipsyncVideoInput] = useState('');
@@ -305,6 +323,8 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         handleUndo,
     } = useMediaHandlers({
         chutesService,
+        supabaseService,
+        userId,
         addToHistory,
         deductCredits,
         startGeneration,
@@ -328,6 +348,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         sourceImage,
         selectedVideoModel,
         ltx23Settings,
+        ltx25Settings,
         ltx2VideoUrl,
         ltx2KeyframeStart,
         ltx2KeyframeEnd,
@@ -545,6 +566,9 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                             setLtx2KeyframeStart={setLtx2KeyframeStart}
                                             ltx2KeyframeEnd={ltx2KeyframeEnd}
                                             setLtx2KeyframeEnd={setLtx2KeyframeEnd}
+                                            // LTX-2.5 Props
+                                            ltx25Settings={ltx25Settings}
+                                            setLtx25Settings={setLtx25Settings}
                                             onPickVideoFromGallery={() => {
                                                 setIsMediaPickerOpen(true);
                                                 // We'll need to know we are picking for LTX-2 video URL, but for now just open picker

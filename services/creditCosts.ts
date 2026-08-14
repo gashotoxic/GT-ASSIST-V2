@@ -36,6 +36,8 @@ export const CREDIT_COSTS = {
     'wan-2.1-t2v': 1,
     'ltx-23-i2v': 1,
     'ltx-23-t2v': 1,
+    'ltx-25-i2v': 1,
+    'ltx-25-t2v': 1,
     musetalk: 1,
     default: 1
   },

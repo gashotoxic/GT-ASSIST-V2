@@ -100,7 +100,7 @@ export class UserSyncService {
           // User profile updated (email, name, etc.)
           const email = event.data.email_addresses?.[0]?.email_address;
           if (email && event.data.id) {
-            await this.supabaseService.updateUserProfile(event.data.id, {
+            await this.getSupabaseService().updateUserProfile(event.data.id, {
               // Add any fields that can be updated from Clerk
             });
           }

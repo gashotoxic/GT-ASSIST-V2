@@ -212,7 +212,7 @@ export const MediaEditControls: React.FC<{
       {editHistory.length > 0 && (
         <div className="flex items-center gap-2 px-2">
           <RotateCcw className="w-3.5 h-3.5 text-gray-400" />
-          <span className="text-xs text-gray-400">{editHistory.length} edit{s > 1 ? 's' : ''} in history</span>
+          <span className="text-xs text-gray-400">{editHistory.length} edit{editHistory.length > 1 ? 's' : ''} in history</span>
           <Button variant="ghost" size="sm" onClick={onUndo} className="h-6 text-xs ml-auto text-gray-500 hover:text-primary">
             <RotateCcw className="w-3 h-3 mr-1" /> Undo
           </Button>
