@@ -55,7 +55,7 @@ export const buildLtx25GenerationInput = (
     if (settings.num_frames != null) input.num_frames = settings.num_frames;
     if (settings.duration != null) input.duration = settings.duration;
     if (settings.seed != null) input.seed = settings.seed;
-    if (settings.generated_keyframes) input.generated_keyframes = settings.generated_keyframes;
+    if (settings.generated_keyframes != null) input.generated_keyframes = settings.generated_keyframes;
     if (settings.stage_1_sigmas?.length) input.stage_1_sigmas = settings.stage_1_sigmas;
     if (settings.stage_2_sigmas?.length) input.stage_2_sigmas = settings.stage_2_sigmas;
 
