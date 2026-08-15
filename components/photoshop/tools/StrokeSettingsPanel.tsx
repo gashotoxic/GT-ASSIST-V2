@@ -74,6 +74,18 @@ export const StrokeSettingsPanel: React.FC<StrokeSettingsPanelProps> = ({ settin
           <option value="overlay">Overlay</option>
         </select>
       </div>
+      {/* Size Jitter */}
+      <div>
+        <div className="flex justify-between text-[10px] text-slate-500"><span>Size Jitter</span><span>{Math.round(settings.sizeJitter * 100)}%</span></div>
+        <input type="range" min={0} max={100} value={Math.round(settings.sizeJitter * 100)} onChange={e => set({ sizeJitter: Number(e.target.value) / 100 })}
+          className="w-full h-1 accent-primary" />
+      </div>
+      {/* Opacity Jitter */}
+      <div>
+        <div className="flex justify-between text-[10px] text-slate-500"><span>Opacity Jitter</span><span>{Math.round(settings.opacityJitter * 100)}%</span></div>
+        <input type="range" min={0} max={100} value={Math.round(settings.opacityJitter * 100)} onChange={e => set({ opacityJitter: Number(e.target.value) / 100 })}
+          className="w-full h-1 accent-primary" />
+      </div>
     </div>
   );
 };

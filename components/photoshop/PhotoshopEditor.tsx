@@ -12,10 +12,14 @@ import {
   DEFAULT_SHAPE_SETTINGS,
   DEFAULT_GRADIENT_SETTINGS,
   DEFAULT_SELECTION,
+  DEFAULT_CLONE_SETTINGS,
+  DEFAULT_RETOUCH_SETTINGS,
   SelectionState,
   ColorState,
   ShapeSettings,
   GradientSettings,
+  CloneSettings,
+  RetouchSettings,
 } from '../../types/photoshop';
 import { CropTool } from './tools/CropTool';
 import { SelectTool } from './tools/SelectTool';
@@ -28,6 +32,8 @@ import { ShapeTool } from './tools/ShapeTool';
 import { GradientTool } from './tools/GradientTool';
 import { TextTool } from './tools/TextTool';
 import { TextInputDialog } from './tools/TextInputDialog';
+import { CloneTool } from './tools/CloneTool';
+import { RetouchTool } from './tools/RetouchTool';
 import { Cheatsheet } from './Cheatsheet';
 import { AIPanel } from './ai/AIPanel';
 import { AIPhotoAction } from '../../services/aiPhotoService';
@@ -38,7 +44,7 @@ import { AdjustmentsPanel } from './adjustments/AdjustmentsPanel';
 import { FilterGallery } from './adjustments/FilterGallery';
 import { compositeAdjustment } from '../../utils/canvasFilters';
 import { renderTextToDataUrl, rerenderTextLayer, TextLayerData } from './tools/textUtils';
-import { drawBrushStroke, fillCanvas } from './tools/colorUtils';
+import { drawBrushStroke, fillCanvas, drawCloneDab, applyBlurRegion, applySharpenRegion, applySmudgeRegion } from './tools/colorUtils';
 import { drawShapeOnCanvas, drawGradientOnCanvas } from './tools/shapeUtils';
 
 interface PhotoshopEditorProps {
@@ -65,6 +71,8 @@ const TOOLS: { id: PhotoshopTool; label: string; shortcut: string; icon: string 
   { id: 'shape', label: 'Shape', shortcut: 'U', icon: '⬡' },
   { id: 'gradient', label: 'Gradient', shortcut: 'Y', icon: '◈' },
   { id: 'eyedropper', label: 'Eyedrop', shortcut: 'I', icon: '◉' },
+  { id: 'clone', label: 'Clone', shortcut: 'S', icon: '⎘' },
+  { id: 'retouch', label: 'Retouch', shortcut: 'O', icon: '✧' },
   { id: 'ai', label: 'AI', shortcut: 'K', icon: '⚡' },
 ];
 
@@ -93,7 +101,12 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('center');
   const [textLineHeight, setTextLineHeight] = useState(1.2);
   const [textBgColor, setTextBgColor] = useState<string | undefined>(undefined);
-
+  const [cloneSettings, setCloneSettings] = useState<CloneSettings>(DEFAULT_CLONE_SETTINGS);
+  const [retouchSettings, setRetouchSettings] = useState<RetouchSettings>(DEFAULT_RETOUCH_SETTINGS);
+  const cloneSourcePos = useRef<{ x: number; y: number } | null>(null);
+  const altKeyDown = useRef(false);
+  const cloneLastPos = useRef({ x: 0, y: 0 });
+  const retouchLastPos = useRef({ x: 0, y: 0 });
 
   const [textInputOpen, setTextInputOpen] = useState(false);
   const [editingTextLayer, setEditingTextLayer] = useState<string | null>(null);
@@ -377,6 +390,8 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // Track Alt key state for clone stamp
+      if (e.key === 'Alt') { altKeyDown.current = true; }
 
       const key = e.key.toLowerCase();
       const ctrl = e.ctrlKey || e.metaKey;
@@ -432,6 +447,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       const toolMap: Record<string, PhotoshopTool> = {
         v: 'move', h: 'pan', m: 'select', c: 'crop', r: 'resize',
         t: 'text', b: 'brush', e: 'eraser', g: 'fill', u: 'shape', y: 'gradient', i: 'eyedropper', k: 'ai',
+        s: 'clone', o: 'retouch',
       };
       if (toolMap[key]) {
         setActiveTool(toolMap[key]);
@@ -446,7 +462,9 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       }
     };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    const handleKeyUp = (e: KeyboardEvent) => { if (e.key === 'Alt') altKeyDown.current = false; };
+    window.addEventListener('keyup', handleKeyUp);
+    return () => { window.removeEventListener('keydown', handler); window.removeEventListener('keyup', handleKeyUp); };
   }, []); // Empty deps — refs keep it fresh
 
   // Load image from file
@@ -580,6 +598,70 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       pushSnapshot(layers, 'Move layer');
       return;
     }
+    // Clone stamp — Alt+click sets source point
+    if (activeTool === 'clone' && altKeyDown.current) {
+      const layer = layers.find(l => l.id === activeLayerId);
+      if (!layer) return;
+      cloneSourcePos.current = { x: cx - layer.x, y: cy - layer.y };
+      setCloneSettings(prev => ({ ...prev, sourceX: cx - layer.x, sourceY: cy - layer.y }));
+      return;
+    }
+    // Clone stamp — normal click-drag paints from source
+    if (activeTool === 'clone') {
+      if (!activeLayerId || isDrawing) return;
+      const layer = layers.find(l => l.id === activeLayerId);
+      if (!layer || !layer.dataUrl) return;
+      if (cloneSourcePos.current === null) return;
+      setIsDrawing(true);
+      pushSnapshot(layers, cloneSettings.mode === 'heal' ? 'Healing brush' : 'Clone stamp');
+      drawStartPos.current = { x: cx - layer.x, y: cy - layer.y };
+      lastMousePos.current = { x: cx - layer.x, y: cy - layer.y };
+      cloneLastPos.current = { x: cx - layer.x, y: cy - layer.y };
+      // Pre-load layer image into offscreen canvas
+      const img = new Image();
+      img.onload = () => {
+        if (!strokeCanvas.current || strokeCanvas.current.width !== layer.width || strokeCanvas.current.height !== layer.height) {
+          const cvs = document.createElement('canvas');
+          cvs.width = layer.width;
+          cvs.height = layer.height;
+          strokeCanvas.current = cvs;
+        }
+        const ctx = strokeCanvas.current.getContext('2d');
+        if (!ctx) return;
+        ctx.clearRect(0, 0, strokeCanvas.current.width, strokeCanvas.current.height);
+        ctx.drawImage(img, 0, 0);
+      };
+      img.src = layer.dataUrl;
+      return;
+    }
+    // Retouch tool — blur/sharpen/smudge
+    if (activeTool === 'retouch') {
+      if (!activeLayerId || isDrawing) return;
+      const layer = layers.find(l => l.id === activeLayerId);
+      if (!layer || !layer.dataUrl) return;
+      setIsDrawing(true);
+      const label = retouchSettings.mode === 'blur' ? 'Blur' : retouchSettings.mode === 'sharpen' ? 'Sharpen' : 'Smudge';
+      pushSnapshot(layers, label);
+      drawStartPos.current = { x: cx - layer.x, y: cy - layer.y };
+      lastMousePos.current = { x: cx - layer.x, y: cy - layer.y };
+      retouchLastPos.current = { x: cx - layer.x, y: cy - layer.y };
+      // Pre-load layer image
+      const img = new Image();
+      img.onload = () => {
+        if (!strokeCanvas.current || strokeCanvas.current.width !== layer.width || strokeCanvas.current.height !== layer.height) {
+          const cvs = document.createElement('canvas');
+          cvs.width = layer.width;
+          cvs.height = layer.height;
+          strokeCanvas.current = cvs;
+        }
+        const ctx = strokeCanvas.current.getContext('2d');
+        if (!ctx) return;
+        ctx.clearRect(0, 0, strokeCanvas.current.width, strokeCanvas.current.height);
+        ctx.drawImage(img, 0, 0);
+      };
+      img.src = layer.dataUrl;
+      return;
+    }
     // Brush/eraser drawing — persistent canvas, no async Image() per pixel
     if (activeTool === 'brush' || activeTool === 'eraser') {
       if (!activeLayerId || isDrawing) return;
@@ -641,6 +723,43 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       });
       return;
     }
+    // Clone stamp — paint from source offset
+    if (activeTool === 'clone' && isDrawing && activeLayerId && strokeCanvas.current && cloneSourcePos.current) {
+      const layer = layers.find(l => l.id === activeLayerId);
+      if (!layer) return;
+      const ctx = strokeCanvas.current.getContext('2d');
+      if (!ctx) return;
+      const cur = { x: cx - layer.x, y: cy - layer.y };
+      const srcX = cloneSourcePos.current.x + (cur.x - cloneLastPos.current.x);
+      const srcY = cloneSourcePos.current.y + (cur.y - cloneLastPos.current.y);
+      drawCloneDab(ctx, strokeCanvas.current, srcX, srcY, cur.x, cur.y, brush.size, brush.hardness, brush.opacity, cloneSettings.mode);
+      cloneLastPos.current = cur;
+      cloneSourcePos.current = { x: srcX, y: srcY };
+      lastMousePos.current = cur;
+      return;
+    }
+    // Retouch tool — blur/sharpen/smudge while moving
+    if (activeTool === 'retouch' && isDrawing && activeLayerId && strokeCanvas.current) {
+      const layer = layers.find(l => l.id === activeLayerId);
+      if (!layer) return;
+      const ctx = strokeCanvas.current.getContext('2d');
+      if (!ctx) return;
+      const cur = { x: cx - layer.x, y: cy - layer.y };
+      const imgData = ctx.getImageData(0, 0, strokeCanvas.current.width, strokeCanvas.current.height);
+      const data = imgData.data;
+      const radius = brush.size / 2;
+      if (retouchSettings.mode === 'blur') {
+        applyBlurRegion(data, strokeCanvas.current.width, strokeCanvas.current.height, cur.x, cur.y, radius, retouchSettings.strength);
+      } else if (retouchSettings.mode === 'sharpen') {
+        applySharpenRegion(data, strokeCanvas.current.width, strokeCanvas.current.height, cur.x, cur.y, radius, retouchSettings.strength);
+      } else if (retouchSettings.mode === 'smudge') {
+        applySmudgeRegion(data, strokeCanvas.current.width, strokeCanvas.current.height, retouchLastPos.current.x, retouchLastPos.current.y, cur.x, cur.y, radius, retouchSettings.strength);
+      }
+      ctx.putImageData(imgData, 0, 0);
+      retouchLastPos.current = cur;
+      lastMousePos.current = cur;
+      return;
+    }
     // Brush/eraser drawing while moving — paint ONTO persistent canvas (no Image loading)
     lastMousePos.current = { x: cx, y: cy };
     if ((activeTool === 'brush' || activeTool === 'eraser') && isDrawing && activeLayerId && strokeCanvas.current) {
@@ -664,11 +783,23 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
           : prev.lassoPoints,
       }));
     }
-  }, [activeTool, activeLayerId, updateLayer, layers, isDrawing, brush, brushMode, selection.isDrawing]);
+  }, [activeTool, activeLayerId, updateLayer, layers, isDrawing, brush, brushMode, selection.isDrawing, cloneSettings, retouchSettings]);
 
   // Move/select tool: canvas mouse up
   const handleMouseUpCanvas = useCallback(() => {
     isDragging.current = false;
+    // Finalize clone stamp stroke — commit to layer
+    if (activeTool === 'clone' && activeLayerId && strokeCanvas.current) {
+      const dataUrl = strokeCanvas.current.toDataURL();
+      updateLayer(activeLayerId, { dataUrl });
+      strokeCanvas.current = null;
+    }
+    // Finalize retouch stroke — commit to layer
+    if (activeTool === 'retouch' && activeLayerId && strokeCanvas.current) {
+      const dataUrl = strokeCanvas.current.toDataURL();
+      updateLayer(activeLayerId, { dataUrl });
+      strokeCanvas.current = null;
+    }
     // Finalize brush/eraser stroke — commit to layer
     if ((activeTool === 'brush' || activeTool === 'eraser') && activeLayerId && strokeCanvas.current) {
       const dataUrl = strokeCanvas.current.toDataURL();
@@ -982,6 +1113,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
                 activeMode={brushMode}
                 onModeChange={setBrushMode}
                 onFillLayer={handleFillLayer}
+                onPresetSelect={(presetSettings) => setBrush(b => ({ ...b, ...presetSettings }))}
               />
             </div>
           ) : activeTool === 'fill' ? (
@@ -1022,6 +1154,16 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
           ) : activeTool === 'gradient' ? (
             <div className="border-b border-slate-700/50">
               <GradientTool settings={gradientSettings} color={currentColor} onChange={setGradientSettings} />
+            </div>
+          ) : activeTool === 'clone' ? (
+            <div className="border-b border-slate-700/50">
+              <StrokeSettingsPanel settings={brush} onChange={setBrush} />
+              <CloneTool settings={cloneSettings} onChange={setCloneSettings} />
+            </div>
+          ) : activeTool === 'retouch' ? (
+            <div className="border-b border-slate-700/50">
+              <StrokeSettingsPanel settings={brush} onChange={setBrush} />
+              <RetouchTool settings={retouchSettings} onChange={setRetouchSettings} />
             </div>
           ) : activeTool === 'ai' ? (
             <div className="border-b border-slate-700/50">

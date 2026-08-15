@@ -13,7 +13,9 @@ export type PhotoshopTool =
   | 'shape'
   | 'eyedropper'
   | 'pan'
-  | 'ai';
+  | 'ai'
+  | 'clone'
+  | 'retouch';
 
 export type PhotoshopShapeType = 'rectangle' | 'rounded-rect' | 'ellipse' | 'line' | 'arrow' | 'polygon';
 
@@ -94,6 +96,8 @@ export interface BrushSettings {
   color: string;
   preset: 'round' | 'soft-round' | 'chalk' | 'marker' | 'airbrush' | 'calligraphy';
   mode: 'normal' | 'multiply' | 'screen' | 'overlay';
+  sizeJitter: number;
+  opacityJitter: number;
 }
 
 export const DEFAULT_BRUSH: BrushSettings = {
@@ -105,6 +109,99 @@ export const DEFAULT_BRUSH: BrushSettings = {
   color: '#000000',
   preset: 'round',
   mode: 'normal',
+  sizeJitter: 0,
+  opacityJitter: 0,
+};
+
+// --- Brush Preset System ---
+
+export interface BrushPreset {
+  id: string;
+  name: string;
+  settings: Omit<BrushSettings, 'color'>;
+  isBuiltin: boolean;
+}
+
+export const BUILTIN_PRESETS: BrushPreset[] = [
+  {
+    id: 'builtin-hard-round',
+    name: 'Hard Round',
+    isBuiltin: true,
+    settings: { size: 20, hardness: 1.0, opacity: 1, flow: 1, spacing: 0.25, preset: 'round', mode: 'normal', sizeJitter: 0, opacityJitter: 0 },
+  },
+  {
+    id: 'builtin-soft-round',
+    name: 'Soft Round',
+    isBuiltin: true,
+    settings: { size: 40, hardness: 0.3, opacity: 1, flow: 1, spacing: 0.25, preset: 'soft-round', mode: 'normal', sizeJitter: 0, opacityJitter: 0 },
+  },
+  {
+    id: 'builtin-airbrush',
+    name: 'Airbrush',
+    isBuiltin: true,
+    settings: { size: 60, hardness: 0.1, opacity: 0.6, flow: 0.4, spacing: 0.15, preset: 'airbrush', mode: 'normal', sizeJitter: 0, opacityJitter: 0.1 },
+  },
+  {
+    id: 'builtin-marker',
+    name: 'Marker',
+    isBuiltin: true,
+    settings: { size: 30, hardness: 0.9, opacity: 0.7, flow: 1, spacing: 0.3, preset: 'marker', mode: 'multiply', sizeJitter: 0, opacityJitter: 0 },
+  },
+  {
+    id: 'builtin-texture',
+    name: 'Texture',
+    isBuiltin: true,
+    settings: { size: 50, hardness: 0.5, opacity: 0.8, flow: 0.6, spacing: 0.4, preset: 'chalk', mode: 'normal', sizeJitter: 0.3, opacityJitter: 0.2 },
+  },
+  {
+    id: 'builtin-calligraphy',
+    name: 'Calligraphy',
+    isBuiltin: true,
+    settings: { size: 24, hardness: 0.85, opacity: 1, flow: 1, spacing: 0.15, preset: 'calligraphy', mode: 'normal', sizeJitter: 0, opacityJitter: 0 },
+  },
+];
+
+export const PRESETS_STORAGE_KEY = 'gt-photoshop-brush-presets';
+
+export function loadCustomPresets(): BrushPreset[] {
+  try {
+    const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((p: BrushPreset) => !p.isBuiltin) : [];
+  } catch { return []; }
+}
+
+export function saveCustomPresets(presets: BrushPreset[]): void {
+  localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+}
+
+// --- Clone Stamp / Healing Brush Settings ---
+
+export interface CloneSettings {
+  sourceX: number | null;
+  sourceY: number | null;
+  mode: 'clone' | 'heal';
+}
+
+export const DEFAULT_CLONE_SETTINGS: CloneSettings = {
+  sourceX: null,
+  sourceY: null,
+  mode: 'clone',
+};
+
+// --- Retouch Tool Settings (Blur / Sharpen / Smudge) ---
+
+export type RetouchMode = 'blur' | 'sharpen' | 'smudge';
+
+export interface RetouchSettings {
+  mode: RetouchMode;
+  strength: number;
+}
+
+export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
+  mode: 'blur',
+  strength: 50,
 };
 
 export const BLEND_MODE_LABELS: Record<BlendMode, string> = {
