@@ -20,6 +20,11 @@ import {
   GradientSettings,
   CloneSettings,
   RetouchSettings,
+  Guide,
+  GridSettings,
+  SnappingSettings,
+  DEFAULT_GRID_SETTINGS,
+  DEFAULT_SNAPPING_SETTINGS,
 } from '../../types/photoshop';
 import { CropTool } from './tools/CropTool';
 import { SelectTool } from './tools/SelectTool';
@@ -119,7 +124,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const drawStartPos = useRef({ x: 0, y: 0 });
   const lastMousePos = useRef({ x: 0, y: 0 });
   const strokeCanvas = useRef<HTMLCanvasElement | null>(null); // persistent offscreen for brush strokes
-  const [gridType, setGridType] = useState<'none' | 'thirds' | 'golden' | 'square'>('thirds');
+  const [gridType, setGridType] = useState<'none' | 'thirds' | 'golden' | 'square' | 'custom'>('thirds');
   const [imageLoaded, setImageLoaded] = useState(false);
   const [resizeDialogOpen, setResizeDialogOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -166,6 +171,26 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
 
   // Phase 3: paint-on-mask mode
   const [paintOnMask, setPaintOnMask] = useState(false);
+
+  // Phase 4: rulers, guides, grid, snapping, navigator
+  const [guides, setGuides] = useState<Guide[]>([]);
+  const [guidesVisible, setGuidesVisible] = useState(true);
+  const [guidesLocked, setGuidesLocked] = useState(false);
+  const [showRulers, setShowRulers] = useState(true);
+  const [gridSettings, setGridSettings] = useState<GridSettings>(DEFAULT_GRID_SETTINGS);
+  const [snapping, setSnapping] = useState<SnappingSettings>(DEFAULT_SNAPPING_SETTINGS);
+  const [showNavigator, setShowNavigator] = useState(false);
+  const [snappingOpen, setSnappingOpen] = useState(false);
+  const [gridSettingsOpen, setGridSettingsOpen] = useState(false);
+  const topRulerRef = useRef<HTMLCanvasElement>(null);
+  const leftRulerRef = useRef<HTMLCanvasElement>(null);
+  const navigatorRef = useRef<HTMLCanvasElement>(null);
+  const navigatorDragRef = useRef(false);
+  const navThumbTimerRef = useRef<number | null>(null);
+  const guideDragRef = useRef<{ id: string } | null>(null);
+  const rulerDragging = useRef(false);
+  const rulerDragOrientation = useRef<'horizontal' | 'vertical' | null>(null);
+  const rulerDragCanvasPos = useRef<number>(0);
 
   // Handle text confirmation from TextInputDialog — create or update text layer
   const handleTextConfirm = useCallback((text: string, editLayerId?: string) => {
@@ -276,6 +301,123 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   layersRef.current = layers;
   removeLayerRef.current = removeLayer;
   activeLayerIdRef.current = activeLayerId;
+
+  // Phase 4: Refs for keyboard handler
+  const zoomToFitRef = useRef(zoomToFit);
+  zoomToFitRef.current = zoomToFit;
+  const canvasStateRef = useRef(canvas);
+  canvasStateRef.current = canvas;
+
+
+  // Phase 4: Snap calculation for move tool
+  const calculateSnap = useCallback((layerX: number, layerY: number, layerW: number, layerH: number) => {
+    if (!snapping.enabled) return { x: layerX, y: layerY };
+    const zoom = canvasStateRef.current.zoom;
+    const threshold = snapping.threshold / zoom; // convert screen px to canvas px
+    let snapX = layerX;
+    let snapY = layerY;
+    let snapped = false;
+
+    const edges = {
+      left: layerX,
+      right: layerX + layerW,
+      centerX: layerX + layerW / 2,
+      top: layerY,
+      bottom: layerY + layerH,
+      centerY: layerY + layerH / 2,
+    };
+
+    const canvasW = canvasStateRef.current.width;
+    const canvasH = canvasStateRef.current.height;
+
+    // Snap to guides
+    if (snapping.snapToGuides && guidesVisible && guides.length > 0) {
+      for (const guide of guides) {
+        if (guide.orientation === 'vertical') {
+          // Check left, center, right edges against vertical guide
+          for (const edgeX of [edges.left, edges.centerX, edges.right]) {
+            if (Math.abs(edgeX - guide.position) < threshold) {
+              snapX = guide.position - (edgeX - layerX);
+              snapped = true;
+              break;
+            }
+          }
+        } else {
+          // Check top, center, bottom edges against horizontal guide
+          for (const edgeY of [edges.top, edges.centerY, edges.bottom]) {
+            if (Math.abs(edgeY - guide.position) < threshold) {
+              snapY = guide.position - (edgeY - layerY);
+              snapped = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Snap to grid
+    if (snapping.snapToGrid && gridVisible && gridType === 'custom' && gridSettings) {
+      const gridSize = gridSettings.size;
+      for (const edgeX of [edges.left, edges.centerX, edges.right]) {
+        const nearestGridX = Math.round(edgeX / gridSize) * gridSize;
+        if (Math.abs(edgeX - nearestGridX) < threshold) {
+          snapX = nearestGridX - (edgeX - layerX);
+          break;
+        }
+      }
+      for (const edgeY of [edges.top, edges.centerY, edges.bottom]) {
+        const nearestGridY = Math.round(edgeY / gridSize) * gridSize;
+        if (Math.abs(edgeY - nearestGridY) < threshold) {
+          snapY = nearestGridY - (edgeY - layerY);
+          break;
+        }
+      }
+    }
+
+    // Snap to canvas center
+    if (snapping.snapToCenter) {
+      const canvasCenterX = canvasW / 2;
+      const canvasCenterY = canvasH / 2;
+      for (const edgeX of [edges.left, edges.centerX, edges.right]) {
+        if (Math.abs(edgeX - canvasCenterX) < threshold) {
+          snapX = canvasCenterX - (edgeX - layerX);
+          break;
+        }
+      }
+      for (const edgeY of [edges.top, edges.centerY, edges.bottom]) {
+        if (Math.abs(edgeY - canvasCenterY) < threshold) {
+          snapY = canvasCenterY - (edgeY - layerY);
+          break;
+        }
+      }
+    }
+
+    // Snap to canvas edges
+    if (snapping.snapToEdges) {
+      for (const edgeX of [edges.left, edges.right]) {
+        if (Math.abs(edgeX) < threshold) {
+          snapX = - (edgeX - layerX);
+          break;
+        }
+        if (Math.abs(edgeX - canvasW) < threshold) {
+          snapX = canvasW - (edgeX - layerX);
+          break;
+        }
+      }
+      for (const edgeY of [edges.top, edges.bottom]) {
+        if (Math.abs(edgeY) < threshold) {
+          snapY = - (edgeY - layerY);
+          break;
+        }
+        if (Math.abs(edgeY - canvasH) < threshold) {
+          snapY = canvasH - (edgeY - layerY);
+          break;
+        }
+      }
+    }
+
+    return snapped ? { x: snapX, y: snapY } : { x: layerX, y: layerY };
+  }, [snapping, guides, guidesVisible, gridVisible, gridType, gridSettings]);
 
   // Selection refs for keyboard handler
   const selectionRef = useRef(selection);
@@ -413,7 +555,16 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         return;
       }
 
-      if (ctrl && key === '0') { e.preventDefault(); zoomToRef.current(1); return; }
+      if (ctrl && key === '0') {
+        e.preventDefault();
+        const container = document.querySelector('.photoshop-canvas-container');
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          zoomToFitRef.current(canvasStateRef.current.width, canvasStateRef.current.height, rect.width, rect.height);
+        }
+        return;
+      }
+      if (ctrl && key === '1') { e.preventDefault(); zoomToRef.current(1); return; }
       if (key === '+' || key === '=') { e.preventDefault(); zoomInRef.current(); return; }
       if (key === '-') { e.preventDefault(); zoomOutRef.current(); return; }
 
@@ -534,6 +685,312 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       img.src = layer.dataUrl;
     } catch (e) { console.error('Adjustment error:', e); }
   }, [activeLayerId, layers, pushSnapshot, updateLayer, undoRef, loadLayersRef]);
+
+
+  // Phase 4: Guide management
+  const addGuide = useCallback((orientation: 'horizontal' | 'vertical', position: number) => {
+    const id = 'guide-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+    setGuides(prev => [...prev, { id, orientation, position }]);
+  }, []);
+
+  const removeGuide = useCallback((id: string) => {
+    setGuides(prev => prev.filter(g => g.id !== id));
+  }, []);
+
+  const clearGuides = useCallback(() => {
+    setGuides([]);
+  }, []);
+
+  // Phase 4: Ruler rendering
+  const renderRulers = useCallback(() => {
+    const zoom = canvas.zoom;
+    const panX = canvas.panX;
+    const panY = canvas.panY;
+
+    // Top ruler
+    const topCanvas = topRulerRef.current;
+    if (topCanvas) {
+      const ctx = topCanvas.getContext('2d');
+      if (ctx) {
+        const w = topCanvas.width;
+        const h = topCanvas.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#475569';
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+
+        // Calculate tick interval based on zoom
+        let tickInterval = 100;
+        if (zoom >= 4) tickInterval = 10;
+        else if (zoom >= 2) tickInterval = 25;
+        else if (zoom >= 1) tickInterval = 50;
+        else if (zoom >= 0.5) tickInterval = 100;
+        else tickInterval = 200;
+
+        const startCanvasX = -panX / zoom;
+        const endCanvasX = (w - panX) / zoom;
+
+        const firstTick = Math.floor(startCanvasX / tickInterval) * tickInterval;
+
+        ctx.beginPath();
+        for (let cx = firstTick; cx <= endCanvasX; cx += tickInterval) {
+          const sx = cx * zoom + panX;
+          if (sx < 0 || sx > w) continue;
+          const isMajor = cx % (tickInterval * 5) === 0;
+          const tickH = isMajor ? 12 : 6;
+          ctx.moveTo(sx, h);
+          ctx.lineTo(sx, h - tickH);
+          if (isMajor) {
+            ctx.fillText(cx.toString(), sx, h - 14);
+          }
+        }
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, h - 0.5);
+        ctx.lineTo(w, h - 0.5);
+        ctx.stroke();
+      }
+    }
+
+    // Left ruler
+    const leftCanvas = leftRulerRef.current;
+    if (leftCanvas) {
+      const ctx = leftCanvas.getContext('2d');
+      if (ctx) {
+        const w = leftCanvas.width;
+        const h = leftCanvas.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#475569';
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '9px monospace';
+
+        let tickInterval = 100;
+        if (zoom >= 4) tickInterval = 10;
+        else if (zoom >= 2) tickInterval = 25;
+        else if (zoom >= 1) tickInterval = 50;
+        else if (zoom >= 0.5) tickInterval = 100;
+        else tickInterval = 200;
+
+        const startCanvasY = -panY / zoom;
+        const endCanvasY = (h - panY) / zoom;
+        const firstTick = Math.floor(startCanvasY / tickInterval) * tickInterval;
+
+        ctx.beginPath();
+        for (let cy = firstTick; cy <= endCanvasY; cy += tickInterval) {
+          const sy = cy * zoom + panY;
+          if (sy < 0 || sy > h) continue;
+          const isMajor = cy % (tickInterval * 5) === 0;
+          const tickW = isMajor ? 12 : 6;
+          ctx.moveTo(w, sy);
+          ctx.lineTo(w - tickW, sy);
+          if (isMajor) {
+            ctx.save();
+            ctx.translate(w - 14, sy);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.fillText(cy.toString(), 0, 0);
+            ctx.restore();
+          }
+        }
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(w - 0.5, 0);
+        ctx.lineTo(w - 0.5, h);
+        ctx.stroke();
+      }
+    }
+  }, [canvas]);
+
+  // Render rulers on every canvas change
+  useEffect(() => {
+    if (showRulers) {
+      requestAnimationFrame(renderRulers);
+    }
+  }, [showRulers, renderRulers, canvas.zoom, canvas.panX, canvas.panY, layers]);
+
+  // Phase 4: Resize ruler canvases
+  useEffect(() => {
+    const resizeRulers = () => {
+      const container = document.querySelector('.photoshop-canvas-container');
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      if (topRulerRef.current) {
+        topRulerRef.current.width = rect.width - 20;
+        topRulerRef.current.height = 20;
+      }
+      if (leftRulerRef.current) {
+        leftRulerRef.current.width = 20;
+        leftRulerRef.current.height = rect.height - 20;
+      }
+      requestAnimationFrame(renderRulers);
+    };
+    resizeRulers();
+    const observer = new ResizeObserver(resizeRulers);
+    const container = document.querySelector('.photoshop-canvas-container');
+    if (container) observer.observe(container);
+    return () => observer.disconnect();
+  }, [showRulers, renderRulers]);
+
+  // Phase 4: Ruler mouse handlers for guide creation
+  const handleRulerMouseDown = useCallback((e: React.MouseEvent, orientation: 'horizontal' | 'vertical') => {
+    if (guidesLocked) return;
+    e.preventDefault();
+    rulerDragging.current = true;
+    rulerDragOrientation.current = orientation;
+    const container = document.querySelector('.photoshop-canvas-container');
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const zoom = canvas.zoom;
+    const panX = canvas.panX;
+    const panY = canvas.panY;
+    if (orientation === 'horizontal') {
+      rulerDragCanvasPos.current = (e.clientY - rect.top - panY) / zoom;
+    } else {
+      rulerDragCanvasPos.current = (e.clientX - rect.left - panX) / zoom;
+    }
+  }, [canvas, guidesLocked]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!rulerDragging.current) return;
+      const container = document.querySelector('.photoshop-canvas-container');
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const zoom = canvas.zoom;
+      const panX = canvas.panX;
+      const panY = canvas.panY;
+      if (rulerDragOrientation.current === 'horizontal') {
+        rulerDragCanvasPos.current = (e.clientY - rect.top - panY) / zoom;
+      } else {
+        rulerDragCanvasPos.current = (e.clientX - rect.left - panX) / zoom;
+      }
+    };
+    const handleMouseUp = () => {
+      if (rulerDragging.current) {
+        rulerDragging.current = false;
+        const pos = rulerDragCanvasPos.current;
+        if (pos >= 0 && pos <= (rulerDragOrientation.current === 'horizontal' ? canvas.height : canvas.width)) {
+          addGuide(rulerDragOrientation.current, Math.round(pos));
+        }
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [canvas, addGuide]);
+
+  // Phase 4: Navigator thumbnail rendering
+  const navImageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+
+  const renderNavigator = useCallback(() => {
+    const navCanvas = navigatorRef.current;
+    if (!navCanvas) return;
+    const ctx = navCanvas.getContext('2d');
+    if (!ctx) return;
+
+    const thumbW = 160;
+    const thumbH = Math.max(1, Math.round((canvas.height / Math.max(1, canvas.width)) * thumbW));
+    navCanvas.width = thumbW;
+    navCanvas.height = thumbH;
+
+    // Draw checkerboard
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, thumbW, thumbH);
+
+    // Scale to fit
+    const scale = canvas.width > 0 ? thumbW / canvas.width : 1;
+    ctx.save();
+    ctx.scale(scale, scale);
+
+    // Draw layers using local image cache
+    let pending = 0;
+    for (const layer of layers) {
+      if (!layer.visible || layer.layerType === 'group') continue;
+      if (layer.dataUrl && layer.dataUrl.startsWith('data:')) {
+        let cached = navImageCache.current.get(layer.id);
+        if (!cached || cached.src !== layer.dataUrl) {
+          const img = new Image();
+          img.onload = () => { navImageCache.current.set(layer.id, img); requestAnimationFrame(renderNavigator); };
+          img.src = layer.dataUrl;
+          navImageCache.current.set(layer.id, img);
+          pending++;
+        } else if (cached.complete) {
+          ctx.drawImage(cached, layer.x, layer.y, layer.width, layer.height);
+        }
+      }
+    }
+
+    ctx.restore();
+
+    if (pending > 0) return; // Will re-render after images load
+
+    // Draw viewport rectangle
+    const container = document.querySelector('.photoshop-canvas-container');
+    if (container) {
+      const containerRect = container.getBoundingClientRect();
+      const vpX = (-canvas.panX / canvas.zoom) * scale;
+      const vpY = (-canvas.panY / canvas.zoom) * scale;
+      const vpW = (containerRect.width / canvas.zoom) * scale;
+      const vpH = (containerRect.height / canvas.zoom) * scale;
+
+      ctx.strokeStyle = 'rgba(26, 188, 156, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(vpX, vpY, vpW, vpH);
+      ctx.fillStyle = 'rgba(26, 188, 156, 0.05)';
+      ctx.fillRect(vpX, vpY, vpW, vpH);
+    }
+  }, [canvas, layers]);
+
+  useEffect(() => {
+    if (showNavigator) {
+      navThumbTimerRef.current = window.setTimeout(renderNavigator, 100);
+      return () => { if (navThumbTimerRef.current) clearTimeout(navThumbTimerRef.current); };
+    }
+  }, [showNavigator, renderNavigator, canvas, layers]);
+
+  // Phase 4: Navigator drag to pan
+  const handleNavigatorMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    navigatorDragRef.current = true;
+    handleNavigatorDrag(e);
+  }, []);
+
+  const handleNavigatorDrag = useCallback((e: React.MouseEvent<HTMLCanvasElement> | MouseEvent) => {
+    if (!navigatorDragRef.current) return;
+    const navCanvas = navigatorRef.current;
+    if (!navCanvas) return;
+    const rect = navCanvas.getBoundingClientRect();
+    const navX = e.clientX - rect.left;
+    const navY = e.clientY - rect.top;
+    const scale = navCanvas.width / canvas.width;
+    const canvasX = navX / scale;
+    const canvasY = navY / scale;
+    const container = document.querySelector('.photoshop-canvas-container');
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const newPanX = -(canvasX * canvas.zoom) + containerRect.width / 2;
+    const newPanY = -(canvasY * canvas.zoom) + containerRect.height / 2;
+    setCanvas(prev => ({ ...prev, panX: newPanX, panY: newPanY }));
+  }, [canvas, setCanvas]);
+
+  useEffect(() => {
+    const handleNavMouseMove = (e: MouseEvent) => handleNavigatorDrag(e);
+    const handleNavMouseUp = () => { navigatorDragRef.current = false; };
+    window.addEventListener('mousemove', handleNavMouseMove);
+    window.addEventListener('mouseup', handleNavMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleNavMouseMove);
+      window.removeEventListener('mouseup', handleNavMouseUp);
+    };
+  }, [handleNavigatorDrag]);
+
   // AI handler — receives action + prompt, calls service, updates layer
   const handleAIAction = useCallback(async (action: AIPhotoAction, prompt: string) => {
     if (!isAuthenticated || !activeLayerId || aiGenerating) return;
@@ -729,10 +1186,11 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     if (activeTool === 'move' && isDragging.current && activeLayerId) {
       const dx = cx - dragStart.current.x;
       const dy = cy - dragStart.current.y;
-      updateLayer(activeLayerId, {
-        x: layerStartPos.current.x + dx,
-        y: layerStartPos.current.y + dy,
-      });
+      const rawX = layerStartPos.current.x + dx;
+      const rawY = layerStartPos.current.y + dy;
+      const layer = layers.find(l => l.id === activeLayerId);
+      const snapped = calculateSnap(rawX, rawY, layer?.width ?? 0, layer?.height ?? 0);
+      updateLayer(activeLayerId, { x: snapped.x, y: snapped.y });
       return;
     }
     // Clone stamp — paint from source offset
@@ -1102,7 +1560,35 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
             onMouseMoveCanvas={handleMouseMoveCanvas}
             onMouseUpCanvas={handleMouseUpCanvas}
             selection={selection}
+            guides={guides}
+            guidesVisible={guidesVisible}
+            gridSettings={gridSettings}
           />
+
+          {showRulers && (
+            <>
+              <canvas
+                ref={topRulerRef}
+                onMouseDown={(e) => handleRulerMouseDown(e, 'horizontal')}
+                className="absolute top-0 left-0 right-0 h-5 z-30 cursor-ns-resize bg-slate-900/95 border-b border-slate-700 pointer-events-auto"
+              />
+              <canvas
+                ref={leftRulerRef}
+                onMouseDown={(e) => handleRulerMouseDown(e, 'vertical')}
+                className="absolute top-0 left-0 bottom-0 w-5 z-30 cursor-ew-resize bg-slate-900/95 border-r border-slate-700 pointer-events-auto"
+              />
+            </>
+          )}
+          {showNavigator && (
+            <div className="absolute bottom-3 right-3 z-30 bg-slate-900/95 border border-slate-700 rounded-lg p-1 shadow-xl">
+              <canvas
+                ref={navigatorRef}
+                width={160}
+                onMouseDown={handleNavigatorMouseDown}
+                className="rounded cursor-pointer block"
+              />
+            </div>
+          )}
         </div>
 
         {/* Right panels */}
@@ -1255,6 +1741,33 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
             className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${gridVisible ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-slate-300'}`}
             title="Toggle grid"
           >⊞</button>
+          <button
+            onClick={() => setShowRulers(v => !v)}
+            className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${showRulers ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-slate-300'}`}
+            title="Toggle rulers"
+          >📏</button>
+          <button
+            onClick={() => setGuidesVisible(v => !v)}
+            disabled={guides.length === 0}
+            className={`text-[10px] px-1.5 py-0.5 rounded transition-colors disabled:opacity-30 ${guidesVisible && guides.length > 0 ? 'text-cyan-400 bg-cyan-400/10' : 'text-slate-500 hover:text-slate-300'}`}
+            title="Toggle guides"
+          >📍</button>
+          <button
+            onClick={clearGuides}
+            disabled={guides.length === 0}
+            className="text-[10px] px-1.5 py-0.5 rounded text-slate-500 hover:text-slate-300 disabled:opacity-30 transition-colors"
+            title="Clear all guides"
+          >✕📍</button>
+          <button
+            onClick={() => setSnapping(v => ({ ...v, enabled: !v.enabled }))}
+            className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${snapping.enabled ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-slate-300'}`}
+            title="Toggle snapping"
+          >🧲</button>
+          <button
+            onClick={() => setShowNavigator(v => !v)}
+            className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${showNavigator ? 'text-primary bg-primary/10' : 'text-slate-500 hover:text-slate-300'}`}
+            title="Toggle navigator"
+          >🗺</button>
           <span className="text-[11px] text-slate-400 font-mono w-12 text-right">{zoomPercent}%</span>
           <button onClick={zoomOut} className="text-[10px] px-1 py-0.5 rounded text-slate-500 hover:text-slate-300">−</button>
           <input

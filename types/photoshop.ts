@@ -279,6 +279,48 @@ export const FONT_FAMILIES = [
 export const ZOOM_LEVELS = [
   0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 8.0, 16.0, 32.0
 ];
+// --- Phase 4: Guides, Grid Settings, Snapping ---
+
+export interface Guide {
+  id: string;
+  orientation: 'horizontal' | 'vertical';
+  position: number; // canvas pixels
+}
+
+export type GridType = 'none' | 'thirds' | 'golden' | 'square' | 'custom';
+
+export interface GridSettings {
+  type: GridType;
+  size: number; // px, for custom grid
+  subdivisions: number;
+  color: string;
+}
+
+export interface SnappingSettings {
+  enabled: boolean;
+  snapToGuides: boolean;
+  snapToGrid: boolean;
+  snapToCenter: boolean;
+  snapToEdges: boolean;
+  threshold: number; // screen px
+}
+
+export const DEFAULT_GRID_SETTINGS: GridSettings = {
+  type: 'thirds',
+  size: 50,
+  subdivisions: 4,
+  color: 'rgba(255, 255, 255, 0.08)',
+};
+
+export const DEFAULT_SNAPPING_SETTINGS: SnappingSettings = {
+  enabled: true,
+  snapToGuides: true,
+  snapToGrid: true,
+  snapToCenter: true,
+  snapToEdges: true,
+  threshold: 6,
+};
+
 // Color state for drawing tools
 export interface ColorState {
   hex: string;

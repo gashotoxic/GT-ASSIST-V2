@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { CanvasState, PhotoshopLayer, BlendMode, SelectionState, SelectionRect, LayerEffects } from '../../types/photoshop';
+import { CanvasState, PhotoshopLayer, BlendMode, SelectionState, SelectionRect, LayerEffects, Guide, GridSettings } from '../../types/photoshop';
 import { renderTextOnCtx, TextLayerData } from './tools/textUtils';
 
 interface CanvasEngineProps {
@@ -12,12 +12,15 @@ interface CanvasEngineProps {
   onWheelZoom: (deltaY: number) => void;
   activeTool: string;
   gridVisible: boolean;
-  gridType: 'none' | 'thirds' | 'golden' | 'square';
+  gridType: 'none' | 'thirds' | 'golden' | 'square' | 'custom';
+  gridSettings?: GridSettings;
   onMouseDownCanvas?: (canvasX: number, canvasY: number, layerId: string | null) => void;
   onMouseMoveCanvas?: (canvasX: number, canvasY: number) => void;
   onMouseUpCanvas?: () => void;
   screenToCanvas?: (sx: number, sy: number, rect: DOMRect) => { x: number; y: number };
   selection?: SelectionState;
+  guides?: Guide[];
+  guidesVisible?: boolean;
 }
 
 function applyBlendMode(ctx: CanvasRenderingContext2D, mode: BlendMode) {
@@ -184,11 +187,14 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
   activeTool,
   gridVisible,
   gridType,
+  gridSettings,
   onMouseDownCanvas,
   onMouseMoveCanvas,
   onMouseUpCanvas,
   screenToCanvas: screenToCanvasProp,
   selection,
+  guides,
+  guidesVisible,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -490,9 +496,9 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
 
     // Draw grid if enabled
     if (gridVisible) {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.lineWidth = 1 / canvas.zoom;
       if (gridType === 'thirds') {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
         const thirdW = canvas.width / 3;
         const thirdH = canvas.height / 3;
         ctx.beginPath();
@@ -502,7 +508,31 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
         ctx.moveTo(0, thirdH * 2); ctx.lineTo(canvas.width, thirdH * 2);
         ctx.stroke();
       } else if (gridType === 'square') {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
         const step = 50;
+        ctx.beginPath();
+        for (let x = 0; x <= canvas.width; x += step) {
+          ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+        }
+        for (let y = 0; y <= canvas.height; y += step) {
+          ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+      } else if (gridType === 'custom' && gridSettings) {
+        const step = gridSettings.size;
+        const subStep = step / gridSettings.subdivisions;
+        // Draw subdivisions (fainter)
+        ctx.strokeStyle = gridSettings.color.replace(/\d+\.?\d*\)$/, (m) => (parseFloat(m) * 0.3).toFixed(2) + ')');
+        ctx.beginPath();
+        for (let x = 0; x <= canvas.width; x += subStep) {
+          ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+        }
+        for (let y = 0; y <= canvas.height; y += subStep) {
+          ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+        // Draw main grid lines
+        ctx.strokeStyle = gridSettings.color;
         ctx.beginPath();
         for (let x = 0; x <= canvas.width; x += step) {
           ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
@@ -514,8 +544,26 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
       }
     }
 
+    // Draw guides
+    if (guidesVisible && guides && guides.length > 0) {
+      ctx.strokeStyle = '#00d4ff';
+      ctx.lineWidth = 1 / canvas.zoom;
+      ctx.setLineDash([]);
+      for (const guide of guides) {
+        ctx.beginPath();
+        if (guide.orientation === 'horizontal') {
+          ctx.moveTo(0, guide.position);
+          ctx.lineTo(canvas.width, guide.position);
+        } else {
+          ctx.moveTo(guide.position, 0);
+          ctx.lineTo(guide.position, canvas.height);
+        }
+        ctx.stroke();
+      }
+    }
+
     ctx.restore(); // match the outer save() for zoom/pan
-  }, [canvas, layers, activeLayerId, gridVisible, gridType, selection, renderSingleLayer, renderGroup]);
+  }, [canvas, layers, activeLayerId, gridVisible, gridType, gridSettings, selection, guides, guidesVisible, renderSingleLayer, renderGroup]);
 
   // Re-render on state changes
   useEffect(() => {
