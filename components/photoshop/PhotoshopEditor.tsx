@@ -160,7 +160,12 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     setLayerVisibility, setLayerOpacity, setLayerBlendMode,
     setLayerLocked, duplicateLayer, reorderLayer,
     loadLayers, clearLayers, setLayers,
+    addGroup, addToGroup, removeFromGroup, setGroupCollapsed,
+    setLayerEffects, addLayerMask, removeLayerMask,
   } = useLayerManager(canvas.width, canvas.height);
+
+  // Phase 3: paint-on-mask mode
+  const [paintOnMask, setPaintOnMask] = useState(false);
 
   // Handle text confirmation from TextInputDialog — create or update text layer
   const handleTextConfirm = useCallback((text: string, editLayerId?: string) => {
@@ -666,12 +671,14 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     if (activeTool === 'brush' || activeTool === 'eraser') {
       if (!activeLayerId || isDrawing) return;
       const layer = layers.find(l => l.id === activeLayerId);
-      if (!layer || !layer.dataUrl) return;
+      // Paint-on-mask: brush paints black (hide), eraser paints white (reveal)
+      const paintingMask = paintOnMask && layer?.maskDataUrl;
+      if (!layer || (!paintingMask && !layer.dataUrl)) return;
       setIsDrawing(true);
-      pushSnapshot(layers, 'Paint stroke');
+      pushSnapshot(layers, paintingMask ? 'Paint mask' : 'Paint stroke');
       drawStartPos.current = { x: cx - layer.x, y: cy - layer.y };
       lastMousePos.current = { x: cx - layer.x, y: cy - layer.y };
-      // Pre-load layer image into a persistent offscreen canvas
+      // Pre-load layer (or mask) image into a persistent offscreen canvas
       const img = new Image();
       img.onload = () => {
         if (!strokeCanvas.current || strokeCanvas.current.width !== layer.width || strokeCanvas.current.height !== layer.height) {
@@ -685,9 +692,14 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         ctx.clearRect(0, 0, strokeCanvas.current.width, strokeCanvas.current.height);
         ctx.drawImage(img, 0, 0);
         const mode = activeTool === 'brush' ? brushMode === 'eraser' ? 'eraser' as const : 'brush' as const : 'eraser' as const;
-        drawBrushStroke(ctx, drawStartPos.current.x, drawStartPos.current.y, drawStartPos.current.x, drawStartPos.current.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
+        if (paintingMask) {
+          const maskColor = (activeTool === 'eraser' || mode === 'eraser') ? '#ffffff' : '#000000';
+          drawBrushStroke(ctx, drawStartPos.current.x, drawStartPos.current.y, drawStartPos.current.x, drawStartPos.current.y, brush.size, brush.hardness, brush.opacity, maskColor, 'brush');
+        } else {
+          drawBrushStroke(ctx, drawStartPos.current.x, drawStartPos.current.y, drawStartPos.current.x, drawStartPos.current.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
+        }
       };
-      img.src = layer.dataUrl;
+      img.src = paintingMask ? layer.maskDataUrl! : layer.dataUrl;
       return;
     }
     // Select tool — draw selection marquee
@@ -770,7 +782,13 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       const prev = drawStartPos.current;
       const cur = { x: cx - layer.x, y: cy - layer.y };
       const mode = activeTool === 'brush' ? brushMode === 'eraser' ? 'eraser' as const : 'brush' as const : 'eraser' as const;
-      drawBrushStroke(ctx, prev.x, prev.y, cur.x, cur.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
+      if (paintOnMask && layer.maskDataUrl) {
+        // Painting on mask: brush = black (hide), eraser = white (reveal)
+        const maskColor = (activeTool === 'eraser' || mode === 'eraser') ? '#ffffff' : '#000000';
+        drawBrushStroke(ctx, prev.x, prev.y, cur.x, cur.y, brush.size, brush.hardness, brush.opacity, maskColor, 'brush');
+      } else {
+        drawBrushStroke(ctx, prev.x, prev.y, cur.x, cur.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
+      }
       drawStartPos.current = cur;
     }
     // Select tool — update selection preview while drawing
@@ -800,10 +818,14 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       updateLayer(activeLayerId, { dataUrl });
       strokeCanvas.current = null;
     }
-    // Finalize brush/eraser stroke — commit to layer
+    // Finalize brush/eraser stroke — commit to layer (or mask when painting on mask)
     if ((activeTool === 'brush' || activeTool === 'eraser') && activeLayerId && strokeCanvas.current) {
-      const dataUrl = strokeCanvas.current.toDataURL();
-      updateLayer(activeLayerId, { dataUrl });
+      const layer = layers.find(l => l.id === activeLayerId);
+      if (paintOnMask && layer?.maskDataUrl) {
+        updateLayer(activeLayerId, { maskDataUrl: strokeCanvas.current.toDataURL() });
+      } else {
+        updateLayer(activeLayerId, { dataUrl: strokeCanvas.current.toDataURL() });
+      }
       strokeCanvas.current = null;
     }
     setIsDrawing(false);
@@ -1193,6 +1215,15 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
               onDuplicate={duplicateLayer}
               onRemove={removeLayer}
               onReorder={reorderLayer}
+              onAddGroup={() => { pushSnapshot(layers, 'New group'); addGroup(); }}
+              onAddToGroup={(layerId, groupId) => { pushSnapshot(layers, 'Add to group'); addToGroup(layerId, groupId); }}
+              onRemoveFromGroup={(layerId) => { pushSnapshot(layers, 'Remove from group'); removeFromGroup(layerId); }}
+              onToggleGroupCollapsed={(groupId) => { const g = layers.find(l => l.id === groupId); setGroupCollapsed(groupId, !(g?.collapsed ?? false)); }}
+              onChangeEffects={(layerId, effects) => { setLayerEffects(layerId, effects); }}
+              onAddMask={(layerId) => { pushSnapshot(layers, 'Add layer mask'); addLayerMask(layerId); }}
+              onRemoveMask={(layerId) => { pushSnapshot(layers, 'Remove layer mask'); removeLayerMask(layerId); }}
+              paintOnMask={paintOnMask}
+              onTogglePaintOnMask={() => setPaintOnMask(m => !m)}
             />
           </div>
         </div>

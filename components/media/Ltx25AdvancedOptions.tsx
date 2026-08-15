@@ -203,8 +203,8 @@ export const Ltx25AdvancedOptions: React.FC<Ltx25AdvancedOptionsProps> = ({
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                     <input
                         type="checkbox"
-                        checked={settings.generated_keyframes}
-                        onChange={(e) => update('generated_keyframes', e.target.checked)}
+                        checked={settings.generated_keyframes != null}
+                        onChange={(e) => update('generated_keyframes', e.target.checked ? 3 : null)}
                         className="rounded"
                     />
                     Generated Keyframes

@@ -31,6 +31,39 @@ export type BlendMode =
   | 'hard-light'
   | 'soft-light';
 
+
+
+// --- Phase 3: Layer Effects ---
+
+export interface LayerEffects {
+  dropShadow?: {
+    enabled: boolean;
+    offsetX: number;
+    offsetY: number;
+    blur: number;
+    color: string;
+    opacity: number;
+  };
+  stroke?: {
+    enabled: boolean;
+    size: number;
+    color: string;
+    position: 'outside' | 'center';
+  };
+  outerGlow?: {
+    enabled: boolean;
+    blur: number;
+    color: string;
+    opacity: number;
+  };
+}
+
+export const DEFAULT_LAYER_EFFECTS: LayerEffects = {
+  dropShadow: { enabled: false, offsetX: 4, offsetY: 4, blur: 8, color: '#000000', opacity: 0.5 },
+  stroke: { enabled: false, size: 2, color: '#000000', position: 'outside' },
+  outerGlow: { enabled: false, blur: 10, color: '#ffffff', opacity: 0.7 },
+};
+
 export type LayerType = 'image' | 'text' | 'shape' | 'adjustment';
 
 export interface PhotoshopLayer {
@@ -46,6 +79,16 @@ export interface PhotoshopLayer {
   y: number;
   width: number;
   height: number;
+  // Phase 3: Layer Effects
+  effects?: LayerEffects;
+  // Phase 3: Groups
+  layerType?: 'layer' | 'group';
+  children?: string[];
+  collapsed?: boolean;
+  // Phase 3: Masking
+  maskDataUrl?: string;
+  // Group membership
+  parentId?: string;
   text?: {
     content: string;
     fontFamily: string;
