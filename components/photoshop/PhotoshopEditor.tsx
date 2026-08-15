@@ -127,6 +127,8 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   const drawStartPos = useRef({ x: 0, y: 0 });
   const lastMousePos = useRef({ x: 0, y: 0 });
   const strokeCanvas = useRef<HTMLCanvasElement | null>(null); // persistent offscreen for brush strokes
+  const strokeReady = useRef(false); // true once the layer image has loaded into strokeCanvas
+  const strokePendingCommit = useRef(false); // mouse-up fired before image load — commit when ready
   const [gridType, setGridType] = useState<'none' | 'thirds' | 'golden' | 'square' | 'custom'>('thirds');
   const [imageLoaded, setImageLoaded] = useState(false);
   const [resizeDialogOpen, setResizeDialogOpen] = useState(false);
@@ -138,8 +140,8 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
 
   // Handle text tool canvas click — open dialog and set position
   // (Text is rendered on a new layer after the dialog confirms)
+  const pendingTextPos = useRef<{ x: number; y: number } | null>(null);
 
-    
 // Open ResizeDialog when resize tool is selected in toolbar
   useEffect(() => {
     if (activeTool === 'resize') {
@@ -225,20 +227,23 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         textColor, textBgColor, textAlign, textLineHeight, 400
       );
       const id = 'ps-layer-text-' + Date.now();
+      const pos = pendingTextPos.current;
       setLayers(prev => [...prev, {
         id,
         name: 'Text ' + (prev.length + 1),
         type: 'text' as const,
+        layerType: 'layer' as const,
         visible: true,
         locked: false,
         opacity: 1,
         blendMode: 'normal' as const,
         dataUrl: result.dataUrl,
-        x: 0, y: 0,
+        x: pos?.x ?? 0, y: pos?.y ?? 0,
         width: result.width,
         height: result.height,
         text: textData,
       }]);
+      pendingTextPos.current = null;
       setActiveLayerId(id);
     }
     setTextInputOpen(false);
@@ -1135,6 +1140,8 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       const paintingMask = paintOnMask && layer?.maskDataUrl;
       if (!layer || (!paintingMask && !layer.dataUrl)) return;
       setIsDrawing(true);
+      strokeReady.current = false; // gate until image loads
+      strokeCanvas.current = null; // never draw on a stale canvas
       pushSnapshot(layers, paintingMask ? 'Paint mask' : 'Paint stroke');
       drawStartPos.current = { x: cx - layer.x, y: cy - layer.y };
       lastMousePos.current = { x: cx - layer.x, y: cy - layer.y };
@@ -1151,12 +1158,24 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         if (!ctx) return;
         ctx.clearRect(0, 0, strokeCanvas.current.width, strokeCanvas.current.height);
         ctx.drawImage(img, 0, 0);
+        strokeReady.current = true;
         const mode = activeTool === 'brush' ? brushMode === 'eraser' ? 'eraser' as const : 'brush' as const : 'eraser' as const;
         if (paintingMask) {
           const maskColor = (activeTool === 'eraser' || mode === 'eraser') ? '#ffffff' : '#000000';
           drawBrushStroke(ctx, drawStartPos.current.x, drawStartPos.current.y, drawStartPos.current.x, drawStartPos.current.y, brush.size, brush.hardness, brush.opacity, maskColor, 'brush');
         } else {
           drawBrushStroke(ctx, drawStartPos.current.x, drawStartPos.current.y, drawStartPos.current.x, drawStartPos.current.y, brush.size, brush.hardness, brush.opacity, brush.color, mode);
+        }
+        // Flush a deferred mouse-up commit if it fired while loading
+        if (strokePendingCommit.current) {
+          strokePendingCommit.current = false;
+          const layer2 = layers.find(l => l.id === activeLayerId);
+          if (paintOnMask && layer2?.maskDataUrl) {
+            updateLayer(activeLayerId, { maskDataUrl: strokeCanvas.current!.toDataURL() });
+          } else {
+            updateLayer(activeLayerId, { dataUrl: strokeCanvas.current!.toDataURL() });
+          }
+          strokeCanvas.current = null;
         }
       };
       img.src = paintingMask ? layer.maskDataUrl! : layer.dataUrl;
@@ -1174,9 +1193,17 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       }));
       return;
     }
+    // Text tool — click canvas to place text there
+    if (activeTool === 'text') {
+      pendingTextPos.current = { x: cx, y: cy };
+      setTextInputOpen(true);
+      return;
+    }
     // Shape/gradient drawing
     if (activeTool === 'shape' || activeTool === 'gradient') {
       if (!activeLayerId) return;
+      const shLayer = layers.find(l => l.id === activeLayerId);
+      if (!shLayer || shLayer.locked) return;
       setIsDrawing(true);
       drawStartPos.current = { x: cx, y: cy };
       lastMousePos.current = { x: cx, y: cy };
@@ -1235,7 +1262,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     }
     // Brush/eraser drawing while moving — paint ONTO persistent canvas (no Image loading)
     lastMousePos.current = { x: cx, y: cy };
-    if ((activeTool === 'brush' || activeTool === 'eraser') && isDrawing && activeLayerId && strokeCanvas.current) {
+    if ((activeTool === 'brush' || activeTool === 'eraser') && isDrawing && activeLayerId && strokeCanvas.current && strokeReady.current) {
       const layer = layers.find(l => l.id === activeLayerId);
       if (!layer) return;
       const ctx = strokeCanvas.current.getContext('2d');
@@ -1281,13 +1308,18 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     }
     // Finalize brush/eraser stroke — commit to layer (or mask when painting on mask)
     if ((activeTool === 'brush' || activeTool === 'eraser') && activeLayerId && strokeCanvas.current) {
-      const layer = layers.find(l => l.id === activeLayerId);
-      if (paintOnMask && layer?.maskDataUrl) {
-        updateLayer(activeLayerId, { maskDataUrl: strokeCanvas.current.toDataURL() });
+      if (!strokeReady.current) {
+        // Image still loading — defer commit until onload completes
+        strokePendingCommit.current = true;
       } else {
-        updateLayer(activeLayerId, { dataUrl: strokeCanvas.current.toDataURL() });
+        const layer = layers.find(l => l.id === activeLayerId);
+        if (paintOnMask && layer?.maskDataUrl) {
+          updateLayer(activeLayerId, { maskDataUrl: strokeCanvas.current.toDataURL() });
+        } else {
+          updateLayer(activeLayerId, { dataUrl: strokeCanvas.current.toDataURL() });
+        }
+        strokeCanvas.current = null;
       }
-      strokeCanvas.current = null;
     }
     setIsDrawing(false);
     // Finalize selection — compute bounding rect
@@ -1328,7 +1360,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     if (activeTool === 'shape' || activeTool === 'gradient') {
       if (!activeLayerId) return;
       const layer = layers.find(l => l.id === activeLayerId);
-      if (!layer || !layer.dataUrl) return;
+      if (!layer) return;
       const start = drawStartPos.current;
       const end = { x: lastMousePos.current.x, y: lastMousePos.current.y };
       const x = Math.min(start.x, end.x);
@@ -1336,14 +1368,25 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       const w = Math.abs(end.x - start.x) || 1;
       const h = Math.abs(end.y - start.y) || 1;
 
-      const img = new Image();
-      img.onload = () => {
+      const drawCommitted = () => {
         const offscreen = document.createElement('canvas');
         offscreen.width = canvas.width;
         offscreen.height = canvas.height;
         const ctx = offscreen.getContext('2d');
         if (!ctx) return;
-        ctx.drawImage(img, 0, 0);
+        if (layer.dataUrl) {
+          const img = new Image();
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+            finishShape(ctx, offscreen);
+          };
+          img.onerror = () => finishShape(ctx, offscreen);
+          img.src = layer.dataUrl;
+        } else {
+          finishShape(ctx, offscreen);
+        }
+      };
+      const finishShape = (ctx: CanvasRenderingContext2D, offscreen: HTMLCanvasElement) => {
 
         if (activeTool === 'shape') {
           drawShapeOnCanvas(ctx, shapeSettings.type, x, y, w, h,
@@ -1358,7 +1401,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         updateLayer(activeLayerId, { dataUrl: offscreen.toDataURL() });
         pushSnapshot(layers, activeTool === 'shape' ? 'Draw shape' : 'Apply gradient');
       };
-      img.src = layer.dataUrl;
+      drawCommitted();
     }
   }, [activeTool, activeLayerId, layers, canvas, pushSnapshot, updateLayer, shapeSettings, gradientSettings]);
 
