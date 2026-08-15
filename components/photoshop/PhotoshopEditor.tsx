@@ -48,6 +48,7 @@ function nextLayerId(): string { return `ps-layer-${++layerIdCounter}-${Date.now
 import { AdjustmentsPanel } from './adjustments/AdjustmentsPanel';
 import { FilterGallery } from './adjustments/FilterGallery';
 import { compositeAdjustment } from '../../utils/canvasFilters';
+import { ExportPreset, ResizeMode } from '../../types/photoshop';
 import { renderTextToDataUrl, rerenderTextLayer, TextLayerData } from './tools/textUtils';
 import { drawBrushStroke, fillCanvas, drawCloneDab, applyBlurRegion, applySharpenRegion, applySmudgeRegion } from './tools/colorUtils';
 import { drawShapeOnCanvas, drawGradientOnCanvas } from './tools/shapeUtils';
@@ -61,6 +62,7 @@ interface PhotoshopEditorProps {
   userId?: string | null;
   chutesService?: any;
   deductCredits?: (type: string, model?: string) => Promise<boolean>;
+  onExportToMedia?: (blob: Blob, name: string) => void;
 }
 
 const TOOLS: { id: PhotoshopTool; label: string; shortcut: string; icon: string }[] = [
@@ -90,6 +92,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   userId,
   chutesService,
   deductCredits,
+  onExportToMedia,
 }) => {
   const [activeTool, setActiveTool] = useState<PhotoshopTool>('move');
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -1447,6 +1450,139 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     }, 'image/webp', 0.9);
   }, [canvas, layers]);
 
+  // Phase 5: Export with preset resize
+  const handleExportPreset = useCallback(async (
+    format: 'png' | 'jpeg' | 'webp',
+    quality: number,
+    preset: ExportPreset,
+    resizeMode: ResizeMode,
+    bgColor: string,
+  ) => {
+    setExportDialogOpen(false);
+    const srcW = canvas.width;
+    const srcH = canvas.height;
+    const targetW = preset.width;
+    const targetH = preset.height;
+
+    let exportW: number, exportH: number;
+    if (resizeMode === 'stretch') {
+      exportW = targetW;
+      exportH = targetH;
+    } else {
+      const scale = Math.min(targetW / srcW, targetH / srcH);
+      exportW = Math.round(srcW * scale);
+      exportH = Math.round(srcH * scale);
+    }
+
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = targetW;
+    exportCanvas.height = targetH;
+    const ctx = exportCanvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, targetW, targetH);
+
+    const offsetX = Math.round((targetW - exportW) / 2);
+    const offsetY = Math.round((targetH - exportH) / 2);
+
+    const visibleLayers = layers.filter(l => l.visible);
+    for (const layer of visibleLayers) {
+      ctx.globalAlpha = layer.opacity;
+      if (layer.dataUrl) {
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const lx = layer.x * (exportW / srcW) + offsetX;
+            const ly = layer.y * (exportH / srcH) + offsetY;
+            const lw = layer.width * (exportW / srcW);
+            const lh = layer.height * (exportH / srcH);
+            ctx.drawImage(img, lx, ly, lw, lh);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = layer.dataUrl;
+        });
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+    const ext = format;
+    exportCanvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${preset.id}-${targetW}x${targetH}-${Date.now()}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, mimeType, format === 'png' ? undefined : quality);
+  }, [canvas, layers]);
+
+  // Phase 5: Batch layer export — each visible layer as separate file
+  const handleBatchLayerExport = useCallback(async (format: 'png' | 'jpeg' | 'webp', quality: number) => {
+    setExportDialogOpen(false);
+    const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+    const ext = format;
+    const visibleLayers = layers.filter(l => l.visible);
+
+    for (const layer of visibleLayers) {
+      const layerCanvas = document.createElement('canvas');
+      layerCanvas.width = canvas.width;
+      layerCanvas.height = canvas.height;
+      const ctx = layerCanvas.getContext('2d');
+      if (!ctx) continue;
+
+      // Transparent background for layer export
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.globalAlpha = layer.opacity;
+      if (layer.dataUrl) {
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.drawImage(img, layer.x, layer.y, layer.width, layer.height);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = layer.dataUrl;
+        });
+      }
+      ctx.globalAlpha = 1;
+
+      const blob = await new Promise<Blob | null>(resolve =>
+        layerCanvas.toBlob(resolve, mimeType, format === 'png' ? undefined : quality),
+      );
+      if (!blob) continue;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeName = layer.name.replace(/[^a-zA-Z0-9-_]/g, '_');
+      a.download = `layer-${safeName}-${Date.now()}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      // Small delay between downloads so browser doesn't block
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }, [canvas, layers]);
+
+  // Phase 5: Send to Media Studio
+  const handleSendToMedia = useCallback((blob: Blob, name: string) => {
+    setExportDialogOpen(false);
+    if (onExportToMedia) {
+      onExportToMedia(blob, name);
+    } else {
+      console.warn('onExportToMedia not provided — cannot send to Media Studio');
+    }
+  }, [onExportToMedia]);
+
   // Extracted export logic for reuse
   const doExport = useCallback(async (format: 'png' | 'jpeg' | 'webp', quality: number) => {
     const exportCanvas = document.createElement('canvas');
@@ -1833,9 +1969,13 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         <ExportDialog
           canvasWidth={canvas.width}
           canvasHeight={canvas.height}
+          layers={layers}
           onExport={handleExport}
           onExportBlog={handleExportBlog}
           onClose={() => setExportDialogOpen(false)}
+          onExportPreset={handleExportPreset}
+          onBatchLayerExport={handleBatchLayerExport}
+          onSendToMedia={handleSendToMedia}
         />
       )}
     </div>

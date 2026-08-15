@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Image, Film, Loader2, Wand2, Upload, AlertCircle, Play, Scissors, ArrowRight, Video, XCircle, Camera, X, Check, Grid, Filter, Type, FileImage, Trash2, Layers } from 'lucide-react';
 import { Button, Input, Textarea, Select, Label } from './UI';
 import { AVAILABLE_VIDEO_MODELS, AppSettings, MediaItem, ImageAspectRatio, Ltx23AdvancedSettings, Ltx25AdvancedSettings } from '../types';
@@ -170,6 +170,13 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         bulkDelete: handleBulkDelete,
         updateMediaTitle: handleUpdateMediaTitle,
     } = useMediaHistory({ isAuthenticated, userId, supabaseService });
+
+    // Phase 5: Photoshop → Media Studio integration
+    const handlePhotoshopExportToMedia = useCallback(async (blob: Blob, name: string) => {
+        await addToHistory(blob, 'image', name);
+        // Switch to gallery tab to show the new item
+        setActiveTab('gallery');
+    }, [addToHistory]);
 
     // Media operations use specific costs
     const getMediaCost = (type: 'image' | 'edit' | 'video', model?: string) => {
@@ -454,6 +461,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                     isAuthenticated={isAuthenticated}
                                     onRequestAuth={onRequestAuth}
                                     userId={userId}
+                                    onExportToMedia={handlePhotoshopExportToMedia}
                                 />
                             </div>
                         ) : (

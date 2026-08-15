@@ -321,6 +321,44 @@ export const DEFAULT_SNAPPING_SETTINGS: SnappingSettings = {
   threshold: 6,
 };
 
+// --- Phase 5: Export Presets ---
+
+export type ResizeMode = 'fit' | 'fill' | 'stretch';
+
+export interface ExportPreset {
+  id: string;
+  category: 'social' | 'blog' | 'print';
+  label: string;
+  width: number;
+  height: number;
+  quality?: number; // default quality for this preset
+}
+
+export const EXPORT_PRESETS: ExportPreset[] = [
+  // Social
+  { id: 'ig-post', category: 'social', label: 'Instagram Post', width: 1080, height: 1080 },
+  { id: 'ig-story', category: 'social', label: 'Instagram Story', width: 1080, height: 1920 },
+  { id: 'x-post', category: 'social', label: 'X Post', width: 1200, height: 675 },
+  { id: 'yt-thumb', category: 'social', label: 'YouTube Thumbnail', width: 1280, height: 720 },
+  { id: 'linkedin', category: 'social', label: 'LinkedIn', width: 1200, height: 627 },
+  { id: 'tiktok', category: 'social', label: 'TikTok', width: 1080, height: 1920 },
+  // Blog/Web
+  { id: 'og-image', category: 'blog', label: 'OG Image', width: 1200, height: 630, quality: 85 },
+  { id: 'featured', category: 'blog', label: 'Featured Image', width: 1200, height: 675, quality: 85 },
+  { id: 'thumbnail', category: 'blog', label: 'Thumbnail', width: 300, height: 200, quality: 80 },
+  // Print
+  { id: 'a4-300', category: 'print', label: 'A4 @300dpi', width: 2480, height: 3508 },
+  { id: 'a5-300', category: 'print', label: 'A5 @300dpi', width: 1748, height: 2480 },
+  { id: 'square-print', category: 'print', label: 'Square Print', width: 3000, height: 3000 },
+];
+
+export const RESIZE_MODE_LABELS: Record<ResizeMode, string> = {
+  fit: 'Fit (pad)',
+  fill: 'Fill (crop)',
+  stretch: 'Stretch',
+};
+
+
 // Color state for drawing tools
 export interface ColorState {
   hex: string;
