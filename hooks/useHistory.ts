@@ -14,7 +14,9 @@ export interface HistoryStateInfo {
   thumbnail: string;
 }
 
-/** Generate a small thumbnail from the composite of all visible layers */
+/** Generate a small thumbnail representation of visible layers.
+ *  Uses colored rectangles since Image loading is async and this must be sync. */
+const THUMB_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 export function createThumbnailFromLayers(layers: PhotoshopLayer[]): string {
   const size = 32;
   const canvas = document.createElement('canvas');
@@ -24,27 +26,17 @@ export function createThumbnailFromLayers(layers: PhotoshopLayer[]): string {
   if (!ctx) return '';
   ctx.fillStyle = '#1e293b';
   ctx.fillRect(0, 0, size, size);
-  let hasLayer = false;
-  for (const layer of layers) {
-    if (!layer.visible || !layer.dataUrl) continue;
-    hasLayer = true;
-    ctx.globalAlpha = layer.opacity;
-  }
-  if (!hasLayer) return canvas.toDataURL('image/png');
-  const tmp = document.createElement('canvas');
-  tmp.width = size;
-  tmp.height = size;
-  const tctx = tmp.getContext('2d');
-  if (!tctx) return canvas.toDataURL('image/png');
-  for (const layer of layers) {
-    if (!layer.visible || !layer.dataUrl) continue;
-    tctx.globalAlpha = layer.opacity;
-    const img = new Image();
-    try {
-      tctx.drawImage(img, 0, 0, size, size);
-    } catch { /* ignore */ }
-  }
-  return tmp.toDataURL('image/png');
+  const visibleLayers = layers.filter(l => l.visible && l.layerType !== 'group');
+  if (visibleLayers.length === 0) return canvas.toDataURL('image/png');
+  // Stack colored rectangles bottom-to-top to represent layer composition
+  const layerH = Math.max(2, (size - 2) / visibleLayers.length);
+  visibleLayers.forEach((layer, i) => {
+    ctx.globalAlpha = Math.max(0.3, layer.opacity);
+    ctx.fillStyle = THUMB_COLORS[i % THUMB_COLORS.length];
+    const y = size - 2 - (i + 1) * layerH;
+    ctx.fillRect(2, Math.max(1, y), size - 4, layerH - 1);
+  });
+  return canvas.toDataURL('image/png');
 }
 
 export function useHistory() {

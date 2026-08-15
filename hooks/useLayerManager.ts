@@ -62,11 +62,17 @@ export function useLayerManager(initialWidth = 1920, initialHeight = 1080) {
   const removeLayer = useCallback((layerId: string) => {
     setLayers(prev => {
       const idx = prev.findIndex(l => l.id === layerId);
+      const removedLayer = prev.find(l => l.id === layerId);
       const next = prev.filter(l => l.id !== layerId);
-      // Also remove from any parent group's children
+      // Orphan children of removed group (clear their parentId so they become top-level)
       const cleaned = next.map(l => {
+        // Remove from any parent group's children array
         if (l.children && l.children.includes(layerId)) {
           return { ...l, children: l.children.filter(cid => cid !== layerId) };
+        }
+        // If this layer was a child of the removed layer, clear parentId
+        if (l.parentId === layerId) {
+          return { ...l, parentId: undefined };
         }
         return l;
       });
@@ -84,7 +90,9 @@ export function useLayerManager(initialWidth = 1920, initialHeight = 1080) {
     setLayers(prev => {
       const next = [...prev];
       const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
+      // When fromIndex < toIndex, removal shifts indices down by 1
+      const adjustedTo = fromIndex < toIndex ? toIndex - 1 : toIndex;
+      next.splice(adjustedTo, 0, moved);
       return next;
     });
   }, []);
@@ -163,6 +171,16 @@ export function useLayerManager(initialWidth = 1920, initialHeight = 1080) {
       const layer = prev.find(l => l.id === layerId);
       const group = prev.find(l => l.id === groupId);
       if (!layer || !group || group.layerType !== 'group') return prev;
+      // Prevent cycles: don't add a group into its own descendant
+      if (layer.layerType === 'group') {
+        const isDescendant = (parentId: string, targetId: string): boolean => {
+          const parent = prev.find(l => l.id === parentId);
+          if (!parent || !parent.children) return false;
+          if (parent.children.includes(targetId)) return true;
+          return parent.children.some(cid => isDescendant(cid, targetId));
+        };
+        if (isDescendant(layerId, groupId)) return prev;
+      }
       // Remove from old parent if any
       let next = prev.map(l => {
         if (l.children && l.children.includes(layerId)) {
@@ -212,20 +230,23 @@ export function useLayerManager(initialWidth = 1920, initialHeight = 1080) {
   // --- Phase 3: Masking ---
 
   const addLayerMask = useCallback((layerId: string) => {
-    const layer = layers.find(l => l.id === layerId);
-    if (!layer) return;
-    // Create white mask (fully visible) matching layer dimensions
-    const w = Math.max(1, layer.width);
-    const h = Math.max(1, layer.height);
-    const cvs = document.createElement('canvas');
-    cvs.width = w;
-    cvs.height = h;
-    const ctx = cvs.getContext('2d');
-    if (!ctx) return;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, w, h);
-    updateLayer(layerId, { maskDataUrl: cvs.toDataURL() });
-  }, [layers, updateLayer]);
+    // Use functional setState to avoid stale closure over `layers`
+    setLayers(prev => {
+      const layer = prev.find(l => l.id === layerId);
+      if (!layer) return prev;
+      // Create white mask (fully visible) matching layer dimensions
+      const w = Math.max(1, layer.width);
+      const h = Math.max(1, layer.height);
+      const cvs = document.createElement('canvas');
+      cvs.width = w;
+      cvs.height = h;
+      const ctx = cvs.getContext('2d');
+      if (!ctx) return prev;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      return prev.map(l => l.id === layerId ? { ...l, maskDataUrl: cvs.toDataURL() } : l);
+    });
+  }, []);
 
   const removeLayerMask = useCallback((layerId: string) => {
     updateLayer(layerId, { maskDataUrl: undefined });

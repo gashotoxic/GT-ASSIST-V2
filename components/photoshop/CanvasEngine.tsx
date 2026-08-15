@@ -111,17 +111,11 @@ function renderLayerEffects(
     tctx.restore();
   }
 
-  // Draw stroke
+  // Draw stroke — detect actual edge pixels and draw circles for stroke width
   if (effects.stroke?.enabled) {
     const st = effects.stroke;
     tctx.save();
-    tctx.strokeStyle = st.color;
-    tctx.lineWidth = st.size * 2;
     tctx.globalAlpha = 1;
-    // Create silhouette path from image alpha
-    // Use the image as a clip mask then stroke
-    tctx.beginPath();
-    // Draw the image to a temp to extract alpha
     const alphaCvs = document.createElement('canvas');
     alphaCvs.width = w;
     alphaCvs.height = h;
@@ -130,16 +124,29 @@ function renderLayerEffects(
       actx.drawImage(img, 0, 0, w, h);
       const imgData = actx.getImageData(0, 0, w, h);
       const data = imgData.data;
-      // Find edge pixels (alpha > 0 and adjacent to alpha === 0)
+      const threshold = 10;
+      const strokeRadius = st.size;
+      // Find edge pixels: alpha > threshold and at least one neighbor is transparent
+      const edges: {x: number; y: number}[] = [];
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           const idx = (y * w + x) * 4;
-          const a = data[idx + 3];
-          if (a > 10) {
-            tctx.fillStyle = st.color;
-            tctx.fillRect(padX + x, padY + y, 1, 1);
+          if (data[idx + 3] <= threshold) continue;
+          let isEdge = false;
+          for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h) { isEdge = true; break; }
+            if (data[(ny * w + nx) * 4 + 3] <= threshold) { isEdge = true; break; }
           }
+          if (isEdge) edges.push({x, y});
         }
+      }
+      // Draw stroke circles at each edge pixel
+      tctx.fillStyle = st.color;
+      for (const pt of edges) {
+        tctx.beginPath();
+        tctx.arc(padX + pt.x, padY + pt.y, strokeRadius, 0, Math.PI * 2);
+        tctx.fill();
       }
     }
     tctx.restore();
@@ -342,15 +349,12 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
     }
   }, []);
 
-  // Render a group and its children
+  // Render a group and its children (supports nested groups recursively)
   const renderGroup = useCallback((ctx: CanvasRenderingContext2D, group: PhotoshopLayer) => {
     if (!group.visible || group.layerType !== 'group') return;
 
     const childIds = group.children || [];
     if (childIds.length === 0) return;
-
-    // If group is collapsed, still render children but don't skip
-    // (collapsed is just UI, not rendering)
 
     const groupW = canvas.width;
     const groupH = canvas.height;
@@ -362,7 +366,7 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
     const tctx = temp.getContext('2d');
     if (!tctx) return;
 
-    // Render children to temp canvas
+    // Render children to temp canvas — handle nested groups recursively
     for (const childId of childIds) {
       const child = layers.find(l => l.id === childId);
       if (!child || !child.visible) continue;
@@ -370,7 +374,12 @@ export const CanvasEngine: React.FC<CanvasEngineProps> = ({
       tctx.save();
       tctx.globalAlpha = child.opacity;
       applyBlendMode(tctx, child.blendMode);
-      renderSingleLayer(tctx, child);
+      if (child.layerType === 'group') {
+        // Recursively render nested group
+        renderGroup(tctx, child);
+      } else {
+        renderSingleLayer(tctx, child);
+      }
       tctx.restore();
     }
 
