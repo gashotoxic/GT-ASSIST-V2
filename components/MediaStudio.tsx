@@ -119,7 +119,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         auto_duration_max_seconds: 10,
         generated_keyframes: null,
         stage_1_sigmas: [1.0, 0.9999, 0.9995, 0.999, 0.998, 0.994, 0.978, 0.0],
-        stage_2_sigmas: [0.368, 0.599, 0.0],
+        stage_2_sigmas: [0.599, 0.368, 0.0],
         json_override: ''
     });
 

@@ -51,15 +51,25 @@ export const buildLtx25GenerationInput = (
         return_json: false
     };
 
-    // Only include optional fields when they have actual values (not null/undefined)
-    if (settings.num_frames != null) input.num_frames = settings.num_frames;
-    if (settings.duration != null) input.duration = settings.duration;
+    // auto_duration conflicts with explicit num_frames/duration (API returns 400)
+    const autoDuration = settings.auto_duration ?? false;
+    if (!autoDuration) {
+        if (settings.num_frames != null) input.num_frames = settings.num_frames;
+        if (settings.duration != null) input.duration = settings.duration;
+    }
     if (settings.seed != null) input.seed = settings.seed;
     if (settings.generated_keyframes != null) input.generated_keyframes = settings.generated_keyframes;
     if (settings.auto_duration_min_seconds != null) input.auto_duration_min_seconds = settings.auto_duration_min_seconds;
     if (settings.auto_duration_max_seconds != null) input.auto_duration_max_seconds = settings.auto_duration_max_seconds;
-    if (settings.stage_1_sigmas?.length) input.stage_1_sigmas = settings.stage_1_sigmas;
-    if (settings.stage_2_sigmas?.length) input.stage_2_sigmas = settings.stage_2_sigmas;
+    const isValidSigmaSchedule = (arr: number[]): boolean =>
+        arr.length > 0 && arr[arr.length - 1] === 0 &&
+        arr.every((v, i) => i === 0 || arr[i - 1] > v);
+    if (settings.stage_1_sigmas?.length && isValidSigmaSchedule(settings.stage_1_sigmas)) {
+        input.stage_1_sigmas = settings.stage_1_sigmas;
+    }
+    if (settings.stage_2_sigmas?.length && isValidSigmaSchedule(settings.stage_2_sigmas)) {
+        input.stage_2_sigmas = settings.stage_2_sigmas;
+    }
 
     // Conditioning: if we have a single image, pass as input_image_b64
     if (conditioningImage) {
