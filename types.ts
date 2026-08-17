@@ -173,6 +173,7 @@ export const AVAILABLE_MODELS: AvailableModel[] = [
   { id: "moonshotai/Kimi-K3-TEE", name: "🧠👁️ Kimi K3", shortName: "Kimi K3", supportsVision: true, badge: "NEW" },
   { id: "google/gemma-4-31B-turbo-TEE", name: "🧠👁️ Gemma 4 (31B)", shortName: "Gemma 4", supportsVision: true },
   { id: "Qwen/Qwen3.6-27B-TEE", name: "🧠👁️ Qwen 3.6 (27B)", shortName: "Qwen 3.6", supportsVision: true },
+  { id: "Qwen/Qwen3.8-27B-TEE", name: "🧠👁️ Qwen 3.8 (27B)", shortName: "Qwen 3.8", supportsVision: true, badge: "NEW" },
   { id: "Qwen/Qwen3.5-397B-A17B-TEE", name: "🧠👁️ Qwen 3.5 (397B)", shortName: "Qwen 3.5", supportsVision: true },
   { id: "Qwen/Qwen3-32B-TEE", name: "🧠 Qwen 3 (32B)", shortName: "Qwen 3 32B" },
   { id: "Qwen/Qwen3-235B-A22B-Thinking-2507-TEE", name: "🧠 Qwen 3 Thinking (235B)", shortName: "Qwen 3 Think" },
@@ -187,6 +188,7 @@ export const BRAND_VISION_MODEL_IDS = [
   "moonshotai/Kimi-K3-TEE",
   "google/gemma-4-31B-turbo-TEE",
   "Qwen/Qwen3.6-27B-TEE",
+  "Qwen/Qwen3.8-27B-TEE",
   "Qwen/Qwen3.5-397B-A17B-TEE",
 ] as const;
 

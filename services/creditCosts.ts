@@ -13,6 +13,7 @@ export const CREDIT_COSTS = {
     'moonshotai/Kimi-K3-TEE': 1,
     'google/gemma-4-31B-turbo-TEE': 1,
     'Qwen/Qwen3.6-27B-TEE': 1,
+    'Qwen/Qwen3.8-27B-TEE': 1,
     'Qwen/Qwen3.5-397B-A17B-TEE': 1,
     'Qwen/Qwen3-32B-TEE': 1,
     'Qwen/Qwen3-235B-A22B-Thinking-2507-TEE': 1,
