@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { PhotoshopLayer, BlendMode, LayerType } from '../types/photoshop';
+import { PhotoshopLayer, BlendMode, LayerType, LayerEffects, DEFAULT_LAYER_EFFECTS } from '../types/photoshop';
 
 let layerCounter = 0;
 function nextId(): string { return `layer-${++layerCounter}-${Date.now()}`; }
@@ -12,6 +12,9 @@ function cloneLayer(source: PhotoshopLayer, overrides?: Partial<PhotoshopLayer>)
     text: source.text ? { ...source.text } : undefined,
     shape: source.shape ? { ...source.shape, polygonPoints: source.shape.polygonPoints ? [...source.shape.polygonPoints] : undefined } : undefined,
     selectionMask: source.selectionMask,
+    effects: source.effects ? { ...source.effects } : undefined,
+    children: source.children ? [...source.children] : undefined,
+    maskDataUrl: source.maskDataUrl,
   };
 }
 
@@ -59,15 +62,27 @@ export function useLayerManager(initialWidth = 1920, initialHeight = 1080) {
   const removeLayer = useCallback((layerId: string) => {
     setLayers(prev => {
       const idx = prev.findIndex(l => l.id === layerId);
+      const removedLayer = prev.find(l => l.id === layerId);
       const next = prev.filter(l => l.id !== layerId);
+      // Orphan children of removed group (clear their parentId so they become top-level)
+      const cleaned = next.map(l => {
+        // Remove from any parent group's children array
+        if (l.children && l.children.includes(layerId)) {
+          return { ...l, children: l.children.filter(cid => cid !== layerId) };
+        }
+        // If this layer was a child of the removed layer, clear parentId
+        if (l.parentId === layerId) {
+          return { ...l, parentId: undefined };
+        }
+        return l;
+      });
       // Read active layer ID from prev state to avoid stale closure
       const currentActive = activeLayerId;
       if (currentActive === layerId) {
-        const newIdx = Math.min(idx, next.length - 1);
-        // Schedule outside the setLayers callback to avoid nested state update
-        setTimeout(() => setActiveLayerId(next[newIdx]?.id || null), 0);
+        const newIdx = Math.min(idx, cleaned.length - 1);
+        setTimeout(() => setActiveLayerId(cleaned[newIdx]?.id || null), 0);
       }
-      return next;
+      return cleaned;
     });
   }, [activeLayerId]);
 
@@ -75,7 +90,9 @@ export function useLayerManager(initialWidth = 1920, initialHeight = 1080) {
     setLayers(prev => {
       const next = [...prev];
       const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
+      // When fromIndex < toIndex, removal shifts indices down by 1
+      const adjustedTo = fromIndex < toIndex ? toIndex - 1 : toIndex;
+      next.splice(adjustedTo, 0, moved);
       return next;
     });
   }, []);
@@ -123,6 +140,118 @@ export function useLayerManager(initialWidth = 1920, initialHeight = 1080) {
     setActiveLayerId(null);
   }, []);
 
+  // --- Phase 3: Groups ---
+
+  const addGroup = useCallback(() => {
+    const groupId = nextId();
+    const group: PhotoshopLayer = {
+      id: groupId,
+      name: `Group ${layerCounter}`,
+      type: 'image',
+      layerType: 'group',
+      visible: true,
+      locked: false,
+      opacity: 1,
+      blendMode: 'normal',
+      dataUrl: '',
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      children: [],
+      collapsed: false,
+    };
+    setLayers(prev => [...prev, group]);
+    setActiveLayerId(groupId);
+    return group;
+  }, []);
+
+  const addToGroup = useCallback((layerId: string, groupId: string) => {
+    setLayers(prev => {
+      const layer = prev.find(l => l.id === layerId);
+      const group = prev.find(l => l.id === groupId);
+      if (!layer || !group || group.layerType !== 'group') return prev;
+      // Prevent cycles: don't add a group into its own descendant
+      if (layer.layerType === 'group') {
+        const isDescendant = (parentId: string, targetId: string): boolean => {
+          const parent = prev.find(l => l.id === parentId);
+          if (!parent || !parent.children) return false;
+          if (parent.children.includes(targetId)) return true;
+          return parent.children.some(cid => isDescendant(cid, targetId));
+        };
+        if (isDescendant(layerId, groupId)) return prev;
+      }
+      // Remove from old parent if any
+      let next = prev.map(l => {
+        if (l.children && l.children.includes(layerId)) {
+          return { ...l, children: l.children.filter(cid => cid !== layerId) };
+        }
+        return l;
+      });
+      // Add to new group
+      next = next.map(l => {
+        if (l.id === groupId) {
+          const children = l.children || [];
+          if (!children.includes(layerId)) {
+            return { ...l, children: [...children, layerId] };
+          }
+        }
+        return l;
+      });
+      // Mark the layer with parentId
+      next = next.map(l => l.id === layerId ? { ...l, parentId: groupId } : l);
+      return next;
+    });
+  }, []);
+
+  const removeFromGroup = useCallback((layerId: string) => {
+    setLayers(prev => {
+      let next = prev.map(l => {
+        if (l.children && l.children.includes(layerId)) {
+          return { ...l, children: l.children.filter(cid => cid !== layerId) };
+        }
+        return l;
+      });
+      next = next.map(l => l.id === layerId ? { ...l, parentId: undefined } : l);
+      return next;
+    });
+  }, []);
+
+  const setGroupCollapsed = useCallback((groupId: string, collapsed: boolean) => {
+    updateLayer(groupId, { collapsed });
+  }, [updateLayer]);
+
+  // --- Phase 3: Layer Effects ---
+
+  const setLayerEffects = useCallback((layerId: string, effects: LayerEffects) => {
+    updateLayer(layerId, { effects });
+  }, [updateLayer]);
+
+  // --- Phase 3: Masking ---
+
+  const addLayerMask = useCallback((layerId: string) => {
+    // Use functional setState to avoid stale closure over `layers`
+    setLayers(prev => {
+      const layer = prev.find(l => l.id === layerId);
+      if (!layer) return prev;
+      // Create white mask (fully visible) matching layer dimensions
+      const w = Math.max(1, layer.width);
+      const h = Math.max(1, layer.height);
+      const cvs = document.createElement('canvas');
+      cvs.width = w;
+      cvs.height = h;
+      const ctx = cvs.getContext('2d');
+      if (!ctx) return prev;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      return prev.map(l => l.id === layerId ? { ...l, maskDataUrl: cvs.toDataURL() } : l);
+    });
+  }, []);
+
+  const removeLayerMask = useCallback((layerId: string) => {
+    updateLayer(layerId, { maskDataUrl: undefined });
+  }, [updateLayer]);
+
   return {
     layers,
     activeLayer,
@@ -142,5 +271,15 @@ export function useLayerManager(initialWidth = 1920, initialHeight = 1080) {
     loadLayers,
     clearLayers,
     setLayers,
+    // Phase 3: Groups
+    addGroup,
+    addToGroup,
+    removeFromGroup,
+    setGroupCollapsed,
+    // Phase 3: Effects
+    setLayerEffects,
+    // Phase 3: Masks
+    addLayerMask,
+    removeLayerMask,
   };
 }

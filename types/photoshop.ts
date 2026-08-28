@@ -13,7 +13,9 @@ export type PhotoshopTool =
   | 'shape'
   | 'eyedropper'
   | 'pan'
-  | 'ai';
+  | 'ai'
+  | 'clone'
+  | 'retouch';
 
 export type PhotoshopShapeType = 'rectangle' | 'rounded-rect' | 'ellipse' | 'line' | 'arrow' | 'polygon';
 
@@ -28,6 +30,39 @@ export type BlendMode =
   | 'difference'
   | 'hard-light'
   | 'soft-light';
+
+
+
+// --- Phase 3: Layer Effects ---
+
+export interface LayerEffects {
+  dropShadow?: {
+    enabled: boolean;
+    offsetX: number;
+    offsetY: number;
+    blur: number;
+    color: string;
+    opacity: number;
+  };
+  stroke?: {
+    enabled: boolean;
+    size: number;
+    color: string;
+    position: 'outside' | 'center';
+  };
+  outerGlow?: {
+    enabled: boolean;
+    blur: number;
+    color: string;
+    opacity: number;
+  };
+}
+
+export const DEFAULT_LAYER_EFFECTS: LayerEffects = {
+  dropShadow: { enabled: false, offsetX: 4, offsetY: 4, blur: 8, color: '#000000', opacity: 0.5 },
+  stroke: { enabled: false, size: 2, color: '#000000', position: 'outside' },
+  outerGlow: { enabled: false, blur: 10, color: '#ffffff', opacity: 0.7 },
+};
 
 export type LayerType = 'image' | 'text' | 'shape' | 'adjustment';
 
@@ -44,6 +79,16 @@ export interface PhotoshopLayer {
   y: number;
   width: number;
   height: number;
+  // Phase 3: Layer Effects
+  effects?: LayerEffects;
+  // Phase 3: Groups
+  layerType?: 'layer' | 'group';
+  children?: string[];
+  collapsed?: boolean;
+  // Phase 3: Masking
+  maskDataUrl?: string;
+  // Group membership
+  parentId?: string;
   text?: {
     content: string;
     fontFamily: string;
@@ -94,6 +139,8 @@ export interface BrushSettings {
   color: string;
   preset: 'round' | 'soft-round' | 'chalk' | 'marker' | 'airbrush' | 'calligraphy';
   mode: 'normal' | 'multiply' | 'screen' | 'overlay';
+  sizeJitter: number;
+  opacityJitter: number;
 }
 
 export const DEFAULT_BRUSH: BrushSettings = {
@@ -105,6 +152,99 @@ export const DEFAULT_BRUSH: BrushSettings = {
   color: '#000000',
   preset: 'round',
   mode: 'normal',
+  sizeJitter: 0,
+  opacityJitter: 0,
+};
+
+// --- Brush Preset System ---
+
+export interface BrushPreset {
+  id: string;
+  name: string;
+  settings: Omit<BrushSettings, 'color'>;
+  isBuiltin: boolean;
+}
+
+export const BUILTIN_PRESETS: BrushPreset[] = [
+  {
+    id: 'builtin-hard-round',
+    name: 'Hard Round',
+    isBuiltin: true,
+    settings: { size: 20, hardness: 1.0, opacity: 1, flow: 1, spacing: 0.25, preset: 'round', mode: 'normal', sizeJitter: 0, opacityJitter: 0 },
+  },
+  {
+    id: 'builtin-soft-round',
+    name: 'Soft Round',
+    isBuiltin: true,
+    settings: { size: 40, hardness: 0.3, opacity: 1, flow: 1, spacing: 0.25, preset: 'soft-round', mode: 'normal', sizeJitter: 0, opacityJitter: 0 },
+  },
+  {
+    id: 'builtin-airbrush',
+    name: 'Airbrush',
+    isBuiltin: true,
+    settings: { size: 60, hardness: 0.1, opacity: 0.6, flow: 0.4, spacing: 0.15, preset: 'airbrush', mode: 'normal', sizeJitter: 0, opacityJitter: 0.1 },
+  },
+  {
+    id: 'builtin-marker',
+    name: 'Marker',
+    isBuiltin: true,
+    settings: { size: 30, hardness: 0.9, opacity: 0.7, flow: 1, spacing: 0.3, preset: 'marker', mode: 'multiply', sizeJitter: 0, opacityJitter: 0 },
+  },
+  {
+    id: 'builtin-texture',
+    name: 'Texture',
+    isBuiltin: true,
+    settings: { size: 50, hardness: 0.5, opacity: 0.8, flow: 0.6, spacing: 0.4, preset: 'chalk', mode: 'normal', sizeJitter: 0.3, opacityJitter: 0.2 },
+  },
+  {
+    id: 'builtin-calligraphy',
+    name: 'Calligraphy',
+    isBuiltin: true,
+    settings: { size: 24, hardness: 0.85, opacity: 1, flow: 1, spacing: 0.15, preset: 'calligraphy', mode: 'normal', sizeJitter: 0, opacityJitter: 0 },
+  },
+];
+
+export const PRESETS_STORAGE_KEY = 'gt-photoshop-brush-presets';
+
+export function loadCustomPresets(): BrushPreset[] {
+  try {
+    const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((p: BrushPreset) => !p.isBuiltin) : [];
+  } catch { return []; }
+}
+
+export function saveCustomPresets(presets: BrushPreset[]): void {
+  localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+}
+
+// --- Clone Stamp / Healing Brush Settings ---
+
+export interface CloneSettings {
+  sourceX: number | null;
+  sourceY: number | null;
+  mode: 'clone' | 'heal';
+}
+
+export const DEFAULT_CLONE_SETTINGS: CloneSettings = {
+  sourceX: null,
+  sourceY: null,
+  mode: 'clone',
+};
+
+// --- Retouch Tool Settings (Blur / Sharpen / Smudge) ---
+
+export type RetouchMode = 'blur' | 'sharpen' | 'smudge';
+
+export interface RetouchSettings {
+  mode: RetouchMode;
+  strength: number;
+}
+
+export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
+  mode: 'blur',
+  strength: 50,
 };
 
 export const BLEND_MODE_LABELS: Record<BlendMode, string> = {
@@ -139,6 +279,86 @@ export const FONT_FAMILIES = [
 export const ZOOM_LEVELS = [
   0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0, 8.0, 16.0, 32.0
 ];
+// --- Phase 4: Guides, Grid Settings, Snapping ---
+
+export interface Guide {
+  id: string;
+  orientation: 'horizontal' | 'vertical';
+  position: number; // canvas pixels
+}
+
+export type GridType = 'none' | 'thirds' | 'golden' | 'square' | 'custom';
+
+export interface GridSettings {
+  type: GridType;
+  size: number; // px, for custom grid
+  subdivisions: number;
+  color: string;
+}
+
+export interface SnappingSettings {
+  enabled: boolean;
+  snapToGuides: boolean;
+  snapToGrid: boolean;
+  snapToCenter: boolean;
+  snapToEdges: boolean;
+  threshold: number; // screen px
+}
+
+export const DEFAULT_GRID_SETTINGS: GridSettings = {
+  type: 'thirds',
+  size: 50,
+  subdivisions: 4,
+  color: 'rgba(255, 255, 255, 0.08)',
+};
+
+export const DEFAULT_SNAPPING_SETTINGS: SnappingSettings = {
+  enabled: true,
+  snapToGuides: true,
+  snapToGrid: true,
+  snapToCenter: true,
+  snapToEdges: true,
+  threshold: 6,
+};
+
+// --- Phase 5: Export Presets ---
+
+export type ResizeMode = 'fit' | 'fill' | 'stretch';
+
+export interface ExportPreset {
+  id: string;
+  category: 'social' | 'blog' | 'print';
+  label: string;
+  width: number;
+  height: number;
+  quality?: number; // default quality for this preset
+}
+
+export const EXPORT_PRESETS: ExportPreset[] = [
+  // Social
+  { id: 'ig-post', category: 'social', label: 'Instagram Post', width: 1080, height: 1080 },
+  { id: 'ig-story', category: 'social', label: 'Instagram Story', width: 1080, height: 1920 },
+  { id: 'x-post', category: 'social', label: 'X Post', width: 1200, height: 675 },
+  { id: 'yt-thumb', category: 'social', label: 'YouTube Thumbnail', width: 1280, height: 720 },
+  { id: 'linkedin', category: 'social', label: 'LinkedIn', width: 1200, height: 627 },
+  { id: 'tiktok', category: 'social', label: 'TikTok', width: 1080, height: 1920 },
+  // Blog/Web
+  { id: 'og-image', category: 'blog', label: 'OG Image', width: 1200, height: 630, quality: 85 },
+  { id: 'featured', category: 'blog', label: 'Featured Image', width: 1200, height: 675, quality: 85 },
+  { id: 'thumbnail', category: 'blog', label: 'Thumbnail', width: 300, height: 200, quality: 80 },
+  // Print
+  { id: 'a4-300', category: 'print', label: 'A4 @300dpi', width: 2480, height: 3508 },
+  { id: 'a5-300', category: 'print', label: 'A5 @300dpi', width: 1748, height: 2480 },
+  { id: 'square-print', category: 'print', label: 'Square Print', width: 3000, height: 3000 },
+];
+
+export const RESIZE_MODE_LABELS: Record<ResizeMode, string> = {
+  fit: 'Fit (pad)',
+  fill: 'Fill (crop)',
+  stretch: 'Stretch',
+};
+
+
 // Color state for drawing tools
 export interface ColorState {
   hex: string;
@@ -194,6 +414,91 @@ export const DEFAULT_GRADIENT_SETTINGS: GradientSettings = {
   ],
   angle: 45,
   repeat: false,
+};
+
+
+// Selection types
+export interface SelectionRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface SelectionState {
+  type: 'none' | 'rectangle' | 'ellipse' | 'lasso';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  isDrawing: boolean;
+  lassoPoints: { x: number; y: number }[];
+  startPoint: { x: number; y: number } | null;
+  currentPoint: { x: number; y: number } | null;
+  rect: SelectionRect | null;
+}
+
+export const DEFAULT_SELECTION: SelectionState = {
+  type: 'none',
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+  isDrawing: false,
+  lassoPoints: [],
+  startPoint: null,
+  currentPoint: null,
+  rect: null,
+};
+
+// Transform tool types
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface TransformState {
+  active: boolean;
+  mode: 'free' | 'perspective';
+  // Original layer bounds (read when transform starts)
+  originalX: number;
+  originalY: number;
+  originalWidth: number;
+  originalHeight: number;
+  // Current transform values
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;   // degrees
+  scaleX: number;     // 1 = no change
+  scaleY: number;
+  skewX: number;      // degrees
+  // Perspective: 4 independent corner positions (null = not in perspective mode)
+  perspective: {
+    tl: Point;
+    tr: Point;
+    br: Point;
+    bl: Point;
+  } | null;
+}
+
+export const DEFAULT_TRANSFORM_STATE: TransformState = {
+  active: false,
+  mode: 'free',
+  originalX: 0,
+  originalY: 0,
+  originalWidth: 0,
+  originalHeight: 0,
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+  rotation: 0,
+  scaleX: 1,
+  scaleY: 1,
+  skewX: 0,
+  perspective: null,
 };
 
 // Color utilities

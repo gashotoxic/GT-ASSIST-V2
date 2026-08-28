@@ -168,23 +168,27 @@ export type AvailableModel = {
 export const AVAILABLE_MODELS: AvailableModel[] = [
   { id: "Nemotron-3-Nano-Omni-30B-TEE", name: "🧠👁️ Nemotron 3 Omni (30B)", shortName: "Nemotron 3", supportsVision: true },
   { id: "deepseek-ai/DeepSeek-V3.2-TEE", name: "🧠 DeepSeek V3.2", shortName: "DeepSeek V3.2" },
-  { id: "moonshotai/Kimi-K2.5-TEE", name: "🧠👁️ Kimi K2.5", shortName: "Kimi K2.5", supportsVision: true },
-  { id: "moonshotai/Kimi-K2.6-TEE", name: "🧠👁️ Kimi K2.6", shortName: "Kimi K2.6", supportsVision: true, badge: "NEW" },
-  { id: "google/gemma-4-31B-turbo-TEE", name: "🧠👁️ Gemma 4 (31B)", shortName: "Gemma 4", supportsVision: true, badge: "NEW" },
-  { id: "Qwen/Qwen3.6-27B-TEE", name: "🧠👁️ Qwen 3.6 (27B)", shortName: "Qwen 3.6", supportsVision: true, badge: "NEW" },
+  { id: "deepseek-ai/DeepSeek-V4-Flash-0731-TEE", name: "🧠 DeepSeek V4 Flash", shortName: "DeepSeek V4 Flash", badge: "NEW" },
+  { id: "moonshotai/Kimi-K2.6-TEE", name: "🧠👁️ Kimi K2.6", shortName: "Kimi K2.6", supportsVision: true },
+  { id: "moonshotai/Kimi-K3-TEE", name: "🧠👁️ Kimi K3", shortName: "Kimi K3", supportsVision: true, badge: "NEW" },
+  { id: "google/gemma-4-31B-turbo-TEE", name: "🧠👁️ Gemma 4 (31B)", shortName: "Gemma 4", supportsVision: true },
+  { id: "Qwen/Qwen3.6-27B-TEE", name: "🧠👁️ Qwen 3.6 (27B)", shortName: "Qwen 3.6", supportsVision: true },
+  { id: "Qwen/Qwen3.8-27B-TEE", name: "🧠👁️ Qwen 3.8 (27B)", shortName: "Qwen 3.8", supportsVision: true, badge: "NEW" },
   { id: "Qwen/Qwen3.5-397B-A17B-TEE", name: "🧠👁️ Qwen 3.5 (397B)", shortName: "Qwen 3.5", supportsVision: true },
   { id: "Qwen/Qwen3-32B-TEE", name: "🧠 Qwen 3 (32B)", shortName: "Qwen 3 32B" },
-  { id: "zai-org/GLM-5-TEE", name: "🧠 GLM 5", shortName: "GLM 5" },
-  { id: "zai-org/GLM-5.1-TEE", name: "🧠 GLM 5.1", shortName: "GLM 5.1", badge: "NEW" },
-  { id: "zai-org/GLM-5.2-TEE", name: "🧠 GLM 5.2", shortName: "GLM 5.2", badge: "NEW" },
+  { id: "Qwen/Qwen3-235B-A22B-Thinking-2507-TEE", name: "🧠 Qwen 3 Thinking (235B)", shortName: "Qwen 3 Think" },
+  { id: "zai-org/GLM-5.1-TEE", name: "🧠 GLM 5.1", shortName: "GLM 5.1" },
+  { id: "zai-org/GLM-5.2-TEE", name: "🧠 GLM 5.2", shortName: "GLM 5.2" },
+  { id: "unsloth/Mistral-Nemo-Instruct-2407-TEE", name: "🧠 Mistral Nemo", shortName: "Mistral Nemo" },
 ];
 
 export const BRAND_VISION_MODEL_IDS = [
   "Nemotron-3-Nano-Omni-30B-TEE",
-  "moonshotai/Kimi-K2.5-TEE",
   "moonshotai/Kimi-K2.6-TEE",
+  "moonshotai/Kimi-K3-TEE",
   "google/gemma-4-31B-turbo-TEE",
   "Qwen/Qwen3.6-27B-TEE",
+  "Qwen/Qwen3.8-27B-TEE",
   "Qwen/Qwen3.5-397B-A17B-TEE",
 ] as const;
 
@@ -215,7 +219,9 @@ export const AVAILABLE_VIDEO_MODELS = [
   { id: "wan-2.2-i2v", name: "Wan 2.2 I2V (Fast)", url: "https://vonkaiser-turbowani2v.chutes.ai/generate", type: 'i2v' },
   { id: "wan-2.1-t2v", name: "Wan 2.1 T2V — Coming Soon", url: "https://chutes-wan2-1-14b.chutes.ai/text2video", type: 't2v', disabled: true },
   { id: "ltx-23-i2v", name: "LTX 2.3 I2V", url: "https://vonkaiser-ltx-23-video.chutes.ai/generate", type: 'i2v' },
-  { id: "ltx-23-t2v", name: "LTX 2.3 T2V", url: "https://vonkaiser-ltx-23-video.chutes.ai/generate", type: 't2v' }
+  { id: "ltx-23-t2v", name: "LTX 2.3 T2V", url: "https://vonkaiser-ltx-23-video.chutes.ai/generate", type: 't2v' },
+  { id: "ltx-25-i2v", name: "LTX 2.5 I2V", url: "https://vonkaiser-ltx-25-video.chutes.ai/generate", type: 'i2v' },
+  { id: "ltx-25-t2v", name: "LTX 2.5 T2V", url: "https://vonkaiser-ltx-25-video.chutes.ai/generate", type: 't2v' }
 ];
 
 export interface Ltx23AdvancedSettings {
@@ -230,6 +236,25 @@ export interface Ltx23AdvancedSettings {
   enhance_prompt: boolean;
   generate_audio: boolean;
   negative_prompt: string;
+  json_override: string;
+}
+
+export interface Ltx25AdvancedSettings {
+  width: number;
+  height: number;
+  fps: number;
+  num_frames: number | null;
+  duration: number | null;
+  seed: number | null;
+  use_random_seed: boolean;
+  enhance_prompt: boolean;
+  generate_audio: boolean;
+  auto_duration: boolean;
+  auto_duration_min_seconds?: number;
+  auto_duration_max_seconds?: number;
+  generated_keyframes: number | null; // int = evenly spaced slots, null = disabled
+  stage_1_sigmas: number[];
+  stage_2_sigmas: number[];
   json_override: string;
 }
 
@@ -287,6 +312,12 @@ export interface VideoGenRequest {
   modelId?: string;
   ltx2Params?: {
     settings: Ltx23AdvancedSettings;
+    videoUrl?: string;
+    keyframeStart?: string | null;
+    keyframeEnd?: string | null;
+  };
+  ltx25Params?: {
+    settings: Ltx25AdvancedSettings;
     videoUrl?: string;
     keyframeStart?: string | null;
     keyframeEnd?: string | null;

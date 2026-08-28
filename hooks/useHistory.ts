@@ -6,13 +6,44 @@ const MAX_HISTORY = 50;
 let snapCounter = 0;
 function nextSnapId(): string { return `snap-${++snapCounter}-${Date.now()}`; }
 
+/** Info for each history state shown in the History panel */
+export interface HistoryStateInfo {
+  index: number;
+  label: string;
+  timestamp: number;
+  thumbnail: string;
+}
+
+/** Generate a small thumbnail representation of visible layers.
+ *  Uses colored rectangles since Image loading is async and this must be sync. */
+const THUMB_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+export function createThumbnailFromLayers(layers: PhotoshopLayer[]): string {
+  const size = 32;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(0, 0, size, size);
+  const visibleLayers = layers.filter(l => l.visible && l.layerType !== 'group');
+  if (visibleLayers.length === 0) return canvas.toDataURL('image/png');
+  // Stack colored rectangles bottom-to-top to represent layer composition
+  const layerH = Math.max(2, (size - 2) / visibleLayers.length);
+  visibleLayers.forEach((layer, i) => {
+    ctx.globalAlpha = Math.max(0.3, layer.opacity);
+    ctx.fillStyle = THUMB_COLORS[i % THUMB_COLORS.length];
+    const y = size - 2 - (i + 1) * layerH;
+    ctx.fillRect(2, Math.max(1, y), size - 4, layerH - 1);
+  });
+  return canvas.toDataURL('image/png');
+}
+
 export function useHistory() {
   const [history, setHistory] = useState<HistorySnapshot[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  // Use ref to track current index for use inside setState callbacks
   const historyIndexRef = useRef(-1);
 
-  // Sync ref whenever historyIndex changes
   const updateIndex = useCallback((fn: number | ((prev: number) => number)) => {
     setHistoryIndex(prev => {
       const next = typeof fn === 'function' ? (fn as (p: number) => number)(prev) : fn;
@@ -23,9 +54,7 @@ export function useHistory() {
 
   const pushSnapshot = useCallback((layers: PhotoshopLayer[], label: string) => {
     const currentIdx = historyIndexRef.current;
-
     setHistory(prev => {
-      // Discard any future history beyond current index (branching)
       const base = prev.slice(0, currentIdx + 1);
       const snap: HistorySnapshot = {
         id: nextSnapId(),
@@ -37,19 +66,15 @@ export function useHistory() {
       if (next.length > MAX_HISTORY) next.shift();
       return next;
     });
-
     updateIndex(prev => Math.min(prev + 1, MAX_HISTORY - 1));
   }, [updateIndex]);
 
   const undo = useCallback((currentLayers: PhotoshopLayer[]): PhotoshopLayer[] | null => {
     const idx = historyIndexRef.current;
     if (idx < 0) return null;
-
-    // Save current state if we're at the tip — push a snapshot silently
     if (idx === history.length - 1) {
       setHistory(prev => {
         if (prev.length === 0) return prev;
-        // Overwrite the last entry with current state instead of branching
         const snap: HistorySnapshot = {
           id: nextSnapId(),
           label: 'auto-save',
@@ -61,11 +86,9 @@ export function useHistory() {
         return next;
       });
     }
-
     const targetIdx = Math.max(0, idx - 1);
     const target = history[targetIdx];
     if (!target) return null;
-
     updateIndex(targetIdx);
     return JSON.parse(JSON.stringify(target.layers));
   }, [history, updateIndex]);
@@ -73,14 +96,31 @@ export function useHistory() {
   const redo = useCallback((): PhotoshopLayer[] | null => {
     const idx = historyIndexRef.current;
     if (idx >= history.length - 1) return null;
-
     const targetIdx = idx + 1;
     const target = history[targetIdx];
     if (!target) return null;
-
     updateIndex(targetIdx);
     return JSON.parse(JSON.stringify(target.layers));
   }, [history, updateIndex]);
+
+  const jumpToState = useCallback((targetIdx: number): PhotoshopLayer[] | null => {
+    const idx = historyIndexRef.current;
+    if (targetIdx < 0 || targetIdx >= history.length) return null;
+    if (targetIdx === idx) return null;
+    const target = history[targetIdx];
+    if (!target) return null;
+    updateIndex(targetIdx);
+    return JSON.parse(JSON.stringify(target.layers));
+  }, [history, updateIndex]);
+
+  const getHistoryList = useCallback((): HistoryStateInfo[] => {
+    return history.map((snap, i) => ({
+      index: i,
+      label: snap.label,
+      timestamp: snap.timestamp,
+      thumbnail: createThumbnailFromLayers(snap.layers),
+    }));
+  }, [history]);
 
   const clearHistory = useCallback(() => {
     setHistory([]);
@@ -94,6 +134,8 @@ export function useHistory() {
     pushSnapshot,
     undo,
     redo,
+    jumpToState,
+    getHistoryList,
     canUndo: historyIndex >= 0,
     canRedo: historyIndex < history.length - 1,
     clearHistory,

@@ -23,7 +23,7 @@ export class UserSyncService {
       supabaseUrl: this.supabaseUrl,
       supabaseKey: this.supabaseKey,
       apiKey: '',
-      model: 'zai-org/GLM-4.6',
+      model: 'zai-org/GLM-5.2-TEE',
       systemPrompt: '',
       ttsVoice: 'af_heart',
       ttsSpeed: 1.0,
@@ -100,7 +100,7 @@ export class UserSyncService {
           // User profile updated (email, name, etc.)
           const email = event.data.email_addresses?.[0]?.email_address;
           if (email && event.data.id) {
-            await this.supabaseService.updateUserProfile(event.data.id, {
+            await this.getSupabaseService().updateUserProfile(event.data.id, {
               // Add any fields that can be updated from Clerk
             });
           }

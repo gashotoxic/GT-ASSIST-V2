@@ -41,7 +41,7 @@ export const CreditSystemTest: React.FC = () => {
       supabaseUrl: (import.meta.env.VITE_APP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL)!,
       supabaseKey: (import.meta.env.VITE_APP_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_KEY)!,
       apiKey: '',
-      model: 'zai-org/GLM-4.6',
+      model: 'zai-org/GLM-5.2-TEE',
       systemPrompt: '',
       ttsVoice: 'af_heart',
       ttsSpeed: 1.0,
@@ -74,7 +74,7 @@ export const CreditSystemTest: React.FC = () => {
       // Test 3: Credit Deduction
       try {
         const initialCredits = credits;
-        const result = await supabaseService.useCredits(userId, 1, 'chat', 'zai-org/GLM-4.6');
+        const result = await supabaseService.useCredits(userId, 1, 'chat', 'zai-org/GLM-5.2-TEE');
         
         if (result.success) {
           addTestResult('Credit Deduction', true, 

@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
 import { FileImage, Type, Upload, Download, Video, Wand2, Loader2, Film } from 'lucide-react';
 import { Button, Textarea, Select, Label } from '../UI';
-import { AVAILABLE_VIDEO_MODELS, Ltx23AdvancedSettings } from '../../types';
+import { AVAILABLE_VIDEO_MODELS, Ltx23AdvancedSettings, Ltx25AdvancedSettings } from '../../types';
 import { Ltx23AdvancedOptions } from './Ltx23AdvancedOptions';
+import { Ltx25AdvancedOptions } from './Ltx25AdvancedOptions';
 
 export function VideoAnimatorPanel(props: {
   isAuthenticated: boolean;
@@ -30,12 +31,17 @@ export function VideoAnimatorPanel(props: {
   setLtx2KeyframeStart: (val: string | null) => void;
   ltx2KeyframeEnd: string | null;
   setLtx2KeyframeEnd: (val: string | null) => void;
+  // LTX-2.5 Props
+  ltx25Settings: Ltx25AdvancedSettings;
+  setLtx25Settings: (settings: Ltx25AdvancedSettings) => void;
   onPickVideoFromGallery: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLtx2Open, setIsLtx2Open] = React.useState(false);
+  const [isLtx25Open, setIsLtx25Open] = React.useState(false);
 
   const isLtx2 = props.selectedVideoModel.includes('ltx-23');
+  const isLtx25 = props.selectedVideoModel.includes('ltx-25');
   const isKeyframeMode = Boolean(props.ltx2KeyframeStart && props.ltx2KeyframeEnd);
   const hasKeyframeStart = Boolean(props.ltx2KeyframeStart);
   const hasKeyframeEnd = Boolean(props.ltx2KeyframeEnd);
@@ -154,6 +160,16 @@ export function VideoAnimatorPanel(props: {
                 keyframeEnd={props.ltx2KeyframeEnd}
                 setKeyframeEnd={props.setLtx2KeyframeEnd}
                 onPickVideoFromGallery={props.onPickVideoFromGallery}
+            />
+        )}
+
+        {isLtx25 && (
+            <Ltx25AdvancedOptions
+                isOpen={isLtx25Open}
+                setIsOpen={setIsLtx25Open}
+                videoMode={props.videoMode}
+                settings={props.ltx25Settings}
+                setSettings={props.setLtx25Settings}
             />
         )}
       </div>

@@ -11,12 +11,16 @@ export type AIPhotoAction =
   | 'edit'
   | 'remove_bg'
   | 'upscale'
+  | 'upscale_2x'
+  | 'upscale_4x'
   | 'smart_fill'
   | 'style_transfer';
 
 export const AI_ACTION_LABELS: Record<AIPhotoAction, string> = {
   generate: 'Generate Image',
   edit: 'AI Edit',
+  upscale_2x: 'Upscale 2x',
+  upscale_4x: 'Upscale 4x',
   remove_bg: 'Remove Background',
   upscale: 'Upscale',
   smart_fill: 'Smart Fill',
@@ -25,6 +29,8 @@ export const AI_ACTION_LABELS: Record<AIPhotoAction, string> = {
 
 export const AI_ACTION_MODELS: Record<AIPhotoAction, { modelId: string; url: string }> = {
   generate: { modelId: 'z-image-turbo', url: 'https://vonkaiser-z-image-turbo.chutes.ai/v1/images/generations' },
+  upscale_2x: { modelId: 'upscale', url: 'https://vonkaiser-imageclassic.chutes.ai/generate' },
+  upscale_4x: { modelId: 'upscale', url: 'https://vonkaiser-imageclassic.chutes.ai/generate' },
   edit: { modelId: 'qwen-image-edit', url: 'https://vonkaiser-qwen-image-edit-2511.chutes.ai/generate' },
   remove_bg: { modelId: 'remove_bg', url: 'https://vonkaiser-imageclassic.chutes.ai/generate' },
   upscale: { modelId: 'upscale', url: 'https://vonkaiser-imageclassic.chutes.ai/generate' },
