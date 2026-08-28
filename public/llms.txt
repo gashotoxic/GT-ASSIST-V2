@@ -1,0 +1,27 @@
+# GashoTech Create — AI Creative Studio
+> URL: https://create.gashotech.com
+> A unified platform for AI-powered chat, image generation, video generation, and image editing.
+
+## Chat
+https://create.gashotech.com/#chat
+AI chat interface with multiple models: DeepSeek V4 Flash, Kimi K3, Qwen 3.8, Qwen 3.5, Qwen 3 Thinking, Gemma 4, GLM 5.2, Nemotron 3 Omni, Mistral Nemo. TEE-secured inference on all models. Persistent sessions, markdown rendering, code highlighting.
+
+## Media Studio — Image Generation
+https://create.gashotech.com/#media-image
+Text-to-image and image-to-image generation. Models: FLUX, DreamShaper, Juggernaut, Illustrious XL. Credit-based pricing (1 credit per generation). Batch generation, history gallery.
+
+## Media Studio — Video Generation
+https://create.gashotech.com/#media-video
+Text-to-video and image-to-video generation. Models: LTX 2.5 (distilled 8+3 step, up to 20s 1080p), WAN 2.1, LTX 2.3. Supports auto-duration, prompt enhancement, audio generation, keyframe interpolation, lip-sync (MuseTalk).
+
+## Media Studio — Photoshop Corner
+https://create.gashotech.com/#media-photoshop
+Full browser-based image editor with layers, selections, brushes, filters, adjustments, text, shapes, gradients, clone stamp, effects (shadow/stroke/glow), groups, masks, rulers/guides, transform, and export presets (social/blog/print). Free to use (no credits for manual editing).
+
+## Media Studio — Gallery
+https://create.gashotech.com/#media-gallery
+Saved generations, history, favorites. Download or re-edit past work.
+
+## Pricing
+https://create.gashotech.com/#pricing
+Credit system: 1 credit per chat/image/video generation. Free tier includes signup credits. Additional credits available via purchase. Photoshop editing tools are free (no credit consumption).

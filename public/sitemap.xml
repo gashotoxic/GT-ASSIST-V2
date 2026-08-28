@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!--
+    Important: This is a single-page application (SPA). All sections are
+    accessible via hash fragments at the root URL:
+      - #chat       — AI Chat Interface
+      - #media-image     — Image Generation
+      - #media-video     — Video Generation
+      - #media-photoshop — Photoshop Corner (Image Editor)
+      - #media-gallery   — Media Gallery
+      - #pricing    — Pricing & Credits
+    Hash fragments are not crawlable by standard search engines but are
+    parsed by LLM crawlers that support the llms.txt standard.
+  -->
+  <url>
+    <loc>https://create.gashotech.com/</loc>
+    <lastmod>2026-08-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://create.gashotech.com/</loc>
+    <lastmod>2026-08-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+    <xhtml:link rel="alternate" href="https://create.gashotech.com/#chat" />
+  </url>
+  <url>
+    <loc>https://create.gashotech.com/</loc>
+    <lastmod>2026-08-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+    <xhtml:link rel="alternate" href="https://create.gashotech.com/#media-image" />
+  </url>
+  <url>
+    <loc>https://create.gashotech.com/</loc>
+    <lastmod>2026-08-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+    <xhtml:link rel="alternate" href="https://create.gashotech.com/#media-video" />
+  </url>
+  <url>
+    <loc>https://create.gashotech.com/</loc>
+    <lastmod>2026-08-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+    <xhtml:link rel="alternate" href="https://create.gashotech.com/#media-photoshop" />
+  </url>
+  <url>
+    <loc>https://create.gashotech.com/</loc>
+    <lastmod>2026-08-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" href="https://create.gashotech.com/#media-gallery" />
+  </url>
+  <url>
+    <loc>https://create.gashotech.com/</loc>
+    <lastmod>2026-08-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+    <xhtml:link rel="alternate" href="https://create.gashotech.com/#pricing" />
+  </url>
+</urlset>
