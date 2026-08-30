@@ -3,7 +3,7 @@ import Joyride, { CallBackProps, STATUS, Step } from 'react-joyride';
 
 interface OnboardingTourProps {
     currentView: string;
-    setCurrentView: (view: any) => void;
+    setCurrentView: (view: "chat" | "media" | "pricing") => void;
     openSidebar: () => void;
     theme: 'light' | 'dark';
     isSignedIn: boolean;

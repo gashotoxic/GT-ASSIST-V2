@@ -1,6 +1,6 @@
 import React from 'react';
 import { Bot, Camera } from 'lucide-react';
-import { AppSettings, BRAND_STUDIO_MODEL_ID, Message, getModelInfo, getModelShortName } from '../../types';
+import { AppSettings, BRAND_STUDIO_MODEL_ID, Message, ContentPart, getModelInfo, getModelShortName } from '../../types';
 import { MessageRow } from './MessageRow';
 
 type MessageListProps = {
@@ -25,7 +25,7 @@ type MessageListProps = {
   onEdit: (msg: Message, idx: number) => void;
   onDelete: (msg: Message, idx: number) => void;
   onCopy: (text: string, id: string) => void;
-  renderMessageContent: (content: any) => React.ReactNode;
+  renderMessageContent: (content: string | ContentPart[]) => React.ReactNode;
   formatModelName: (modelId: string) => string;
 };
 

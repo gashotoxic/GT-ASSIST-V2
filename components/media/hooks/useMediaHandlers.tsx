@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-import { AVAILABLE_EDIT_MODELS, AVAILABLE_IMAGE_MODELS, AVAILABLE_VIDEO_MODELS, ImageAspectRatio, Ltx25AdvancedSettings, MediaItem, MuseTalkLipSyncRequest } from '../../../types';
+import { AVAILABLE_EDIT_MODELS, AVAILABLE_IMAGE_MODELS, AVAILABLE_VIDEO_MODELS, ImageAspectRatio, Ltx25AdvancedSettings, MediaItem, MuseTalkLipSyncRequest, EditMode, StylePreset } from '../../../types';
 
 import type { ChutesService } from '../../../services/chutes';
 
@@ -112,7 +112,7 @@ export const useMediaHandlers = ({
 
   chutesService: ChutesService;
 
-  supabaseService: any; // SupabaseService type
+  supabaseService: import('../../../services/supabase').SupabaseService;
 
   userId?: string | null;
 
@@ -282,17 +282,21 @@ export const useMediaHandlers = ({
 
       setGeneratedImageItem(item);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
 
-      if (err?.name !== 'AbortError') {
+  if (err instanceof Error) {
+      if (err.name !== 'AbortError') {
 
-        updateGenStatus('image', { error: err?.message || 'Image generation failed' });
+        updateGenStatus('image', { error: err.message || 'Image generation failed' });
 
         // Refund credits on failure
 
         try { await supabaseService.refundCredits?.(userId, getCreditCost('image', selectedImageModel)); } catch {}
 
       }
+  } else {
+    console.error('Unknown error:', err);
+  }
 
     } finally {
 
@@ -376,17 +380,21 @@ export const useMediaHandlers = ({
 
       setEditedImageItem(item);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
 
-      if (err?.name !== 'AbortError') {
+  if (err instanceof Error) {
+      if (err.name !== 'AbortError') {
 
-        updateGenStatus('edit', { error: err?.message || 'Edit failed' });
+        updateGenStatus('edit', { error: err.message || 'Edit failed' });
 
         // Refund credits on failure
 
         try { await supabaseService.refundCredits?.(userId, getCreditCost('edit')); } catch {}
 
       }
+  } else {
+    console.error('Unknown error:', err);
+  }
 
     } finally {
 
@@ -488,17 +496,21 @@ export const useMediaHandlers = ({
 
       setGeneratedVideoItem(item);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
 
-      if (err?.name !== 'AbortError') {
+  if (err instanceof Error) {
+      if (err.name !== 'AbortError') {
 
-        updateGenStatus('video', { error: err?.message || 'Video generation failed' });
+        updateGenStatus('video', { error: err.message || 'Video generation failed' });
 
         // Refund credits on failure
 
         try { await supabaseService.refundCredits?.(userId, getCreditCost('video', selectedVideoModel)); } catch {}
 
       }
+  } else {
+    console.error('Unknown error:', err);
+  }
 
     } finally {
 
@@ -591,17 +603,21 @@ export const useMediaHandlers = ({
 
       setGeneratedVideoItem(item);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
 
-      if (err?.name !== 'AbortError') {
+  if (err instanceof Error) {
+      if (err.name !== 'AbortError') {
 
-        updateGenStatus('video', { error: err?.message || 'Lip sync failed' });
+        updateGenStatus('video', { error: err.message || 'Lip sync failed' });
 
         // Refund credits on failure
 
         try { await supabaseService.refundCredits?.(userId, getCreditCost('video', 'musetalk')); } catch {}
 
       }
+  } else {
+    console.error('Unknown error:', err);
+  }
 
     } finally {
 
@@ -889,9 +905,9 @@ export const useMediaHandlers = ({
 
         aspectRatio: editAspectRatio,
 
-        editMode: editMode as any,
+        editMode: editMode as EditMode,
 
-        stylePreset: stylePreset as any,
+        stylePreset: stylePreset as StylePreset,
 
       }, signal);
 
@@ -903,15 +919,19 @@ export const useMediaHandlers = ({
 
       setEditedImageItem(item);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
 
-      if (err?.name !== 'AbortError') {
+  if (err instanceof Error) {
+      if (err.name !== 'AbortError') {
 
-        updateGenStatus('edit', { error: err?.message || 'Edit failed' });
+        updateGenStatus('edit', { error: err.message || 'Edit failed' });
 
         try { await supabaseService.refundCredits?.(userId, getCreditCost('edit', editMode === 'upscale' ? 'upscale' : 'qwen-image-edit')); } catch {}
 
       }
+  } else {
+    console.error('Unknown error:', err);
+  }
 
     } finally {
 

@@ -357,7 +357,7 @@ export class KnowledgeBaseService {
         accessToken: string,
         chunkCount?: number
     ): Promise<KnowledgeDocument> {
-        const updates: any = { status };
+        const updates: Record<string, unknown> = { status };
         if (chunkCount !== undefined) {
             updates.chunk_count = chunkCount;
         }

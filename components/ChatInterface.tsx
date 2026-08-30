@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Mic, Square, X, FileText, Globe, Check, Copy } from 'lucide-react';
 import { Button } from './UI';
-import { Message, AppSettings, FileAttachment, ChatSession, AVAILABLE_MODELS } from '../types';
+import { Message, ContentPart, AppSettings, FileAttachment, ChatSession, AVAILABLE_MODELS } from '../types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { KnowledgeBaseService } from '../services/knowledgeBase';
@@ -630,7 +630,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     }
   };
 
-  const renderMessageContent = (content: any) => {
+  const renderMessageContent = (content: string | ContentPart[]) => {
     const renderMarkdown = (text: string) => (
       <div className="prose dark:prose-invert prose-sm w-full max-w-full min-w-0 break-words [overflow-wrap:anywhere] leading-relaxed">
         <ReactMarkdown

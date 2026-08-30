@@ -45,7 +45,7 @@ export function createBrandStudioToolRuntime(args: {
   userId: string | null | undefined;
   sessionId: string;
 }): {
-  executeTool: (name: BrandStudioToolName, toolArgs: any) => Promise<BrandStudioToolResult>;
+  executeTool: (name: BrandStudioToolName, toolArgs: Record<string, unknown>) => Promise<BrandStudioToolResult>;
 } {
   const { chutesService, supabaseService, subscriptionTier, userId, sessionId } = args;
 
@@ -76,7 +76,7 @@ export function createBrandStudioToolRuntime(args: {
     await supabaseService.saveMediaItem(item, blob, sessionId, userId || undefined);
   };
 
-  const executeTool = async (name: BrandStudioToolName, toolArgs: any): Promise<BrandStudioToolResult> => {
+  const executeTool = async (name: BrandStudioToolName, toolArgs: Record<string, unknown>): Promise<BrandStudioToolResult> => {
     const gateError = ensureAllowed();
     if (gateError) return gateError;
 
@@ -138,8 +138,8 @@ export function createBrandStudioToolRuntime(args: {
       }
 
       return { type: 'error', message: `Unknown tool: ${name}` };
-    } catch (err: any) {
-      const message = (err?.message || String(err || '')).trim() || 'Tool execution failed.';
+    } catch (err: unknown) {
+      const message = (err instanceof Error ? err.message : String(err || '')).trim() || 'Tool execution failed.';
       return { type: 'error', message };
     }
   };

@@ -255,13 +255,13 @@ export class SearchAgent {
 
         const data = await response.json();
 
-        return data.results.map((r: any, index: number) => ({
-            title: r.title || 'Untitled',
-            url: r.url,
-            content: r.content || r.raw_content || '',
-            snippet: (r.content || '').slice(0, 200),
-            publishedDate: r.published_date,
-            score: r.score || (1 - index * 0.1),
+        return data.results.map((r: Record<string, unknown>, index: number) => ({
+            title: (r.title as string) || 'Untitled',
+            url: r.url as string,
+            content: (r.content as string) || (r.raw_content as string) || '',
+            snippet: ((r.content as string) || '').slice(0, 200),
+            publishedDate: r.published_date as string,
+            score: (r.score as number) || (1 - index * 0.1),
         }));
     }
 
@@ -290,12 +290,12 @@ export class SearchAgent {
             return [];
         }
 
-        return data.web.results.map((r: any, index: number) => ({
-            title: r.title || 'Untitled',
-            url: r.url,
-            content: r.description || '',
-            snippet: (r.description || '').slice(0, 200),
-            favicon: r.profile?.img,
+        return data.web.results.map((r: Record<string, unknown>, index: number) => ({
+            title: (r.title as string) || 'Untitled',
+            url: r.url as string,
+            content: (r.description as string) || '',
+            snippet: ((r.description as string) || '').slice(0, 200),
+            favicon: (r.profile as Record<string, unknown>)?.img as string,
             score: 1 - index * 0.1,
         }));
     }

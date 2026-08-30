@@ -152,14 +152,14 @@ export class ChutesService {
     systemPrompt: string,
     model: string,
     searchConfig?: { enabled: boolean; apiKey: string; provider: 'tavily' | 'brave' },
-    toolRuntime?: { executeTool: (name: string, args: any) => Promise<any> } | null,
-    onToolResult?: (payload: { tool: string; result: any }) => void,
+    toolRuntime?: { executeTool: (name: string, args: Record<string, unknown>) => Promise<Record<string, unknown>> } | null,
+    onToolResult?: (payload: { tool: string; result: Record<string, unknown> }) => void,
     onStatusChange?: (status: string | null) => void,
     signal?: AbortSignal
-  ): AsyncGenerator<{ type: 'thinking' | 'content' | 'sources' | 'tool_result' | 'done'; text?: string; sources?: SearchSource[]; tool?: string; result?: any }, void, unknown> {
+  ): AsyncGenerator<{ type: 'thinking' | 'content' | 'sources' | 'tool_result' | 'done'; text?: string; sources?: SearchSource[]; tool?: string; result?: Record<string, unknown> }, void, unknown> {
 
     // Setup Tools
-    const tools: any[] = [];
+    const tools: Record<string, unknown>[] = [];
 
     if (searchConfig?.enabled && searchConfig?.apiKey && searchConfig.apiKey.length > 5) {
       tools.push({
@@ -224,7 +224,7 @@ export class ChutesService {
       ...messages
     ];
 
-    const body: any = {
+    const body: Record<string, unknown> = {
       model: model,
       messages: allMessages,
       stream: true,
@@ -254,7 +254,7 @@ export class ChutesService {
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
 
-    let currentToolCalls: any[] = [];
+    let currentToolCalls: { id: string; type: string; function: { name: string; arguments: string } }[] = [];
     let sawDone = false;
 
     try {
@@ -434,8 +434,8 @@ export class ChutesService {
 
         if (sawDone) break;
       }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.log('Stream aborted');
         return;
       }
@@ -503,7 +503,7 @@ export class ChutesService {
 
   async generateImage(request: ImageGenRequest, signal?: AbortSignal): Promise<Blob> {
     const { width, height } = this.getImageDimensions(request.aspectRatio);
-    let body: any = { prompt: request.prompt, width, height };
+    let body: Record<string, unknown> = { prompt: request.prompt, width, height };
 
     // Model Specific Logic (updated for vonkaiser endpoints)
     if (request.modelId === 'qwen-image-2512') {
@@ -659,7 +659,7 @@ export class ChutesService {
   }
 
   async generateVideo(request: VideoGenRequest, signal?: AbortSignal): Promise<Blob> {
-    let body: any = {};
+    let body: Record<string, unknown> = {};
 
     if (isLtx25Model(request.modelId)) {
       if (!request.ltx25Params) {

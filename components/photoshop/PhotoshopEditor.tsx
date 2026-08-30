@@ -60,7 +60,7 @@ interface PhotoshopEditorProps {
   isAuthenticated?: boolean;
   onRequestAuth?: () => void;
   userId?: string | null;
-  chutesService?: any;
+  chutesService?: import('../../services/chutes').ChutesService;
   deductCredits?: (type: string, model?: string) => Promise<boolean>;
   onExportToMedia?: (blob: Blob, name: string) => void;
 }
@@ -662,7 +662,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   }, [clearLayers, clearHistory, setCanvas]);
 
     // Apply image adjustment/filter to active layer
-  const handleAdjustment = useCallback(async (type: string, params: any) => {
+  const handleAdjustment = useCallback(async (type: string, params: Record<string, unknown>) => {
     if (!activeLayerId) return;
     const layer = layers.find(l => l.id === activeLayerId);
     if (!layer || !layer.dataUrl) return;
@@ -1828,10 +1828,10 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
                 onChange={(p) => {
                   if (p.fontFamily !== undefined) setTextFont(p.fontFamily);
                   if (p.fontSize !== undefined) setTextSize(p.fontSize);
-                  if (p.fontWeight !== undefined) setTextWeight(p.fontWeight as any);
-                  if (p.fontStyle !== undefined) setTextStyle(p.fontStyle as any);
+                  if (p.fontWeight !== undefined) setTextWeight(p.fontWeight as 'light' | 'regular' | 'bold' | 'black');
+                  if (p.fontStyle !== undefined) setTextStyle(p.fontStyle as 'normal' | 'italic');
                   if (p.color !== undefined) setTextColor(p.color);
-                  if (p.textAlign !== undefined) setTextAlign(p.textAlign as any);
+                  if (p.textAlign !== undefined) setTextAlign(p.textAlign as 'left' | 'center' | 'right');
                   if (p.lineHeight !== undefined) setTextLineHeight(p.lineHeight);
                   if (p.bgColor !== undefined) setTextBgColor(p.bgColor);
                 }}

@@ -38,7 +38,7 @@ export class SearchService {
 
       const data = await response.json();
       
-      const results = data.results.map((r: any) => 
+      const results = data.results.map((r: Record<string, unknown>) => 
         `Title: ${r.title}\nURL: ${r.url}\nContent: ${r.content}`
       ).join('\n\n');
 
@@ -73,7 +73,7 @@ export class SearchService {
       const data = await response.json();
       
       // Check if 'web' and 'results' exist
-      const results = data.web?.results?.map((r: any) => 
+      const results = data.web?.results?.map((r: Record<string, unknown>) => 
         `Title: ${r.title}\nURL: ${r.url}\nDescription: ${r.description}`
       ).join('\n\n');
 

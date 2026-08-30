@@ -229,7 +229,7 @@ export function applyFilterPreset(imageData: ImageData, preset = 'grayscale'): I
 export function compositeAdjustment(
   canvas: HTMLCanvasElement,
   adjustment: string,
-  params: any
+  params: Record<string, number | string>
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     try {

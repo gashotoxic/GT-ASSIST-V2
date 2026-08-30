@@ -1,6 +1,6 @@
 import React from 'react';
 import { Bot, BrainCircuit, Camera, Check, Copy, Cpu, Edit3, GitBranch, Loader2, Pause, Play, RotateCcw, Search, Trash2, User, Volume2 } from 'lucide-react';
-import { Message, MediaItem, getModelInfo } from '../../types';
+import { Message, ContentPart, MediaItem, getModelInfo } from '../../types';
 import { SearchResultsCard } from '../SearchResultsCard';
 
 type MessageRowProps = {
@@ -21,7 +21,7 @@ type MessageRowProps = {
   onEdit: (msg: Message, idx: number) => void;
   onCopy: (text: string, id: string) => void;
   onDelete: (msg: Message, idx: number) => void;
-  renderMessageContent: (content: any) => React.ReactNode;
+  renderMessageContent: (content: string | ContentPart[]) => React.ReactNode;
   formatModelName: (modelId: string) => string;
 };
 
