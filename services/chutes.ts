@@ -1,7 +1,6 @@
 
 import { Message, TTSRequest, STTRequest, ImageGenRequest, VideoGenRequest, ImageEditRequest, MuseTalkLipSyncRequest, SearchSource, ImageAspectRatio } from '../types';
 import { SearchAgent } from './searchAgent';
-import { isLtx23Model, buildLtx23GenerationInput } from './chutesLtx2';
 import { isLtx25Model, buildLtx25GenerationInput } from './chutesLtx25';
 
 const BASE_LLM_URL = 'https://llm.chutes.ai/v1/chat/completions';
@@ -668,19 +667,6 @@ export class ChutesService {
       }
       const { settings, videoUrl, keyframeStart, keyframeEnd } = request.ltx25Params;
       body = buildLtx25GenerationInput(
-        request.prompt,
-        settings,
-        request.image,
-        videoUrl,
-        keyframeStart,
-        keyframeEnd
-      );
-    } else if (isLtx23Model(request.modelId)) {
-      if (!request.ltx2Params) {
-        throw new Error("LTX 2.3 model selected but no settings provided");
-      }
-      const { settings, videoUrl, keyframeStart, keyframeEnd } = request.ltx2Params;
-      body = buildLtx23GenerationInput(
         request.prompt,
         settings,
         request.image,
