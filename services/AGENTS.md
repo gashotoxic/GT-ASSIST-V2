@@ -4,7 +4,7 @@
 
 ## Files
 
-- chutes.ts -- Chutes API client (LLM, image gen, image edit, video gen, style transfer, remove bg, upscale, TTS, STT)
+- chutes.ts -- Chutes API client (LLM, image gen, image edit, video gen, style transfer, remove bg, upscale, TTS, STT). Video routing: LTX 2.5 (chutesLtx25.ts) + Wan; LTX 2.3 removed 2026-08-29.
 - supabase.ts -- Supabase client (user data, credits, billing, analytics)
 - aiPhotoService.ts -- AI-powered Photoshop operations with credit deduction
 - creditCosts.ts -- Credit cost definitions for all AI features
