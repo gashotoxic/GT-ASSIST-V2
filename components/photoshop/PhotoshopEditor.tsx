@@ -662,7 +662,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
   }, [clearLayers, clearHistory, setCanvas]);
 
     // Apply image adjustment/filter to active layer
-  const handleAdjustment = useCallback(async (type: string, params: Record<string, unknown>) => {
+  const handleAdjustment = useCallback(async (type: string, params: Record<string, number | string>) => {
     if (!activeLayerId) return;
     const layer = layers.find(l => l.id === activeLayerId);
     if (!layer || !layer.dataUrl) return;
