@@ -19,7 +19,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onBack }) => {
     const [config, setConfig] = useState<any>(null);
     const initializePayment = usePaystackPayment(config);
 
-    const handlePaystackSuccess = (reference: any) => {
+    const handlePaystackSuccess = (reference: Record<string, unknown>) => {
         console.log('Payment successful:', reference);
         setLoading(null);
         setShowSuccess(true);

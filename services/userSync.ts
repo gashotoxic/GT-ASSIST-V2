@@ -78,29 +78,36 @@ export class UserSyncService {
    */
   async handleClerkWebhook(event: {
     type: string;
-    data: any;
+    data: Record<string, unknown>;
   }): Promise<{ success: boolean; error?: string }> {
     if (!this.isConfigured) {
       return { success: false, error: 'Supabase configuration missing' };
     }
     try {
+      const data = event.data as {
+        id: string;
+        email_addresses?: { email_address: string }[];
+        first_name?: string;
+        last_name?: string;
+        image_url?: string;
+      };
       switch (event.type) {
         case 'user.created':
           // New user signed up
           await this.syncUserProfile({
-            id: event.data.id,
-            emailAddresses: event.data.email_addresses,
-            firstName: event.data.first_name,
-            lastName: event.data.last_name,
-            imageUrl: event.data.image_url,
+            id: data.id,
+            emailAddresses: data.email_addresses?.map(e => ({ emailAddress: e.email_address })) || [],
+            firstName: data.first_name,
+            lastName: data.last_name,
+            imageUrl: data.image_url,
           });
           break;
 
         case 'user.updated':
           // User profile updated (email, name, etc.)
-          const email = event.data.email_addresses?.[0]?.email_address;
-          if (email && event.data.id) {
-            await this.getSupabaseService().updateUserProfile(event.data.id, {
+          const email = data.email_addresses?.[0]?.email_address;
+          if (email && data.id) {
+            await this.getSupabaseService().updateUserProfile(data.id, {
               // Add any fields that can be updated from Clerk
             });
           }
@@ -180,16 +187,17 @@ export class UserSyncService {
       
       console.log(`User found: ${userId}, credits: ${profile.credits}`);
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string; code?: string; details?: string };
       // Handle type mismatch errors specifically
-      if (error.message?.includes('invalid input syntax for type uuid') ||
-          error.code === '42883' ||
-          error.details?.includes('invalid input syntax')) {
+      if (err.message?.includes('invalid input syntax for type uuid') ||
+          err.code === '42883' ||
+          err.details?.includes('invalid input syntax')) {
         console.log(`User ${userId} has invalid UUID format - likely a Clerk ID type mismatch. This is expected and will be handled during user creation.`);
         return false;
       }
-      
-      console.log(`User ${userId} not found in Supabase:`, error.message);
+
+      console.log(`User ${userId} not found in Supabase:`, err.message);
       return false;
     }
   }

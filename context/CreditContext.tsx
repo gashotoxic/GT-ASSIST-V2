@@ -160,7 +160,7 @@ export function CreditProvider({ children }: { children: React.ReactNode }) {
       },
       onProfileUpdate: (profile) => {
         if (profile.daily_credits !== undefined) {
-          setDailyCredits(profile.daily_credits);
+          setDailyCredits(profile.daily_credits as number);
         }
         if (profile.subscription_tier) {
           setTier(profile.subscription_tier as 'free' | 'basic' | 'plus' | 'pro');
@@ -168,7 +168,7 @@ export function CreditProvider({ children }: { children: React.ReactNode }) {
         // Also update credits from profile update events (covers INSERT)
         if (profile.credits !== undefined) {
           console.log('Profile update - setting credits:', profile.credits);
-          setCredits(profile.credits);
+          setCredits(profile.credits as number);
         }
       }
     });

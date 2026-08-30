@@ -38,7 +38,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({ isOp
     const isPro = subscriptionTier === 'pro';
     const isPlus = subscriptionTier === 'plus' || isPro;
 
-    const handleChange = (key: keyof AppSettings, value: any) => {
+    const handleChange = (key: keyof AppSettings, value: string | boolean | number) => {
         setFormData(prev => ({ ...prev, [key]: value }));
     };
 

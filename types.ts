@@ -26,7 +26,7 @@ export interface Message {
   audio_url?: string; // Remote URL from Supabase
   tool_call_id?: string; // For tool responses
   name?: string; // For tool responses
-  tool_calls?: any[]; // For assistant tool requests
+  tool_calls?: { id: string; type: string; function: { name: string; arguments: string } }[]; // For assistant tool requests
   sources?: SearchSource[]; // Attached search sources for UI
   media?: MediaItem[]; // Attached generated media for UI (e.g., Brand Studio tools)
 }

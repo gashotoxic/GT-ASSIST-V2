@@ -76,13 +76,13 @@ export class SupabaseService {
         return [];
       }
 
-      return data.map((row: any) => ({
-        id: row.id,
-        title: row.title || 'New Conversation',
-        preview: row.preview || '',
-        updatedAt: new Date(row.updated_at).getTime(),
-        isBranch: row.is_branch,
-        model: row.model
+      return data.map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        title: (row.title as string) || 'New Conversation',
+        preview: (row.preview as string) || '',
+        updatedAt: new Date(row.updated_at as string).getTime(),
+        isBranch: row.is_branch as boolean,
+        model: row.model as string
       }));
     } catch (err) {
       console.error('Error fetching sessions:', err);
@@ -94,7 +94,7 @@ export class SupabaseService {
     if (!this.client) return;
 
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         id: session.id,
         title: session.title,
         preview: session.preview,
@@ -229,7 +229,7 @@ export class SupabaseService {
     const sid = targetSessionId || this.sessionId;
     const { audioUrl, ...msgToSave } = message;
 
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       session_id: sid,
       role: msgToSave.role,
       content: msgToSave.content,
@@ -368,7 +368,7 @@ export class SupabaseService {
         .getPublicUrl(fileName);
 
       // 2. Save Record
-      const record: any = {
+      const record: Record<string, unknown> = {
         id: item.id,
         session_id: sessionId,
         type: item.type,
@@ -421,14 +421,14 @@ export class SupabaseService {
         return [];
       }
 
-      return data.map((row: any) => ({
-        id: row.id,
-        type: row.type,
-        title: row.title,
-        url: row.url,
-        prompt: row.prompt,
-        createdAt: new Date(row.created_at).getTime(),
-        sessionId: row.session_id
+      return data.map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        type: row.type as 'image' | 'video',
+        title: row.title as string,
+        url: row.url as string,
+        prompt: row.prompt as string,
+        createdAt: new Date(row.created_at as string).getTime(),
+        sessionId: row.session_id as string
       }));
     } catch (e) {
       console.error("Error getting media history", e);
@@ -454,14 +454,14 @@ export class SupabaseService {
       }
 
       console.log('[Supabase] Found', data?.length || 0, 'media items for user');
-      return (data || []).map((row: any) => ({
-        id: row.id,
-        type: row.type,
-        title: row.title,
-        url: row.url,
-        prompt: row.prompt,
-        createdAt: new Date(row.created_at).getTime(),
-        sessionId: row.session_id
+      return (data || []).map((row: Record<string, unknown>) => ({
+        id: row.id as string,
+        type: row.type as 'image' | 'video',
+        title: row.title as string,
+        url: row.url as string,
+        prompt: row.prompt as string,
+        createdAt: new Date(row.created_at as string).getTime(),
+        sessionId: row.session_id as string
       }));
     } catch (e) {
       console.error("Error getting user media history", e);
@@ -550,16 +550,16 @@ export class SupabaseService {
       .subscribe();
   }
 
-  async removeChannel(channel: any): Promise<void> {
+  async removeChannel(channel: string | { channelName: string }): Promise<void> {
     if (!this.client) return;
-    await this.client.removeChannel(channel);
+    await this.client.removeChannel(channel as any);
   }
 
   async deductCredits(userId: string, amount: number, action: string, model_used?: string): Promise<{ success: boolean; new_balance: number; message: string }> {
     if (!this.client) throw new Error('Supabase client not initialized');
 
     try {
-      const params: any = {
+      const params: Record<string, unknown> = {
         p_user_id: userId,
         p_amount: amount,
         p_action: action,
@@ -616,7 +616,7 @@ export class SupabaseService {
       });
   }
 
-  async createSubscription(userId: string, subscriptionData: any): Promise<void> {
+  async createSubscription(userId: string, subscriptionData: Record<string, unknown>): Promise<void> {
     if (!this.client) throw new Error('Supabase client not initialized');
 
     const { error } = await this.client
@@ -742,7 +742,7 @@ export class SupabaseService {
     console.log(`Deducting ${amount} credits for user ${userId}, action: ${action}`);
 
     try {
-      const params: any = {
+      const params: Record<string, unknown> = {
         p_user_id: userId,
         p_amount: amount,
         p_action: action,
@@ -784,7 +784,7 @@ export class SupabaseService {
     if (!this.client) throw new Error('Supabase client not initialized');
 
     try {
-      const params: any = {
+      const params: Record<string, unknown> = {
         p_user_id: userId,
         p_amount: amount,
       };
@@ -844,7 +844,7 @@ export class SupabaseService {
   async addCredits(userId: string, amount: number, action: string = 'refund', purchaseId?: string): Promise<boolean> {
     if (!this.client) throw new Error('Supabase client not initialized');
     try {
-      const params: any = {
+      const params: Record<string, unknown> = {
         p_user_id: userId,
         p_amount: amount,
         p_action: action,
@@ -1047,9 +1047,9 @@ export class SupabaseService {
   // --- Real-time subscription improvements ---
 
   subscribeToUserUpdates(userId: string, callbacks: {
-    onProfileUpdate?: (profile: any) => void;
+    onProfileUpdate?: (profile: Record<string, unknown>) => void;
     onCreditChange?: (credits: number) => void;
-    onSubscriptionChange?: (subscription: any) => void;
+    onSubscriptionChange?: (subscription: Record<string, unknown>) => void;
   }) {
     if (!this.client) throw new Error('Supabase client not initialized');
 
@@ -1064,12 +1064,13 @@ export class SupabaseService {
           schema: 'public',
           table: 'users',
           filter: `id=eq.${userId}`,
-        }, (payload: any) => {
+        }, (payload: Record<string, unknown>) => {
+          const newRecord = payload.new as Record<string, unknown>;
           if (callbacks.onProfileUpdate) {
-            callbacks.onProfileUpdate(payload.new);
+            callbacks.onProfileUpdate(newRecord);
           }
           if (callbacks.onCreditChange) {
-            callbacks.onCreditChange(payload.new?.credits || 0);
+            callbacks.onCreditChange((newRecord?.credits as number) || 0);
           }
         })
         .subscribe();

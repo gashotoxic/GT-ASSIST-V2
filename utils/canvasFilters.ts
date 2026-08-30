@@ -229,7 +229,7 @@ export function applyFilterPreset(imageData: ImageData, preset = 'grayscale'): I
 export function compositeAdjustment(
   canvas: HTMLCanvasElement,
   adjustment: string,
-  params: any
+  params: Record<string, number | string>
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     try {
@@ -241,12 +241,12 @@ export function compositeAdjustment(
       ctx.drawImage(canvas, 0, 0);
       let imageData = ctx.getImageData(0, 0, offscreen.width, offscreen.height);
       switch (adjustment) {
-        case 'brightnessContrast': imageData = applyBrightnessContrast(imageData, params.brightness, params.contrast); break;
-        case 'hsl': imageData = applyHSL(imageData, params.hue, params.saturation, params.lightness); break;
-        case 'levels': imageData = applyLevels(imageData, params.black || params.blackPoint, params.white || params.whitePoint, params.gamma); break;
-        case 'blur': imageData = applyBlur(imageData, params.radius); break;
-        case 'sharpen': imageData = applySharpen(imageData, params.amount); break;
-        case 'filterPreset': imageData = applyFilterPreset(imageData, params.preset); break;
+        case 'brightnessContrast': imageData = applyBrightnessContrast(imageData, params.brightness as number, params.contrast as number); break;
+        case 'hsl': imageData = applyHSL(imageData, params.hue as number, params.saturation as number, params.lightness as number); break;
+        case 'levels': imageData = applyLevels(imageData, (params.black || params.blackPoint) as number, (params.white || params.whitePoint) as number, params.gamma as number); break;
+        case 'blur': imageData = applyBlur(imageData, params.radius as number); break;
+        case 'sharpen': imageData = applySharpen(imageData, params.amount as number); break;
+        case 'filterPreset': imageData = applyFilterPreset(imageData, params.preset as string); break;
       }
       ctx.putImageData(imageData, 0, 0);
       resolve(offscreen.toDataURL());

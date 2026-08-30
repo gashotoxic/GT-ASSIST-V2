@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { AppSettings, BRAND_STUDIO_MODEL_ID, DEFAULT_SYSTEM_PROMPT, Message, MediaItem, NORMAL_CHAT_APP_FEATURES_CONTEXT, BASE_SYSTEM_CONTEXT, RESPONSE_FORMAT_CONTEXT } from '../../../types';
+import { AppSettings, BRAND_STUDIO_MODEL_ID, DEFAULT_SYSTEM_PROMPT, Message, ContentPart, MediaItem, NORMAL_CHAT_APP_FEATURES_CONTEXT, BASE_SYSTEM_CONTEXT, RESPONSE_FORMAT_CONTEXT } from '../../../types';
 import { createBrandStudioToolRuntime } from '../../../services/brandStudioToolRuntime';
 import { KnowledgeBaseService } from '../../../services/knowledgeBase';
 import { getCreditCost } from '../../../services/creditCosts';
@@ -87,7 +87,7 @@ export const useChatSendMessage = ({
       try {
         await supabaseService.useCredits(userId, cost, 'chat', activeModel, sessionId);
         refetchCredits();
-      } catch (error: any) {
+      } catch (error: unknown) {
         alert('Insufficient credits. Please add more credits to continue.');
         return;
       }
@@ -100,7 +100,7 @@ export const useChatSendMessage = ({
       localStorage.setItem('chutes_guest_credits', (guestCredits - cost).toString());
     }
 
-    let userContent: any = textInput;
+    let userContent: string | ContentPart[] = textInput;
 
     if (activeAttachment) {
       if (activeAttachment.type === 'image') {
@@ -251,13 +251,13 @@ export const useChatSendMessage = ({
             prev.map(msg => msg.id === assistantMsg.id ? { ...msg, sources: chunk.sources } : msg)
           );
         } else if (chunk.type === 'tool_result') {
-          const result: any = (chunk as any).result;
+          const result: Record<string, unknown> = (chunk as Record<string, unknown>).result as Record<string, unknown>;
           if (result?.type === 'image') {
             const media: MediaItem = {
-              id: result.mediaItemId || `${Date.now()}`,
+              id: (result.mediaItemId as string) || `${Date.now()}`,
               type: 'image',
-              url: result.url,
-              prompt: result.prompt || '',
+              url: result.url as string,
+              prompt: (result.prompt as string) || '',
               createdAt: Date.now(),
               sessionId
             };
@@ -265,7 +265,7 @@ export const useChatSendMessage = ({
               prev.map(msg => msg.id === assistantMsg.id ? { ...msg, media: [...(msg.media || []), media] } : msg)
             );
           } else if (result?.type === 'error') {
-            fullResponse += `\n\n${result.message}`;
+            fullResponse += `\n\n${(result.message as string)}`;
             setMessages(prev =>
               prev.map(msg => msg.id === assistantMsg.id ? { ...msg, content: fullResponse } : msg)
             );
@@ -291,11 +291,11 @@ export const useChatSendMessage = ({
           void 0;
         }
       }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
         setMessages(prev => prev.map(msg => {
           if (msg.role === 'assistant' && msg.id === (Date.now() + 1).toString()) {
-            return { ...msg, content: (msg.content as any) + ' [Stopped]' };
+            return { ...msg, content: (msg.content as string) + ' [Stopped]' };
           }
           return msg;
         }));

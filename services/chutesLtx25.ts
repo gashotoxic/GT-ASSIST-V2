@@ -37,8 +37,8 @@ export const buildLtx25GenerationInput = (
     _conditioningVideoUrl?: string | null,
     _conditioningKeyframeStart?: string | null,
     _conditioningKeyframeEnd?: string | null
-): any => {
-    const input: any = {
+): Record<string, unknown> => {
+    const input: Record<string, unknown> = {
         prompt,
         width: normalizeWidthHeight25(settings.width ?? 768),
         height: normalizeWidthHeight25(settings.height ?? 512),
@@ -86,7 +86,7 @@ export const buildLtx25GenerationInput = (
         if (start && end) {
             input.keyframes = [
                 { image_b64: start, frame_idx: 0 },
-                { image_b64: end, frame_idx: (input.num_frames || 97) - 1 }
+                { image_b64: end, frame_idx: ((input.num_frames as number) || 97) - 1 }
             ];
             delete input.input_image_b64; // keyframes overrides single image
         }
