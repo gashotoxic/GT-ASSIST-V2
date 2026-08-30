@@ -218,26 +218,9 @@ export const AVAILABLE_EDIT_MODELS = [
 export const AVAILABLE_VIDEO_MODELS = [
   { id: "wan-2.2-i2v", name: "Wan 2.2 I2V (Fast)", url: "https://vonkaiser-turbowani2v.chutes.ai/generate", type: 'i2v' },
   { id: "wan-2.1-t2v", name: "Wan 2.1 T2V — Coming Soon", url: "https://chutes-wan2-1-14b.chutes.ai/text2video", type: 't2v', disabled: true },
-  { id: "ltx-23-i2v", name: "LTX 2.3 I2V", url: "https://vonkaiser-ltx-23-video.chutes.ai/generate", type: 'i2v' },
-  { id: "ltx-23-t2v", name: "LTX 2.3 T2V", url: "https://vonkaiser-ltx-23-video.chutes.ai/generate", type: 't2v' },
   { id: "ltx-25-i2v", name: "LTX 2.5 I2V", url: "https://vonkaiser-ltx-25-video.chutes.ai/generate", type: 'i2v' },
   { id: "ltx-25-t2v", name: "LTX 2.5 T2V", url: "https://vonkaiser-ltx-25-video.chutes.ai/generate", type: 't2v' }
 ];
-
-export interface Ltx23AdvancedSettings {
-  width: number;
-  height: number;
-  fps: number;
-  num_frames: number | null;
-  duration: number | null;
-  guidance_scale: number;
-  seed: number | null;
-  use_random_seed: boolean;
-  enhance_prompt: boolean;
-  generate_audio: boolean;
-  negative_prompt: string;
-  json_override: string;
-}
 
 export interface Ltx25AdvancedSettings {
   width: number;
@@ -310,12 +293,6 @@ export interface VideoGenRequest {
   image?: string; // base64 or url (Optional for T2V)
   modelUrl: string;
   modelId?: string;
-  ltx2Params?: {
-    settings: Ltx23AdvancedSettings;
-    videoUrl?: string;
-    keyframeStart?: string | null;
-    keyframeEnd?: string | null;
-  };
   ltx25Params?: {
     settings: Ltx25AdvancedSettings;
     videoUrl?: string;

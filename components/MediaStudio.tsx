@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Image, Film, Loader2, Wand2, Upload, AlertCircle, Play, Scissors, ArrowRight, Video, XCircle, Camera, X, Check, Grid, Filter, Type, FileImage, Trash2, Layers } from 'lucide-react';
 import { Button, Input, Textarea, Select, Label } from './UI';
-import { AVAILABLE_VIDEO_MODELS, AppSettings, MediaItem, ImageAspectRatio, Ltx23AdvancedSettings, Ltx25AdvancedSettings } from '../types';
+import { AVAILABLE_VIDEO_MODELS, AppSettings, MediaItem, ImageAspectRatio, Ltx25AdvancedSettings } from '../types';
 import { getCreditCost } from '../services/creditCosts';
 import { useCredits } from '../context/CreditContext';
 import { useServices } from '../context/ServicesContext';
@@ -84,21 +84,6 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
     const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
     const [generatedVideoItem, setGeneratedVideoItem] = useState<MediaItem | null>(null);
 
-    // LTX-2 State
-    const [ltx23Settings, setLtx2Settings] = useState<Ltx23AdvancedSettings>({
-        width: 768,
-        height: 512,
-        fps: 24,
-        num_frames: null,
-        duration: null,
-        guidance_scale: 3.1,
-        seed: null,
-        use_random_seed: true,
-        generate_audio: true,
-        negative_prompt: 'low-res, morphing, distortion, warping, flicker, jitter, stutter, shaky camera, erratic motion, temporal artifacts, frame blending, low quality, jpeg artifacts',
-        enhance_prompt: false,
-        json_override: ''
-    });
     const [ltx2VideoUrl, setLtx2VideoUrl] = useState('');
     const [ltx2KeyframeStart, setLtx2KeyframeStart] = useState<string | null>(null);
     const [ltx2KeyframeEnd, setLtx2KeyframeEnd] = useState<string | null>(null);
@@ -215,11 +200,6 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
     useEffect(() => {
         const compatibleModels = AVAILABLE_VIDEO_MODELS.filter(m => m.type === videoMode);
         if (compatibleModels.length > 0) {
-            if (videoMode === 't2v') {
-                const ltx2T2v = compatibleModels.find(m => m.id === 'ltx-2-t2v');
-                setSelectedVideoModel(ltx2T2v?.id || compatibleModels[0].id);
-                return;
-            }
             setSelectedVideoModel(compatibleModels[0].id);
         }
     }, [videoMode]);
@@ -356,7 +336,6 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
         videoMode,
         sourceImage,
         selectedVideoModel,
-        ltx23Settings,
         ltx25Settings,
         ltx2VideoUrl,
         ltx2KeyframeStart,
@@ -567,9 +546,6 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                             onEnhancePrompt={() => handleEnhancePrompt(videoPrompt, setVideoPrompt, { hasImage: videoMode === 'i2v' && Boolean(sourceImage) })}
                                             onGenerate={handleVideoGeneration}
                                             onDownloadBase64={downloadBase64}
-                                            // LTX-2 Props
-                                            ltx23Settings={ltx23Settings}
-                                            setLtx2Settings={setLtx2Settings}
                                             ltx2VideoUrl={ltx2VideoUrl}
                                             setLtx2VideoUrl={setLtx2VideoUrl}
                                             ltx2KeyframeStart={ltx2KeyframeStart}

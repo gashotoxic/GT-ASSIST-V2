@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-import { AVAILABLE_EDIT_MODELS, AVAILABLE_IMAGE_MODELS, AVAILABLE_VIDEO_MODELS, ImageAspectRatio, Ltx23AdvancedSettings, Ltx25AdvancedSettings, MediaItem, MuseTalkLipSyncRequest } from '../../../types';
+import { AVAILABLE_EDIT_MODELS, AVAILABLE_IMAGE_MODELS, AVAILABLE_VIDEO_MODELS, ImageAspectRatio, Ltx25AdvancedSettings, MediaItem, MuseTalkLipSyncRequest } from '../../../types';
 
 import type { ChutesService } from '../../../services/chutes';
 
@@ -59,7 +59,6 @@ export const useMediaHandlers = ({
 
   selectedVideoModel,
 
-  ltx23Settings,
 
   ltx25Settings,
 
@@ -161,7 +160,6 @@ export const useMediaHandlers = ({
 
   selectedVideoModel: string;
 
-  ltx23Settings: Ltx23AdvancedSettings;
 
   ltx25Settings: Ltx25AdvancedSettings;
 
@@ -468,18 +466,6 @@ export const useMediaHandlers = ({
 
         modelId: selectedVideoModel,
 
-        ltx2Params: model.id.includes('ltx-23') ? {
-
-          settings: ltx23Settings,
-
-          videoUrl: ltx2VideoUrl,
-
-          keyframeStart: ltx2KeyframeStart,
-
-          keyframeEnd: ltx2KeyframeEnd
-
-        } : undefined,
-
         ltx25Params: model.id.includes('ltx-25') ? {
 
           settings: ltx25Settings,
@@ -532,7 +518,6 @@ export const useMediaHandlers = ({
 
     ltx2KeyframeStart,
 
-    ltx23Settings,
 
     ltx25Settings,
 

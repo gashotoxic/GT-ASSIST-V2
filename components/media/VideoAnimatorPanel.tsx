@@ -1,8 +1,7 @@
 import React, { useRef } from 'react';
 import { FileImage, Type, Upload, Download, Video, Wand2, Loader2, Film } from 'lucide-react';
 import { Button, Textarea, Select, Label } from '../UI';
-import { AVAILABLE_VIDEO_MODELS, Ltx23AdvancedSettings, Ltx25AdvancedSettings } from '../../types';
-import { Ltx23AdvancedOptions } from './Ltx23AdvancedOptions';
+import { AVAILABLE_VIDEO_MODELS, Ltx25AdvancedSettings } from '../../types';
 import { Ltx25AdvancedOptions } from './Ltx25AdvancedOptions';
 
 export function VideoAnimatorPanel(props: {
@@ -22,9 +21,6 @@ export function VideoAnimatorPanel(props: {
   onEnhancePrompt: () => void;
   onGenerate: () => void;
   onDownloadBase64: (base64Data: string, filename: string) => void;
-  // LTX-2 Props
-  ltx23Settings: Ltx23AdvancedSettings;
-  setLtx2Settings: (settings: Ltx23AdvancedSettings) => void;
   ltx2VideoUrl: string;
   setLtx2VideoUrl: (url: string) => void;
   ltx2KeyframeStart: string | null;
@@ -37,17 +33,9 @@ export function VideoAnimatorPanel(props: {
   onPickVideoFromGallery: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isLtx2Open, setIsLtx2Open] = React.useState(false);
   const [isLtx25Open, setIsLtx25Open] = React.useState(false);
 
-  const isLtx2 = props.selectedVideoModel.includes('ltx-23');
   const isLtx25 = props.selectedVideoModel.includes('ltx-25');
-  const isKeyframeMode = Boolean(props.ltx2KeyframeStart && props.ltx2KeyframeEnd);
-  const hasKeyframeStart = Boolean(props.ltx2KeyframeStart);
-  const hasKeyframeEnd = Boolean(props.ltx2KeyframeEnd);
-  const ltx2MissingRequiredInputs =
-    isLtx2 &&
-    ((isKeyframeMode && (!hasKeyframeStart || !hasKeyframeEnd)));
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -146,22 +134,6 @@ export function VideoAnimatorPanel(props: {
           className="h-32 text-base"
         />
 
-        {isLtx2 && (
-            <Ltx23AdvancedOptions
-                isOpen={isLtx2Open}
-                setIsOpen={setIsLtx2Open}
-                videoMode={props.videoMode}
-                settings={props.ltx23Settings}
-                setSettings={props.setLtx2Settings}
-                videoUrl={props.ltx2VideoUrl}
-                setVideoUrl={props.setLtx2VideoUrl}
-                keyframeStart={props.ltx2KeyframeStart}
-                setKeyframeStart={props.setLtx2KeyframeStart}
-                keyframeEnd={props.ltx2KeyframeEnd}
-                setKeyframeEnd={props.setLtx2KeyframeEnd}
-                onPickVideoFromGallery={props.onPickVideoFromGallery}
-            />
-        )}
 
         {isLtx25 && (
             <Ltx25AdvancedOptions
@@ -178,7 +150,7 @@ export function VideoAnimatorPanel(props: {
       <div id="tour-video-generate">
         <Button
           onClick={() => props.isAuthenticated ? props.onGenerate() : props.onRequestAuth()}
-          disabled={props.isGenerating || !props.videoPrompt || (props.videoMode === 'i2v' && !props.sourceImage) || ltx2MissingRequiredInputs || !props.isAuthenticated || !props.canAfford('video', props.selectedVideoModel)}
+          disabled={props.isGenerating || !props.videoPrompt || (props.videoMode === 'i2v' && !props.sourceImage) || !props.isAuthenticated || !props.canAfford('video', props.selectedVideoModel)}
           className={`w-full h-14 text-lg font-semibold rounded-xl shadow-xl transition-all ${props.isGenerating ? 'opacity-80' : 'hover:scale-[1.02] shadow-primary/20'}`}
         >
           {props.isGenerating ? 'Animating...' : (props.isAuthenticated ? <><Film className="w-5 h-5 mr-2" /> Animate Video</> : 'Sign In to Animate Video')}
