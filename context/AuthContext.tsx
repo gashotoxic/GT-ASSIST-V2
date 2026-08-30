@@ -7,7 +7,7 @@ interface AuthContextType {
   user: any;
   isLoaded: boolean;
   isSignedIn: boolean;
-  getToken: (options?: any) => Promise<string | null>;
+  getToken: (options?: Record<string, unknown>) => Promise<string | null>;
 }
 
 export const AuthContext = createContext<AuthContextType>({

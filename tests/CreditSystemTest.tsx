@@ -112,7 +112,7 @@ export const CreditSystemTest: React.FC = () => {
           addTestResult('Real-time Subscription', false, 'No subscription update received');
         }
         
-        await supabaseService.removeChannel(channel);
+        await supabaseService.removeChannel(channel as any);
       } catch (error) {
         addTestResult('Real-time Subscription', false, `Error: ${error}`);
       }

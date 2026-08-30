@@ -298,8 +298,9 @@ const App: React.FC = () => {
     }
     // Event listener for Account Settings
     const handleOpenAccountSettings = () => setIsAccountSettingsOpen(true);
-    const handleOpenView = (e: any) => {
-      if (e.detail) setCurrentView(e.detail);
+    const handleOpenView = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) setCurrentView(detail as 'chat' | 'media' | 'pricing');
     };
 
     window.addEventListener('open-account-settings', handleOpenAccountSettings);

@@ -550,7 +550,7 @@ export class SupabaseService {
       .subscribe();
   }
 
-  async removeChannel(channel: string): Promise<void> {
+  async removeChannel(channel: string | { channelName: string }): Promise<void> {
     if (!this.client) return;
     await this.client.removeChannel(channel as any);
   }
