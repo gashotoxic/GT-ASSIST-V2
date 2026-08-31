@@ -47,3 +47,10 @@
 
 ## 2026-02-05
 - Make Media preview scroll/zoom responsive and improve onboarding guide cancel UX.
+
+## 2026-08-30
+- Remove deprecated LTX 2.3 video model — replaced by LTX 2.5 (PR #7, merged). Deleted chutesLtx2.ts + Ltx23AdvancedOptions.tsx, removed model entries/credit costs/ltx2Params/routing. (completed)
+- Type cleanup: replaced 54 `: any` across 20 files → 8 intentional `any` remain (PR #8, merged). tsc + build 0 errors. (completed)
+- Fix subagent delegation to use mimo-v2.5-pro (was failing with Hermes streaming parser bug). Tested + used successfully. (completed)
+- Merged PRs #5-#8 to main; production deployment READY, 0 runtime errors. (completed)
+- Project documentation refresh: llms.txt, MODEL_UPDATE_PLAN, PROGRESS_REPORT, ROADMAP, README. (completed)

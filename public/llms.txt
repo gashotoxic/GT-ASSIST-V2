@@ -12,7 +12,7 @@ Text-to-image and image-to-image generation. Models: FLUX, DreamShaper, Juggerna
 
 ## Media Studio — Video Generation
 https://create.gashotech.com/#media-video
-Text-to-video and image-to-video generation. Models: LTX 2.5 (distilled 8+3 step, up to 20s 1080p), WAN 2.1, LTX 2.3. Supports auto-duration, prompt enhancement, audio generation, keyframe interpolation, lip-sync (MuseTalk).
+Text-to-video and image-to-video generation. Models: LTX 2.5 (distilled 8+3 step, up to 20s 1080p, i2v + t2v), WAN 2.2 I2V, WAN 2.1 T2V. Supports auto-duration, prompt enhancement, audio generation, keyframe interpolation, lip-sync (MuseTalk).
 
 ## Media Studio — Photoshop Corner
 https://create.gashotech.com/#media-photoshop

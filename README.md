@@ -9,12 +9,14 @@ A next-generation AI Assistant platform featuring real-time Chat, Voice, Image G
 *   **Media Studio**:
     *   **Generator**: High-quality images (Hunyuan, Flux).
     *   **Magic Editor**: Edit images with simple text commands.
-    *   **Animator**: Wan 2.2 Image-to-Video, Text-to-Video, and Lip Sync.
+    *   **Animator**: LTX 2.5 (i2v/t2v) + Wan Video, and Lip Sync (MuseTalk).
 *   **Monetization**: Tiered subscriptions and credit packs via Paystack.
 *   **Cloud Sync**: Persist your history and media via Supabase.
 *   **Voice Engine**: STT (Whisper) and TTS (Kokoro) with 28 premium voices.
 
-## 📊 Status: Phase 3 Started
+## 📊 Status: Phase 3 In Progress (see ROADMAP.md / PROGRESS_REPORT.md)
+
+**Major additions since v2:** Photoshop Corner full canvas editor (5-phase upgrade: selections, layers w/ effects/groups/masks, clone/heal/retouch, rulers/guides/snapping, export presets) + LTX 2.5 video (LTX 2.3 removed) + SEO (sitemap/robots/llms.txt).
 
 **Phase 1 (Monetization & Foundation): ✅ 100% COMPLETE**
 *   Clerk Auth 

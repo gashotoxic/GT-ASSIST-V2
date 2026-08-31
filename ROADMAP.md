@@ -13,7 +13,7 @@
 - [x] Image Generation (Qwen, Flux, Dreamshaper, Juggernaut, Ilustmix)
 - [x] Image Editing (Smart, Remove BG, Upscale, Style Transfer)
 - [x] Edit Chaining (Edit Again + Undo + Before/After)
-- [x] Video Generation (Wan 2.2 I2V/T2V, LTX-2)
+- [x] Video Generation (Wan 2.2 I2V / T2V, LTX 2.5 i2v/t2v — LTX 2.3 removed)
 - [x] Lip Sync (MuseTalk)
 - [x] Frame Capture from Video
 - [x] Media Gallery with Lightbox
@@ -38,15 +38,9 @@
 
 ## Next Up
 
-### 1. Add GLM 5.2 Model
-- Add to AVAILABLE_MODELS / model list in types.ts
-- Add credit cost entry
-- Wire into ChatInterface model selector
+### 1. Add GLM 5.2 Model — ✅ DONE (in production)
 
-### 2. Update LTX Video Model
-- New version of LTX (details TBD)
-- Update API endpoint if changed
-- Update model configuration
+### 2. Update LTX Video Model — ✅ DONE (LTX 2.5 shipped, LTX 2.3 removed)
 
 ### 3. Music/Audio Generation
 - New feature module in Media Studio
@@ -58,6 +52,16 @@
 - Render the user manual content as a styled HTML page
 - Source: /home/gasho/GT-ASSIST-V2-Manual.pdf (existing PDF manual)
 - Could be static MD→HTML or a proper route in the SPA
+
+### 5. Brand Chat — Generated Images to Gallery
+- Auto-save brand-chat generated images to Media Gallery
+- Add full-screen view button
+- Add "Send to Animate" button → routes image to Media > Animator for video generation
+- (Logged 2026-08-30, low priority)
+
+### 6. Add upcoming models (when they drop on Chutes)
+- DeepSeek V4 **Pro**
+- GLM **5.3**
 
 ## Notes
 
