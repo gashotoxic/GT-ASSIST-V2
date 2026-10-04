@@ -6,12 +6,14 @@ export type MediaGenerationState = {
   isGenerating: boolean;
   progress: number;
   error: string | null;
+  /** Transient status hint (e.g. a retry notice) shown alongside progress. */
+  status: string | null;
 };
 
 const DEFAULT_STATUS: Record<MediaGenType, MediaGenerationState> = {
-  image: { isGenerating: false, progress: 0, error: null },
-  edit: { isGenerating: false, progress: 0, error: null },
-  video: { isGenerating: false, progress: 0, error: null },
+  image: { isGenerating: false, progress: 0, error: null, status: null },
+  edit: { isGenerating: false, progress: 0, error: null, status: null },
+  video: { isGenerating: false, progress: 0, error: null, status: null },
 };
 
 export const useMediaGeneration = () => {
@@ -42,7 +44,7 @@ export const useMediaGeneration = () => {
     if (abortControllers.current[type]) abortControllers.current[type]?.abort();
     abortControllers.current[type] = new AbortController();
 
-    updateGenStatus(type, { isGenerating: true, progress: 0, error: null });
+    updateGenStatus(type, { isGenerating: true, progress: 0, error: null, status: null });
 
     return abortControllers.current[type]!.signal;
   }, [updateGenStatus]);

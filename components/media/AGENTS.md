@@ -16,3 +16,4 @@ Media generation interface where users create and edit images, videos, and anima
 - Image generation via Chutes API (vonkaiser-z-image-turbo)
 - Credit deduction per generation via deducCredits
 - Photoshop editor embedded as a tab within MediaStudio
+- Video generation retry hints surface through genStatus.video.status ("retrying n/3") in the existing progress row

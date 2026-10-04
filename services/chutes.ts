@@ -2,6 +2,7 @@
 import { Message, TTSRequest, STTRequest, ImageGenRequest, VideoGenRequest, ImageEditRequest, MuseTalkLipSyncRequest, SearchSource, ImageAspectRatio } from '../types';
 import { SearchAgent } from './searchAgent';
 import { isLtx25Model, buildLtx25GenerationInput } from './chutesLtx25';
+import { fetchWithRetry } from './retryFetch';
 
 const BASE_LLM_URL = 'https://llm.chutes.ai/v1/chat/completions';
 const BASE_TTS_URL = 'https://vonkaiser-audiodojo.chutes.ai/speak';
@@ -658,7 +659,11 @@ export class ChutesService {
     return await response.blob();
   }
 
-  async generateVideo(request: VideoGenRequest, signal?: AbortSignal): Promise<Blob> {
+  async generateVideo(
+    request: VideoGenRequest,
+    signal?: AbortSignal,
+    onRetry?: (retryNumber: number, maxRetries: number) => void
+  ): Promise<Blob> {
     let body: Record<string, unknown> = {};
 
     if (isLtx25Model(request.modelId)) {
@@ -693,12 +698,15 @@ export class ChutesService {
       };
     }
 
-    const response = await this.fetchWithRetry(request.modelUrl, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(body),
-      signal
-    });
+    const response = await fetchWithRetry(
+      request.modelUrl,
+      {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(body),
+      },
+      { signal, onRetry }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
