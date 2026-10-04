@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ClerkProvider } from '@clerk/clerk-react';
+import { Analytics } from '@vercel/analytics/react';
 import { AuthProvider } from './context/AuthContext';
 import { CreditProvider } from './context/CreditContext';
 import App from './App';
@@ -32,6 +33,7 @@ if (!clerkPublishableKey) {
         <AuthProvider>
           <CreditProvider>
             <App />
+            <Analytics />
           </CreditProvider>
         </AuthProvider>
       </ClerkProvider>
