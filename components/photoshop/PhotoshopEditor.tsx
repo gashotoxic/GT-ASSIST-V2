@@ -1083,6 +1083,8 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       if (!layer || !layer.dataUrl) return;
       if (cloneSourcePos.current === null) return;
       setIsDrawing(true);
+      strokeReady.current = false; // gate until image loads
+      strokeCanvas.current = null; // never draw on a stale canvas
       pushSnapshot(layers, cloneSettings.mode === 'heal' ? 'Healing brush' : 'Clone stamp');
       drawStartPos.current = { x: cx - layer.x, y: cy - layer.y };
       lastMousePos.current = { x: cx - layer.x, y: cy - layer.y };
@@ -1100,6 +1102,13 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         if (!ctx) return;
         ctx.clearRect(0, 0, strokeCanvas.current.width, strokeCanvas.current.height);
         ctx.drawImage(img, 0, 0);
+        strokeReady.current = true;
+        // Flush a deferred mouse-up commit if it fired while loading
+        if (strokePendingCommit.current) {
+          strokePendingCommit.current = false;
+          updateLayer(activeLayerId, { dataUrl: strokeCanvas.current!.toDataURL() });
+          strokeCanvas.current = null;
+        }
       };
       img.src = layer.dataUrl;
       return;
@@ -1110,6 +1119,8 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       const layer = layers.find(l => l.id === activeLayerId);
       if (!layer || !layer.dataUrl) return;
       setIsDrawing(true);
+      strokeReady.current = false; // gate until image loads
+      strokeCanvas.current = null; // never draw on a stale canvas
       const label = retouchSettings.mode === 'blur' ? 'Blur' : retouchSettings.mode === 'sharpen' ? 'Sharpen' : 'Smudge';
       pushSnapshot(layers, label);
       drawStartPos.current = { x: cx - layer.x, y: cy - layer.y };
@@ -1128,6 +1139,13 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
         if (!ctx) return;
         ctx.clearRect(0, 0, strokeCanvas.current.width, strokeCanvas.current.height);
         ctx.drawImage(img, 0, 0);
+        strokeReady.current = true;
+        // Flush a deferred mouse-up commit if it fired while loading
+        if (strokePendingCommit.current) {
+          strokePendingCommit.current = false;
+          updateLayer(activeLayerId, { dataUrl: strokeCanvas.current!.toDataURL() });
+          strokeCanvas.current = null;
+        }
       };
       img.src = layer.dataUrl;
       return;
@@ -1224,7 +1242,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       return;
     }
     // Clone stamp — paint from source offset
-    if (activeTool === 'clone' && isDrawing && activeLayerId && strokeCanvas.current && cloneSourcePos.current) {
+    if (activeTool === 'clone' && isDrawing && activeLayerId && strokeCanvas.current && strokeReady.current && cloneSourcePos.current) {
       const layer = layers.find(l => l.id === activeLayerId);
       if (!layer) return;
       const ctx = strokeCanvas.current.getContext('2d');
@@ -1239,7 +1257,7 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
       return;
     }
     // Retouch tool — blur/sharpen/smudge while moving
-    if (activeTool === 'retouch' && isDrawing && activeLayerId && strokeCanvas.current) {
+    if (activeTool === 'retouch' && isDrawing && activeLayerId && strokeCanvas.current && strokeReady.current) {
       const layer = layers.find(l => l.id === activeLayerId);
       if (!layer) return;
       const ctx = strokeCanvas.current.getContext('2d');
@@ -1296,15 +1314,25 @@ export const PhotoshopEditor: React.FC<PhotoshopEditorProps> = ({
     isDragging.current = false;
     // Finalize clone stamp stroke — commit to layer
     if (activeTool === 'clone' && activeLayerId && strokeCanvas.current) {
-      const dataUrl = strokeCanvas.current.toDataURL();
-      updateLayer(activeLayerId, { dataUrl });
-      strokeCanvas.current = null;
+      if (!strokeReady.current) {
+        // Image still loading — defer commit until onload completes
+        strokePendingCommit.current = true;
+      } else {
+        const dataUrl = strokeCanvas.current.toDataURL();
+        updateLayer(activeLayerId, { dataUrl });
+        strokeCanvas.current = null;
+      }
     }
     // Finalize retouch stroke — commit to layer
     if (activeTool === 'retouch' && activeLayerId && strokeCanvas.current) {
-      const dataUrl = strokeCanvas.current.toDataURL();
-      updateLayer(activeLayerId, { dataUrl });
-      strokeCanvas.current = null;
+      if (!strokeReady.current) {
+        // Image still loading — defer commit until onload completes
+        strokePendingCommit.current = true;
+      } else {
+        const dataUrl = strokeCanvas.current.toDataURL();
+        updateLayer(activeLayerId, { dataUrl });
+        strokeCanvas.current = null;
+      }
     }
     // Finalize brush/eraser stroke — commit to layer (or mask when painting on mask)
     if ((activeTool === 'brush' || activeTool === 'eraser') && activeLayerId && strokeCanvas.current) {
