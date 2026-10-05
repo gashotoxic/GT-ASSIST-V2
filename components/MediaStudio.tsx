@@ -610,7 +610,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                             {genStatus[activeTab as GenType]?.isGenerating && (
                                 <div className="animate-in fade-in slide-in-from-bottom-2 mt-4">
                                     <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1 px-1">
-                                        <span>Status: {Math.round(genStatus[activeTab as GenType].progress)}%</span>
+                                        <span>Status: {Math.round(genStatus[activeTab as GenType].progress)}%{genStatus[activeTab as GenType].status ? ` · ${genStatus[activeTab as GenType].status}` : ''}</span>
                                         <Button
                                             variant="destructive"
                                             size="sm"

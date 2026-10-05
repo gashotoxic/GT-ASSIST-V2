@@ -122,7 +122,7 @@ export const useMediaHandlers = ({
 
   startGeneration: (type: 'image' | 'edit' | 'video') => AbortSignal;
 
-  updateGenStatus: (type: 'image' | 'edit' | 'video', updates: { isGenerating?: boolean; progress?: number; error?: string | null }) => void;
+  updateGenStatus: (type: 'image' | 'edit' | 'video', updates: { isGenerating?: boolean; progress?: number; error?: string | null; status?: string | null }) => void;
 
   convertUrlToBase64: (url: string) => Promise<string>;
 
@@ -486,7 +486,11 @@ export const useMediaHandlers = ({
 
         } : undefined
 
-      }, signal);
+      }, signal, (retryNumber, maxRetries) => {
+
+        updateGenStatus('video', { status: `Chutes at capacity — retrying (${retryNumber}/${maxRetries})…` });
+
+      });
 
 
 
@@ -513,6 +517,8 @@ export const useMediaHandlers = ({
   }
 
     } finally {
+
+      updateGenStatus('video', { status: null });
 
       if (!signal.aborted) updateGenStatus('video', { isGenerating: false, progress: 100 });
 
