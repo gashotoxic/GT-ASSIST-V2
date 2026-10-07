@@ -8,15 +8,25 @@
  * migrated).
  *
  * - POST { targetUrl, body, userKey? } -> forwards a JSON POST to targetUrl.
- * - targetUrl must be https on chutes.ai / *.chutes.ai (allowlist = SSRF guard).
+ * - targetUrl must be https on port 443 at chutes.ai / *.chutes.ai (allowlist =
+ *   SSRF guard) and upstream redirects are not followed (keeps the injected
+ *   Authorization on-allowlist).
  * - userKey is an optional BYOK key; when absent the platform key is used.
  * - The upstream response (status, content-type, body incl. SSE streams and
  *   binary blobs) is passed straight through.
+ * - Guards: browser-Origin allowlist (lib/apiGuard) + per-IP rate limiting.
+ *
+ * HANDLER SIGNATURE: Vercel requires named method exports (`export function
+ * POST(request: Request)`) or `export default { fetch() {} }` for the web
+ * standard — a plain default-exported function is never invoked and the
+ * function 504s. Verified against https://vercel.com/docs/functions/runtimes/node-js
  */
 
 // 60s is deploy-safe on every Vercel plan (Hobby cap). Raise to 300 on Pro if
 // long media generations need more headroom.
 export const config = { maxDuration: 60, supportsResponseStreaming: true };
+
+import { guardOrigin, guardRateLimit } from '../lib/apiGuard';
 
 const PLATFORM_HOST = 'chutes.ai';
 
@@ -35,6 +45,7 @@ const isAllowedTarget = (raw: unknown): raw is string => {
     return false;
   }
   if (url.protocol !== 'https:') return false;
+  if (url.port !== '' && url.port !== '443') return false;
   const host = url.hostname.toLowerCase();
   return host === PLATFORM_HOST || host.endsWith(`.${PLATFORM_HOST}`);
 };
@@ -46,10 +57,9 @@ const resolveApiKey = (userKey: unknown): string | undefined => {
   return process.env.CHUTES_API_KEY || process.env.VITE_CHUTES_API_KEY || undefined;
 };
 
-export default async function handler(request: Request): Promise<Response> {
-  if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405);
-  }
+export async function POST(request: Request): Promise<Response> {
+  const blocked = guardOrigin(request) ?? guardRateLimit(request, 'chutes', 60);
+  if (blocked) return blocked;
 
   let payload: { targetUrl?: unknown; body?: unknown; userKey?: unknown };
   try {
@@ -77,6 +87,7 @@ export default async function handler(request: Request): Promise<Response> {
       },
       body: JSON.stringify(payload.body ?? {}),
       signal: request.signal,
+      redirect: 'manual',
     });
   } catch (error) {
     if ((error as Error).name === 'AbortError') {
@@ -90,4 +101,8 @@ export default async function handler(request: Request): Promise<Response> {
   if (contentType) headers.set('Content-Type', contentType);
 
   return new Response(upstream.body, { status: upstream.status, headers });
+}
+
+export function GET(): Response {
+  return json({ error: 'Method not allowed' }, 405);
 }

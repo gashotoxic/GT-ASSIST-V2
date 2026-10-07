@@ -401,16 +401,20 @@ export class KnowledgeBaseService {
         limit: number = 5,
         threshold: number = 0.7
     ): Promise<SearchResult[]> {
-        // Generate embedding for query
-        const response = await fetch(EMBEDDING_URL, {
+        // Generate embedding for query (via the server-side proxy — never a
+        // client-built Authorization header)
+        const response = await fetch('/api/chutes', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${this.chutesApiKey}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                model: EMBEDDING_MODEL,
-                input: query,
+                targetUrl: EMBEDDING_URL,
+                body: {
+                    model: EMBEDDING_MODEL,
+                    input: query,
+                },
+                userKey: this.chutesApiKey || undefined,
             }),
         });
 

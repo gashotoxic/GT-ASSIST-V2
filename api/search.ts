@@ -11,9 +11,17 @@
  * - GET -> capability probe: { tavily: boolean, brave: boolean } (whether a
  *   platform key exists for each provider; never exposes key material).
  * - userKey is an optional BYOK key; when absent the platform key is used.
+ * - Guards: browser-Origin allowlist (lib/apiGuard) + per-IP rate limiting.
+ *
+ * HANDLER SIGNATURE: Vercel requires named method exports (`export function
+ * GET/POST(request: Request)`) — a plain default-exported function is never
+ * invoked and the function 504s. Verified against
+ * https://vercel.com/docs/functions/runtimes/node-js
  */
 
-export const config = { maxDuration: 30 };
+export const config = { maxDuration: 30, supportsResponseStreaming: true };
+
+import { guardOrigin, guardRateLimit } from '../lib/apiGuard';
 
 const json = (data: unknown, status = 200): Response =>
   new Response(JSON.stringify(data), {
@@ -48,6 +56,7 @@ const runTavily = async (
       include_domains: [],
       exclude_domains: [],
     }),
+    redirect: 'manual',
   });
   return new Response(upstream.body, {
     status: upstream.status,
@@ -66,6 +75,7 @@ const runBrave = async (key: string, query: string, maxResults: number): Promise
       'Accept': 'application/json',
       'X-Subscription-Token': key,
     },
+    redirect: 'manual',
   });
   return new Response(upstream.body, {
     status: upstream.status,
@@ -73,17 +83,22 @@ const runBrave = async (key: string, query: string, maxResults: number): Promise
   });
 };
 
-export default async function handler(request: Request): Promise<Response> {
-  if (request.method === 'GET') {
-    return json({
-      tavily: Boolean(resolveKey('tavily', undefined)),
-      brave: Boolean(resolveKey('brave', undefined)),
-    });
-  }
+export function GET(request: Request): Response {
+  const blocked = guardOrigin(request) ?? guardRateLimit(request, 'search', 120);
+  if (blocked) return blocked;
+  return json({
+    tavily: Boolean(resolveKey('tavily', undefined)),
+    brave: Boolean(resolveKey('brave', undefined)),
+  });
+}
 
-  if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405);
-  }
+export function PUT(): Response {
+  return json({ error: 'Method not allowed' }, 405);
+}
+
+export async function POST(request: Request): Promise<Response> {
+  const blocked = guardOrigin(request) ?? guardRateLimit(request, 'search', 60);
+  if (blocked) return blocked;
 
   let payload: {
     provider?: unknown;
