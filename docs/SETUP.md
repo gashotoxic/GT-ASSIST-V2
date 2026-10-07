@@ -33,7 +33,7 @@ VITE_PAYSTACK_PUBLIC_KEY=pk_test_...
 **Server (Vercel project environment variables — never sent to the browser):**
 
 ```env
-CHUTES_API_KEY=your_chutes_secret   # required for AI features (legacy VITE_CHUTES_API_KEY still works as a transitional server-side fallback)
+CHUTES_API_KEY=your_chutes_secret   # required for AI features
 TAVILY_API_KEY=tvly-...             # optional platform web search (legacy VITE_TAVILY_API_KEY fallback)
 BRAVE_API_KEY=...                   # optional platform web search (legacy VITE_BRAVE_API_KEY fallback)
 ```
