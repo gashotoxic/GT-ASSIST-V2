@@ -102,9 +102,10 @@ const isAllowedTarget = (raw: unknown): raw is string => {
 
 const resolveApiKey = (userKey: unknown): string | undefined => {
   if (typeof userKey === 'string' && userKey.trim().length > 0) return userKey.trim();
-  // Transitional fallback: same secret, legacy env name. Migrate to
-  // CHUTES_API_KEY in Vercel and delete the VITE_ variant.
-  return process.env.CHUTES_API_KEY || process.env.VITE_CHUTES_API_KEY || undefined;
+  // Server-side only. The public VITE_ variant was removed after the 2026-10-07
+  // key-leak sweep (Vite inlines VITE_* vars into the public client bundle).
+  // Set CHUTES_API_KEY in Vercel env (server scope). Never reintroduce a VITE_ secret.
+  return process.env.CHUTES_API_KEY || undefined;
 };
 
 export async function POST(request: Request): Promise<Response> {
