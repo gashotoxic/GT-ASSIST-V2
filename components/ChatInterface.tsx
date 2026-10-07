@@ -192,9 +192,30 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Check if search is actually available based on keys
-  const canSearch = (settings.searchProvider === 'tavily' && !!(settings.tavilyApiKey || import.meta.env.VITE_TAVILY_API_KEY)) ||
-    (settings.searchProvider === 'brave' && !!(settings.braveApiKey || import.meta.env.VITE_BRAVE_API_KEY));
+  // Platform search keys live server-side (/api/search); probe once so the
+  // toggle reflects reality without any key material reaching the client.
+  const [platformSearch, setPlatformSearch] = useState<{ tavily: boolean; brave: boolean }>({ tavily: false, brave: false });
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/search')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data && typeof data === 'object') {
+          setPlatformSearch({
+            tavily: Boolean((data as { tavily?: unknown }).tavily),
+            brave: Boolean((data as { brave?: unknown }).brave),
+          });
+        }
+      })
+      .catch(() => void 0);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Check if search is actually available: user BYOK key or platform key
+  const canSearch = (settings.searchProvider === 'tavily' && !!(settings.tavilyApiKey || platformSearch.tavily)) ||
+    (settings.searchProvider === 'brave' && !!(settings.braveApiKey || platformSearch.brave));
   const isHoverPointer = typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
   // Cleanup effect when sessionId changes (Stop generation/audio)
@@ -328,7 +349,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
     chatMode,
     brandToolsEnabled,
     subscriptionTier,
-    isSearchEnabled,
+    isSearchEnabled: isSearchEnabled && canSearch,
     isKnowledgeEnabled,
     brandPromptText,
     knowledgeService,

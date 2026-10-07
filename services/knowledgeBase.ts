@@ -70,7 +70,7 @@ export class KnowledgeBaseService {
     constructor(settings: AppSettings) {
         this.supabaseUrl = settings.supabaseUrl || import.meta.env.VITE_APP_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL || '';
         this.supabaseKey = settings.supabaseKey || import.meta.env.VITE_APP_SUPABASE_KEY || import.meta.env.VITE_SUPABASE_KEY || '';
-        this.chutesApiKey = settings.apiKey || import.meta.env.VITE_CHUTES_API_KEY || '';
+        this.chutesApiKey = settings.apiKey || '';
     }
 
     // ===========================================================================
@@ -276,15 +276,18 @@ export class KnowledgeBaseService {
         for (let i = 0; i < chunks.length; i += batchSize) {
             const batch = chunks.slice(i, i + batchSize);
 
-            const response = await fetch(EMBEDDING_URL, {
+            const response = await fetch('/api/chutes', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${this.chutesApiKey}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    model: EMBEDDING_MODEL,
-                    input: batch,
+                    targetUrl: EMBEDDING_URL,
+                    body: {
+                        model: EMBEDDING_MODEL,
+                        input: batch,
+                    },
+                    userKey: this.chutesApiKey || undefined,
                 }),
             });
 

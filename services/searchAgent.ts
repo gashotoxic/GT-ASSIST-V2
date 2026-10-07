@@ -200,52 +200,48 @@ export class SearchAgent {
     private async executeSearch(query: string, strategy: SearchStrategy): Promise<SearchResult[]> {
         const maxResults = strategy === 'research' ? 8 : strategy === 'quick' ? 3 : 5;
 
-        // Try preferred provider first
+        // Try preferred provider first. Keys may be user-supplied (BYOK) or
+        // platform keys held server-side by the /api/search proxy, so provider
+        // availability is decided by the proxy, not by local key presence.
         try {
-            if (this.config.preferredProvider === 'tavily' && this.config.tavilyApiKey) {
+            if (this.config.preferredProvider === 'tavily') {
                 return await this.searchTavily(query, maxResults, strategy);
-            } else if (this.config.braveApiKey) {
-                return await this.searchBrave(query, maxResults);
             }
+            return await this.searchBrave(query, maxResults);
         } catch (primaryError) {
             console.warn(`Primary search (${this.config.preferredProvider}) failed:`, primaryError);
         }
 
         // Fallback to other provider
         try {
-            if (this.config.preferredProvider === 'tavily' && this.config.braveApiKey) {
+            if (this.config.preferredProvider === 'tavily') {
                 return await this.searchBrave(query, maxResults);
-            } else if (this.config.tavilyApiKey) {
-                return await this.searchTavily(query, maxResults, strategy);
             }
+            return await this.searchTavily(query, maxResults, strategy);
         } catch (fallbackError) {
             console.warn('Fallback search failed:', fallbackError);
-            throw new Error('All search providers failed');
+            throw new Error(`All search providers failed: ${fallbackError instanceof Error ? fallbackError.message : 'unknown error'}`);
         }
-
-        throw new Error('No valid search API key configured');
     }
 
     /**
-     * Search using Tavily API
+     * Search using Tavily API (via the server-side /api/search proxy, which
+     * injects the API key so it never reaches the browser)
      */
     private async searchTavily(query: string, maxResults: number, strategy: SearchStrategy): Promise<SearchResult[]> {
         const searchDepth = strategy === 'research' ? 'advanced' : 'basic';
 
-        const response = await fetch('https://api.tavily.com/search', {
+        const response = await fetch('/api/search', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                api_key: this.config.tavilyApiKey,
+                provider: 'tavily',
                 query,
-                search_depth: searchDepth,
-                include_answer: true,
-                include_raw_content: false,
-                max_results: maxResults,
-                include_domains: [],
-                exclude_domains: [],
+                searchDepth,
+                maxResults,
+                userKey: this.config.tavilyApiKey || undefined,
             }),
         });
 
@@ -266,18 +262,21 @@ export class SearchAgent {
     }
 
     /**
-     * Search using Brave API (via CORS proxy)
+     * Search using Brave API (via the server-side /api/search proxy, which
+     * injects the API key so it never reaches the browser)
      */
     private async searchBrave(query: string, maxResults: number): Promise<SearchResult[]> {
-        const targetUrl = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${maxResults}`;
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-
-        const response = await fetch(proxyUrl, {
-            method: 'GET',
+        const response = await fetch('/api/search', {
+            method: 'POST',
             headers: {
-                'Accept': 'application/json',
-                'X-Subscription-Token': this.config.braveApiKey || '',
+                'Content-Type': 'application/json',
             },
+            body: JSON.stringify({
+                provider: 'brave',
+                query,
+                maxResults,
+                userKey: this.config.braveApiKey || undefined,
+            }),
         });
 
         if (!response.ok) {
