@@ -165,11 +165,14 @@ export const useChatSendMessage = ({
       let fullResponse = '';
       let fullThinking = '';
 
+      const providerKey = settings.searchProvider === 'brave'
+        ? (settings.braveApiKey || '')
+        : (settings.tavilyApiKey || '');
       const searchConfig = {
         enabled: isSearchEnabled,
-        apiKey: settings.searchProvider === 'brave'
-          ? (settings.braveApiKey || import.meta.env.VITE_BRAVE_API_KEY || '')
-          : (settings.tavilyApiKey || import.meta.env.VITE_TAVILY_API_KEY || ''),
+        // BYOK key only; platform search keys live server-side and are injected
+        // by the /api/search proxy.
+        'apiKey': providerKey,
         provider: settings.searchProvider
       };
 

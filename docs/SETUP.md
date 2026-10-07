@@ -14,12 +14,11 @@ Complete setup instructions for GT Assistant including environment configuration
 
 ## 🔑 Environment Variables
 
-Create a `.env.local` file:
+`VITE_*` variables are inlined into the PUBLIC client bundle at build time — only PUBLISHABLE values (Clerk `pk_`, Supabase anon key, Paystack `pk_`) may carry that prefix. Secrets must never be `VITE_`-prefixed: they are read server-side by the `api/` proxy routes (`api/chutes.ts`, `api/search.ts`) and injected into upstream requests there.
+
+**Client (`.env.local` — publishable only):**
 
 ```env
-# AI INFERENCE
-VITE_CHUTES_API_KEY=your_key
-
 # AUTHENTICATION (CLERK)
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 
@@ -30,6 +29,16 @@ VITE_SUPABASE_KEY=your_anon_key
 # PAYMENTS (PAYSTACK)
 VITE_PAYSTACK_PUBLIC_KEY=pk_test_...
 ```
+
+**Server (Vercel project environment variables — never sent to the browser):**
+
+```env
+CHUTES_API_KEY=your_chutes_secret   # required for AI features (legacy VITE_CHUTES_API_KEY still works as a transitional server-side fallback)
+TAVILY_API_KEY=tvly-...             # optional platform web search (legacy VITE_TAVILY_API_KEY fallback)
+BRAVE_API_KEY=...                   # optional platform web search (legacy VITE_BRAVE_API_KEY fallback)
+```
+
+> **Local dev:** plain `npm run dev` (Vite) does not serve the `api/` routes, so AI/search calls will 404 locally. Use `vercel dev`, or push a branch and test on the Vercel preview. `npm run build` fails if any key shape lands in `dist/` (secret scan); `npm run test:api` verifies the proxy contract.
 
 ---
 

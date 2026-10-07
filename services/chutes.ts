@@ -9,22 +9,30 @@ const BASE_TTS_URL = 'https://vonkaiser-audiodojo.chutes.ai/speak';
 const BASE_STT_URL = 'https://vonkaiser-audiodojo.chutes.ai/stt/whisper';
 const BASE_MUSETALK_URL = 'https://chutes-musetalk.chutes.ai/generate';
 
-export class ChutesService {
-  private apiKey: string;
+// Server-side Chutes proxy (api/chutes.ts). All Chutes traffic goes through it
+// so the API key stays in server env vars and never ships in the client bundle.
+const PROXY_URL = '/api/chutes';
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+export class ChutesService {
+  private key: string;
+
+  constructor(key: string) {
+    this.key = key;
   }
 
-  private getHeaders() {
-    let key = this.apiKey;
-    if (!key || key === 'internal') {
-      key = import.meta.env.VITE_CHUTES_API_KEY || '';
-    }
-    return {
-      'Authorization': `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    };
+  /** BYOK key when the user supplied one; otherwise the proxy injects the platform key. */
+  private get userKey(): string | undefined {
+    if (!this.key || this.key === 'internal') return undefined;
+    return this.key;
+  }
+
+  private proxyFetch(targetUrl: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+    return this.fetchWithRetry(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetUrl, body, userKey: this.userKey }),
+      signal,
+    });
   }
 
   // Helper for exponential backoff retry logic
@@ -162,7 +170,9 @@ export class ChutesService {
     // Setup Tools
     const tools: Record<string, unknown>[] = [];
 
-    if (searchConfig?.enabled && searchConfig?.apiKey && searchConfig.apiKey.length > 5) {
+    // The web_search tool runs whenever search is enabled: API keys (user BYOK
+    // or platform) are resolved server-side by the /api/search proxy.
+    if (searchConfig?.enabled && searchConfig?.provider) {
       tools.push({
         type: "function",
         function: {
@@ -237,12 +247,7 @@ export class ChutesService {
       body.tools = toolsPayload;
     }
 
-    const response = await this.fetchWithRetry(BASE_LLM_URL, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(body),
-      signal
-    });
+    const response = await this.proxyFetch(BASE_LLM_URL, body, signal);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -337,7 +342,7 @@ export class ChutesService {
                   const rawArgs = call.function.arguments || '{}';
 
                   if (toolName === 'web_search') {
-                    if (!searchConfig?.enabled || !searchConfig.apiKey || searchConfig.apiKey.length <= 5) {
+                    if (!searchConfig?.enabled || !searchConfig.provider) {
                       newMessages.push({
                         role: 'tool',
                         tool_call_id: call.id,
@@ -458,14 +463,10 @@ export class ChutesService {
       throw new Error("Text is empty");
     }
 
-    const response = await this.fetchWithRetry(BASE_TTS_URL, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify({
-        text: request.text,
-        speed: request.speed,
-        voice: request.voice
-      }),
+    const response = await this.proxyFetch(BASE_TTS_URL, {
+      text: request.text,
+      speed: request.speed,
+      voice: request.voice
     });
 
     if (!response.ok) {
@@ -477,13 +478,9 @@ export class ChutesService {
   }
 
   async transcribe(request: STTRequest): Promise<string> {
-    const response = await this.fetchWithRetry(BASE_STT_URL, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify({
-        audio_b64: request.audio_b64,
-        language: request.language
-      }),
+    const response = await this.proxyFetch(BASE_STT_URL, {
+      audio_b64: request.audio_b64,
+      language: request.language
     });
 
     if (!response.ok) {
@@ -557,12 +554,7 @@ export class ChutesService {
       };
     }
 
-    const response = await this.fetchWithRetry(request.modelUrl, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(body),
-      signal
-    });
+    const response = await this.proxyFetch(request.modelUrl, body, signal);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -590,12 +582,7 @@ export class ChutesService {
       num_inference_steps: 40
     };
 
-    const response = await this.fetchWithRetry(request.modelUrl, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(body),
-      signal
-    });
+    const response = await this.proxyFetch(request.modelUrl, body, signal);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -644,12 +631,7 @@ export class ChutesService {
       num_inference_steps: mode === 'remove_bg' ? 30 : mode === 'upscale' ? 50 : 40
     };
 
-    const response = await this.fetchWithRetry(request.modelUrl, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(body),
-      signal
-    });
+    const response = await this.proxyFetch(request.modelUrl, body, signal);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -699,11 +681,11 @@ export class ChutesService {
     }
 
     const response = await fetchWithRetry(
-      request.modelUrl,
+      PROXY_URL,
       {
         method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUrl: request.modelUrl, body, userKey: this.userKey }),
       },
       { signal, onRetry }
     );
@@ -736,12 +718,7 @@ export class ChutesService {
     };
 
     const doRequest = async (body: unknown) => {
-      return this.fetchWithRetry(request.modelUrl || BASE_MUSETALK_URL, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(body),
-        signal
-      });
+      return this.proxyFetch(request.modelUrl || BASE_MUSETALK_URL, body, signal);
     };
 
     let response = await doRequest(payload);

@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/scan-dist-secrets.mjs",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "scan:secrets": "node scripts/scan-dist-secrets.mjs",
+    "test:api": "node scripts/api_smoke.mjs"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.3",

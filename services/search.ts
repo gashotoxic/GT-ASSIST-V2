@@ -18,17 +18,19 @@ export class SearchService {
 
   private async searchTavily(query: string): Promise<string> {
     try {
-      const response = await fetch('https://api.tavily.com/search', {
+      // Via the server-side /api/search proxy: the API key (BYOK or platform)
+      // is injected there and never reaches the browser or third parties.
+      const response = await fetch('/api/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          api_key: this.apiKey,
-          query: query,
-          search_depth: "basic",
-          include_answer: true,
-          max_results: 3
+          provider: 'tavily',
+          query,
+          searchDepth: 'basic',
+          maxResults: 3,
+          userKey: this.apiKey || undefined,
         }),
       });
 
@@ -51,17 +53,19 @@ export class SearchService {
 
   private async searchBrave(query: string): Promise<string> {
     try {
-      // Direct call to Brave API usually fails in browser due to CORS.
-      // We route through a CORS proxy for this client-side application.
-      const targetUrl = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=3`;
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-
-      const response = await fetch(proxyUrl, {
-        method: 'GET',
+      // Via the server-side /api/search proxy: the API key (BYOK or platform)
+      // is injected there and never reaches the browser or third parties.
+      const response = await fetch('/api/search', {
+        method: 'POST',
         headers: {
-          'Accept': 'application/json',
-          'X-Subscription-Token': this.apiKey
-        }
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'brave',
+          query,
+          maxResults: 3,
+          userKey: this.apiKey || undefined,
+        }),
       });
 
       if (!response.ok) {
