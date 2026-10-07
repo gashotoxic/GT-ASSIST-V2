@@ -26,7 +26,57 @@
 // long media generations need more headroom.
 export const config = { maxDuration: 60, supportsResponseStreaming: true };
 
-import { guardOrigin, guardRateLimit } from '../lib/apiGuard';
+// ---- Request guards (INLINED on purpose: Vercel does not bundle relative
+// cross-directory imports for /api functions — a shared module fails at
+// runtime with ERR_MODULE_NOT_FOUND. Keep in sync with api/search.ts.) ----
+
+const ALLOWED_ORIGINS = new Set([
+  'https://create.gashotech.com',
+  'https://gashotech.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+]);
+
+/** 403 when a browser Origin is present and not ours; null when allowed. */
+const guardOrigin = (request: Request): Response | null => {
+  const origin = request.headers.get('origin');
+  if (!origin) return null;
+  if (ALLOWED_ORIGINS.has(origin)) return null;
+  try {
+    if (new URL(origin).hostname.endsWith('.vercel.app')) return null; // our previews
+  } catch {
+    // fall through to reject
+  }
+  return json({ error: 'Origin not allowed' }, 403);
+};
+
+const WINDOW_MS = 60_000;
+const rateBuckets = new Map<string, number[]>();
+
+/** Per-IP sliding window (per instance) — defence-in-depth, not auth. */
+const guardRateLimit = (request: Request, bucket: string, maxPerMinute = 60): Response | null => {
+  const fwd = request.headers.get('x-forwarded-for');
+  const ip = (fwd ? fwd.split(',')[0].trim() : '') || 'unknown';
+  const key = `${bucket}:${ip}`;
+  const now = Date.now();
+  if (rateBuckets.size > 2000) {
+    for (const [k, hits] of rateBuckets) {
+      if (hits.length === 0 || now - hits[hits.length - 1] > 2 * WINDOW_MS) rateBuckets.delete(k);
+    }
+  }
+  const hits = (rateBuckets.get(key) || []).filter((t) => now - t < WINDOW_MS);
+  if (hits.length >= maxPerMinute) {
+    rateBuckets.set(key, hits);
+    return new Response(JSON.stringify({ error: 'Rate limit exceeded, retry shortly' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
+    });
+  }
+  hits.push(now);
+  rateBuckets.set(key, hits);
+  return null;
+};
+// ---- End request guards ----
 
 const PLATFORM_HOST = 'chutes.ai';
 
