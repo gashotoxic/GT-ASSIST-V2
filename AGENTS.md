@@ -86,8 +86,16 @@ Default section order:
 - **Coding style:** conventional commits, tests before pushing, DOX pass after changes
 - **Photoshop Corner v2:** manual client-side editing is primary, AI is secondary
 
+## Security Contract
+
+- No API secret ever appears in client code or the built bundle: `import.meta.env.VITE_*` is for publishable keys only (Clerk, Supabase anon, Paystack public). Server secrets live in plain-named env vars (`CHUTES_API_KEY`, `TAVILY_API_KEY`, `BRAVE_API_KEY`) and are read only inside `api/`.
+- `/api/chutes` and `/api/search` POSTs require a Clerk session JWT, verified server-side against Clerk's JWKS (`node:crypto`, no deps); every proxy-generated error carries `X-Proxy-Error: 1`.
+- `npm run build` fails when `scripts/scan-dist-secrets.mjs` finds any key shape in `dist/`.
+- `npm run test:api` re-verifies the proxy contract incl. auth positive controls.
+
 ## Child DOX Index
 
+- [api/](./api/AGENTS.md) -- Server-side proxy routes (secret isolation + session auth)
 - [components/](./components/AGENTS.md) -- React UI components
   - [chat/](./components/chat/AGENTS.md) -- Chat Interface
   - [media/](./components/media/AGENTS.md) -- Media Studio

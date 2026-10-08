@@ -13,5 +13,6 @@ Main conversational AI interface where users interact with AI assistants.
 ## Local Contracts
 
 - Messages flow through ChatInterface.tsx to ChatComposer.tsx
-- AI responses via Chutes API (llm.chutes.ai/v1/chat/completions)
+- AI responses via the /api/chutes proxy -> llm.chutes.ai/v1/chat/completions (Clerk session auth + platform key injected server-side; BYOK keys forwarded as userKey)
+- Web search via /api/search proxy; the composer search toggle gates on the GET /api/search capability probe + BYOK keys (probe is unauthenticated, booleans only)
 - Auth: Clerk-based user session
