@@ -3,9 +3,7 @@
  *
  * SECURITY CONTRACT: the Chutes API key NEVER reaches the browser. All Chutes
  * calls from the client go through this route; the Authorization header is
- * injected here from server-side environment variables (CHUTES_API_KEY, with a
- * transitional fallback to VITE_CHUTES_API_KEY until the Vercel env is
- * migrated).
+ * injected here from a server-side environment variable (CHUTES_API_KEY).
  *
  * - POST { targetUrl, body, userKey? } -> forwards a JSON POST to targetUrl.
  * - targetUrl must be https on port 443 at chutes.ai / *.chutes.ai (allowlist =
@@ -14,7 +12,8 @@
  * - userKey is an optional BYOK key; when absent the platform key is used.
  * - The upstream response (status, content-type, body incl. SSE streams and
  *   binary blobs) is passed straight through.
- * - Guards: browser-Origin allowlist (lib/apiGuard) + per-IP rate limiting.
+ * - Guards: browser-Origin allowlist + per-IP rate limiting (inlined in this
+ *   file — see the request-guards section below).
  *
  * HANDLER SIGNATURE: Vercel requires named method exports (`export function
  * POST(request: Request)`) or `export default { fetch() {} }` for the web

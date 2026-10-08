@@ -1,8 +1,13 @@
 # DOX PENDING — Chutes proxy security change (branch fix/chutes-server-proxy)
 
 AGENTS.md writes are approval-gated and could not be applied by the unattended
-worker (kanban task t_babf09d8, 2026-10-07). The exact deltas below are ready to
-paste in an interactive session. Apply, then DELETE this file.
+worker (kanban task t_babf09d8, 2026-10-10-07; re-confirmed still gated 2026-10-08,
+run 14). The exact deltas below are ready to paste in an interactive session.
+Apply, then DELETE this file.
+
+Refreshed 2026-10-08 after the `5457c40` sweep removed the legacy
+`VITE_CHUTES_API_KEY` fallback from `api/chutes.ts` — the staged wording below
+now reflects that (search's transitional `VITE_` fallbacks remain).
 
 ---
 

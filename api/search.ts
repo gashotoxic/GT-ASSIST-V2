@@ -11,7 +11,8 @@
  * - GET -> capability probe: { tavily: boolean, brave: boolean } (whether a
  *   platform key exists for each provider; never exposes key material).
  * - userKey is an optional BYOK key; when absent the platform key is used.
- * - Guards: browser-Origin allowlist (lib/apiGuard) + per-IP rate limiting.
+ * - Guards: browser-Origin allowlist + per-IP rate limiting (inlined in this
+ *   file — see the request-guards section below).
  *
  * HANDLER SIGNATURE: Vercel requires named method exports (`export function
  * GET/POST(request: Request)`) — a plain default-exported function is never
