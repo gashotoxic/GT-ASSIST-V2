@@ -75,8 +75,12 @@ export async function fetchWithRetry(
 
     const response = await fetch(url, { ...init, signal: effectiveSignal ?? null });
 
+    // The proxy marks its own error responses with X-Proxy-Error: 1 (e.g. the
+    // permanent "key not configured" 503) — retrying those is pure waste.
+    // Upstream passthroughs carry no such header and stay retryable.
+    const proxyGenerated = response.headers.get('x-proxy-error') === '1';
     const isRetryable =
-      response.status === 429 || (retryOn503 && response.status === 503);
+      !proxyGenerated && (response.status === 429 || (retryOn503 && response.status === 503));
 
     if (!isRetryable || attempt >= maxRetries) {
       return response;

@@ -1,4 +1,6 @@
 
+import { authHeaders } from './authToken';
+
 export class SearchService {
   private apiKey: string;
   private provider: 'tavily' | 'brave';
@@ -24,6 +26,7 @@ export class SearchService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(await authHeaders()),
         },
         body: JSON.stringify({
           provider: 'tavily',
@@ -59,6 +62,7 @@ export class SearchService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(await authHeaders()),
         },
         body: JSON.stringify({
           provider: 'brave',

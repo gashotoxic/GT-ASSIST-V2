@@ -8,6 +8,8 @@
  * - Provides clean source metadata for UI rendering
  */
 
+import { authHeaders } from './authToken';
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -235,6 +237,7 @@ export class SearchAgent {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                ...(await authHeaders()),
             },
             body: JSON.stringify({
                 provider: 'tavily',
@@ -270,6 +273,7 @@ export class SearchAgent {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                ...(await authHeaders()),
             },
             body: JSON.stringify({
                 provider: 'brave',

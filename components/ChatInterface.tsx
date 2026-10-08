@@ -194,28 +194,37 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ settings, sessionId, onSe
 
   // Platform search keys live server-side (/api/search); probe once so the
   // toggle reflects reality without any key material reaching the client.
-  const [platformSearch, setPlatformSearch] = useState<{ tavily: boolean; brave: boolean }>({ tavily: false, brave: false });
+  // null = probe still pending (see canSearch below — no false "unavailable").
+  const [platformSearch, setPlatformSearch] = useState<{ tavily: boolean; brave: boolean } | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetch('/api/search')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!cancelled && data && typeof data === 'object') {
-          setPlatformSearch({
-            tavily: Boolean((data as { tavily?: unknown }).tavily),
-            brave: Boolean((data as { brave?: unknown }).brave),
-          });
+        if (!cancelled) {
+          setPlatformSearch(
+            data && typeof data === 'object'
+              ? {
+                  tavily: Boolean((data as { tavily?: unknown }).tavily),
+                  brave: Boolean((data as { brave?: unknown }).brave),
+                }
+              : { tavily: false, brave: false }
+          );
         }
       })
-      .catch(() => void 0);
+      .catch(() => {
+        if (!cancelled) setPlatformSearch({ tavily: false, brave: false });
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // Check if search is actually available: user BYOK key or platform key
-  const canSearch = (settings.searchProvider === 'tavily' && !!(settings.tavilyApiKey || platformSearch.tavily)) ||
-    (settings.searchProvider === 'brave' && !!(settings.braveApiKey || platformSearch.brave));
+  // Check if search is actually available: user BYOK key or platform key.
+  // While the probe is pending stay optimistic — rendering "unavailable"
+  // before the GET resolves is a false claim.
+  const canSearch = (settings.searchProvider === 'tavily' && !!(settings.tavilyApiKey || (platformSearch?.tavily ?? true))) ||
+    (settings.searchProvider === 'brave' && !!(settings.braveApiKey || (platformSearch?.brave ?? true)));
   const isHoverPointer = typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
   // Cleanup effect when sessionId changes (Stop generation/audio)

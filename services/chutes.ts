@@ -3,6 +3,7 @@ import { Message, TTSRequest, STTRequest, ImageGenRequest, VideoGenRequest, Imag
 import { SearchAgent } from './searchAgent';
 import { isLtx25Model, buildLtx25GenerationInput } from './chutesLtx25';
 import { fetchWithRetry } from './retryFetch';
+import { authHeaders } from './authToken';
 
 const BASE_LLM_URL = 'https://llm.chutes.ai/v1/chat/completions';
 const BASE_TTS_URL = 'https://vonkaiser-audiodojo.chutes.ai/speak';
@@ -26,10 +27,10 @@ export class ChutesService {
     return this.key;
   }
 
-  private proxyFetch(targetUrl: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+  private async proxyFetch(targetUrl: string, body: unknown, signal?: AbortSignal): Promise<Response> {
     return this.fetchWithRetry(PROXY_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ targetUrl, body, userKey: this.userKey }),
       signal,
     });
@@ -40,8 +41,11 @@ export class ChutesService {
     try {
       const response = await fetch(url, options);
 
-      // Retry on 429 (Too Many Requests) or 5xx (Server Errors)
-      if (!response.ok && (response.status === 429 || response.status >= 500)) {
+      // Retry on 429 (Too Many Requests) or 5xx (Server Errors) — except the
+      // proxy's own permanent errors (X-Proxy-Error: 1, e.g. the "key not
+      // configured" 503): retrying those only wastes the backoff budget.
+      const proxyGenerated = response.headers.get('x-proxy-error') === '1';
+      if (!response.ok && !proxyGenerated && (response.status === 429 || response.status >= 500)) {
         if (retries > 0) {
           const delay = initialDelay * Math.pow(2, 3 - retries); // 1s, 2s, 4s
           await new Promise(resolve => setTimeout(resolve, delay));
@@ -363,7 +367,22 @@ export class ChutesService {
                     });
 
                     if (onStatusChange) onStatusChange(`🔍 Searching: "${String(args.query || '').slice(0, 30)}${String(args.query || '').length > 30 ? '...' : ''}"`);
-                    const searchContext = await searchAgent.search(args.query);
+                    let searchContext: Awaited<ReturnType<SearchAgent['search']>>;
+                    try {
+                      searchContext = await searchAgent.search(args.query);
+                    } catch (e) {
+                      // Upstream search failures must NOT be masked as stream
+                      // parse issues — log the real error and answer the tool so
+                      // the conversation can continue.
+                      console.error('web_search upstream error', e);
+                      newMessages.push({
+                        role: 'tool',
+                        tool_call_id: call.id,
+                        name: 'web_search',
+                        content: `Web search failed: ${(e as Error)?.message || 'unknown error'}`
+                      });
+                      continue;
+                    }
 
                     if (onStatusChange) {
                       onStatusChange(SearchAgent.getStatusMessage(searchContext));
@@ -433,7 +452,9 @@ export class ChutesService {
               }
 
             } catch (e) {
-              console.warn('Error parsing stream chunk', e);
+              // Stream-chunk parse errors AND tool-call failures land here;
+              // log the real error instead of masking it.
+              console.warn('Error processing stream chunk or tool call', e);
             }
           }
         }
@@ -684,7 +705,7 @@ export class ChutesService {
       PROXY_URL,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ targetUrl: request.modelUrl, body, userKey: this.userKey }),
       },
       { signal, onRetry }

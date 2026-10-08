@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import { useUserSync } from '../services/userSync';
+import { setAuthTokenGetter } from '../services/authToken';
 
 interface AuthContextType {
   userId: string | null;
@@ -22,6 +23,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { userId, isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
   const { syncUser } = useUserSync();
+
+  // Register Clerk's session-token getter for the server-side proxy auth
+  // (services/authToken.ts sends it as Authorization: Bearer on /api/* calls).
+  useEffect(() => {
+    setAuthTokenGetter(getToken);
+    return () => setAuthTokenGetter(null);
+  }, [getToken]);
 
   // Sync user profile when they sign in/up
   useEffect(() => {
