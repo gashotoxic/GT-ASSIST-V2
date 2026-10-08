@@ -77,18 +77,24 @@ try {
   assert.equal(calls[1].init.headers['Authorization'], 'Bearer ' + byokKey, 'BYOK key wins when provided');
   console.log('PASS chutes: BYOK key forwarded');
 
+  // Security tripwire: the legacy VITE_ name must NOT resolve a key. Vite
+  // inlines VITE_* vars into the public client bundle, so that fallback was
+  // removed in the 2026-10-07 leak sweep (5457c40) — bringing it back would
+  // recreate the leak. Assert 503 + no upstream call, not the old fallback.
   delete process.env.CHUTES_API_KEY;
   process.env.VITE_CHUTES_API_KEY = platformKey;
-  await chutesMod.POST(chutesPost({ targetUrl: 'https://llm.chutes.ai/x', body: {} }));
-  assert.equal(calls[2].init.headers['Authorization'], 'Bearer ' + platformKey, 'legacy env fallback works');
+  const legacyCalls = calls.length;
+  const legacyRes = await chutesMod.POST(chutesPost({ targetUrl: 'https://llm.chutes.ai/x', body: {} }));
+  assert.equal(legacyRes.status, 503, 'legacy VITE_ env name must NOT resolve a key');
+  assert.equal(calls.length, legacyCalls, 'no upstream call on the legacy name');
   delete process.env.VITE_CHUTES_API_KEY;
-  console.log('PASS chutes: legacy env fallback');
+  console.log('PASS chutes: legacy VITE_ env fallback removed (503, no upstream call)');
 
   for (const bad of ['https://evil.example.com/x', 'http://llm.chutes.ai/v1', 'https://llm.chutes.ai.evil.com/x', 'not-a-url', 'https://api.tavily.com/search', 'https://llm.chutes.ai:8443/v1']) {
     const r = await chutesMod.POST(chutesPost({ targetUrl: bad, body: {} }));
     assert.equal(r.status, 400, 'must reject: ' + bad);
   }
-  assert.equal(calls.length, 3, 'no upstream call for rejected targets');
+  assert.equal(calls.length, 2, 'no upstream call for rejected targets');
   console.log('PASS chutes: allowlist rejects non-https, non-443, off-host and malformed targets');
 
   assert.equal((await chutesMod.GET(new Request('http://localhost/api/chutes', { method: 'GET' }))).status, 405);
