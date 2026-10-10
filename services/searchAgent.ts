@@ -23,6 +23,9 @@ export interface SearchResult {
 }
 
 import { SearchSource } from '../types';
+import { validateTavilyResponse, validateBraveResponse, formatErrors } from './toolOutputValidation';
+import { getCachedSearch, setCachedSearch } from './queryCache';
+import { getAppUserContext } from './userContext';
 
 export interface SearchContext {
     query: string;
@@ -84,7 +87,11 @@ export class SearchAgent {
     // ===========================================================================
 
     /**
-     * Execute an intelligent search with query analysis and result synthesis
+     * Execute an intelligent search with query analysis and result synthesis.
+     *
+     * Lane A cache (spec §3): an identical repeated query within TTL is served
+     * from Supabase `query_cache` instead of re-invoking the provider —
+     * observably (hit_count + model_call_log cache_hit row).
      */
     async search(query: string): Promise<SearchContext> {
         const startTime = Date.now();
@@ -94,6 +101,25 @@ export class SearchAgent {
 
         // Step 2: Optimize query based on strategy
         const optimizedQuery = this.optimizeQuery(query, strategy);
+
+        // Cache-key params — same formulas executeSearch/searchTavily use for
+        // the provider request, so a hit always corresponds to this request.
+        const maxResults = strategy === 'research' ? 8 : strategy === 'quick' ? 3 : 5;
+        const searchDepth = strategy === 'research' ? 'advanced' : 'basic';
+
+        const userCtx = getAppUserContext();
+        if (userCtx?.userId) {
+            const cached = await getCachedSearch({
+                userId: userCtx.userId,
+                provider: this.config.preferredProvider,
+                query: optimizedQuery,
+                maxResults,
+                searchDepth,
+            });
+            if (cached) {
+                return { ...cached, searchTime: Date.now() - startTime };
+            }
+        }
 
         // Step 3: Execute search with fallback
         let results: SearchResult[] = [];
@@ -117,7 +143,7 @@ export class SearchAgent {
 
         const searchTime = Date.now() - startTime;
 
-        return {
+        const context: SearchContext = {
             query: optimizedQuery,
             originalQuery: query,
             strategy,
@@ -127,6 +153,20 @@ export class SearchAgent {
             searchTime,
             error,
         };
+
+        // Cache only successful, non-empty searches (errors/empties never cached).
+        if (userCtx?.userId && !error && processedResults.length > 0) {
+            await setCachedSearch({
+                userId: userCtx.userId,
+                provider: this.config.preferredProvider,
+                query: optimizedQuery,
+                maxResults,
+                searchDepth,
+                context,
+            });
+        }
+
+        return context;
     }
 
     // ===========================================================================
@@ -249,15 +289,20 @@ export class SearchAgent {
             throw new Error(`Tavily API error: ${response.status}`);
         }
 
-        const data = await response.json();
+        const data: unknown = await response.json();
 
-        return data.results.map((r: Record<string, unknown>, index: number) => ({
-            title: (r.title as string) || 'Untitled',
-            url: r.url as string,
-            content: (r.content as string) || (r.raw_content as string) || '',
-            snippet: ((r.content as string) || '').slice(0, 200),
-            publishedDate: r.published_date as string,
-            score: (r.score as number) || (1 - index * 0.1),
+        // Fail closed (spec §2): invalid provider output is a provider failure —
+        // executeSearch falls back to the next provider; it never reaches the prompt.
+        const validated = validateTavilyResponse(data);
+        if (!validated.ok) {
+            throw new Error(`Tavily response failed schema validation: ${formatErrors(validated)}`);
+        }
+        if (validated.dropped > 0) {
+            console.warn(`Tavily: dropped ${validated.dropped} malformed result entr(ies)`);
+        }
+        return validated.value.map((r, index) => ({
+            ...r,
+            score: r.score ?? (1 - index * 0.1),
         }));
     }
 
@@ -283,19 +328,20 @@ export class SearchAgent {
             throw new Error(`Brave API error: ${response.status}`);
         }
 
-        const data = await response.json();
+        const data: unknown = await response.json();
 
-        if (!data.web?.results) {
-            return [];
+        // Fail closed (spec §2): invalid provider output degrades to a typed
+        // error and the fallback provider takes over.
+        const validated = validateBraveResponse(data);
+        if (!validated.ok) {
+            throw new Error(`Brave response failed schema validation: ${formatErrors(validated)}`);
         }
-
-        return data.web.results.map((r: Record<string, unknown>, index: number) => ({
-            title: (r.title as string) || 'Untitled',
-            url: r.url as string,
-            content: (r.description as string) || '',
-            snippet: ((r.description as string) || '').slice(0, 200),
-            favicon: (r.profile as Record<string, unknown>)?.img as string,
-            score: 1 - index * 0.1,
+        if (validated.dropped > 0) {
+            console.warn(`Brave: dropped ${validated.dropped} malformed result entr(ies)`);
+        }
+        return validated.value.map((r, index) => ({
+            ...r,
+            score: r.score ?? (1 - index * 0.1),
         }));
     }
 

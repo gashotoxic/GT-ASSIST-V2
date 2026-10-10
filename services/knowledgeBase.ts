@@ -4,6 +4,8 @@
  */
 
 import { AppSettings } from '../types';
+import { validateEmbeddingResponse, validateKnowledgeResults, formatErrors } from './toolOutputValidation';
+import { getCachedKnowledge, setCachedKnowledge } from './queryCache';
 
 // =============================================================================
 // Types
@@ -296,10 +298,13 @@ export class KnowledgeBaseService {
                 throw new Error(`Embedding API error: ${response.status} - ${errorText}`);
             }
 
-            const data = await response.json();
-
-            for (const item of data.data) {
-                embeddings.push(item.embedding);
+            const data: unknown = await response.json();
+            const validated = validateEmbeddingResponse(data);
+            if (!validated.ok) {
+                throw new Error(`Embedding API returned malformed output: ${formatErrors(validated)}`);
+            }
+            for (const embedding of validated.value) {
+                embeddings.push(embedding);
             }
 
             onProgress?.((i + batch.length) / chunks.length);
@@ -401,6 +406,13 @@ export class KnowledgeBaseService {
         limit: number = 5,
         threshold: number = 0.7
     ): Promise<SearchResult[]> {
+        // Lane A cache (spec §3): identical retrieval query within TTL is served
+        // from Supabase `query_cache` (observably — hit_count + cache_hit row).
+        const cached = await getCachedKnowledge({ userId, query, limit, threshold });
+        if (cached) {
+            return cached;
+        }
+
         // Generate embedding for query (via the server-side proxy — never a
         // client-built Authorization header)
         const response = await fetch('/api/chutes', {
@@ -422,8 +434,12 @@ export class KnowledgeBaseService {
             throw new Error('Failed to generate query embedding');
         }
 
-        const data = await response.json();
-        const queryEmbedding = data.data[0].embedding;
+        const data: unknown = await response.json();
+        const validatedEmbedding = validateEmbeddingResponse(data);
+        if (!validatedEmbedding.ok || validatedEmbedding.value.length === 0) {
+            throw new Error(`Query embedding failed schema validation: ${validatedEmbedding.ok ? 'empty embedding' : formatErrors(validatedEmbedding)}`);
+        }
+        const queryEmbedding = validatedEmbedding.value[0];
 
         // Call RPC function for similarity search
         const searchResponse = await fetch(
@@ -448,7 +464,22 @@ export class KnowledgeBaseService {
             throw new Error('Failed to search knowledge base');
         }
 
-        return searchResponse.json();
+        // Fail closed (spec §2): malformed RPC rows are dropped and counted;
+        // a malformed envelope degrades to a typed error — never the prompt/UI.
+        const rawRows: unknown = await searchResponse.json();
+        const validatedRows = validateKnowledgeResults(rawRows);
+        if (!validatedRows.ok) {
+            throw new Error(`Knowledge search returned malformed output: ${formatErrors(validatedRows)}`);
+        }
+        if (validatedRows.dropped > 0) {
+            console.warn(`Knowledge search: dropped ${validatedRows.dropped} malformed row(s)`);
+        }
+
+        // Cache only non-empty successful retrievals.
+        if (validatedRows.value.length > 0) {
+            await setCachedKnowledge({ userId, query, limit, threshold, results: validatedRows.value });
+        }
+        return validatedRows.value;
     }
 
     /**

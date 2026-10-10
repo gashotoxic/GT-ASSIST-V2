@@ -3,6 +3,9 @@ import { Message, TTSRequest, STTRequest, ImageGenRequest, VideoGenRequest, Imag
 import { SearchAgent } from './searchAgent';
 import { isLtx25Model, buildLtx25GenerationInput } from './chutesLtx25';
 import { fetchWithRetry } from './retryFetch';
+import { logModelCall, type ModelCallMode } from './modelCallLog';
+import { getCachedChat, setCachedChat } from './queryCache';
+import { getAppUserContext } from './userContext';
 
 const BASE_LLM_URL = 'https://llm.chutes.ai/v1/chat/completions';
 const BASE_TTS_URL = 'https://vonkaiser-audiodojo.chutes.ai/speak';
@@ -12,6 +15,21 @@ const BASE_MUSETALK_URL = 'https://chutes-musetalk.chutes.ai/generate';
 // Server-side Chutes proxy (api/chutes.ts). All Chutes traffic goes through it
 // so the API key stays in server env vars and never ships in the client bundle.
 const PROXY_URL = '/api/chutes';
+
+/** Log/latency context for one provider call (spec §1). */
+type ModelCallInfo = { mode: ModelCallMode; model: string; prompt: string };
+
+/** Best-effort model label from a provider URL when no modelId exists. */
+function modelFromUrl(url: string | undefined): string {
+  if (!url) return 'unknown';
+  try {
+    const u = new URL(url, 'https://placeholder.invalid');
+    const seg = u.pathname.split('/').filter(Boolean).pop();
+    return seg || u.hostname.replace(/\..*$/, '') || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
 
 export class ChutesService {
   private key: string;
@@ -26,13 +44,60 @@ export class ChutesService {
     return this.key;
   }
 
-  private proxyFetch(targetUrl: string, body: unknown, signal?: AbortSignal): Promise<Response> {
-    return this.fetchWithRetry(PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetUrl, body, userKey: this.userKey }),
-      signal,
-    });
+  /**
+   * Every provider call crosses this boundary (spec §1). Logs exactly one
+   * model_call_log row per call — successes and failures alike — with
+   * prompt/model/latency. latency_ms is time-to-first-byte across internal
+   * 429/503 retries (documented in database/migrations/model_call_log.sql).
+   * Logging is fire-and-forget and can never break the actual call.
+   */
+  private async loggedCall(call: ModelCallInfo, exec: () => Promise<Response>): Promise<Response> {
+    const started = Date.now();
+    try {
+      const response = await exec();
+      void logModelCall({
+        ...call,
+        latency_ms: Date.now() - started,
+        status: response.ok ? 'ok' : 'error',
+        error: response.ok ? null : `HTTP ${response.status}`,
+      });
+      return response;
+    } catch (err) {
+      void logModelCall({
+        ...call,
+        latency_ms: Date.now() - started,
+        status: 'error',
+        error: err instanceof Error ? err.message : 'request failed',
+      });
+      throw err;
+    }
+  }
+
+  private proxyFetch(targetUrl: string, body: unknown, call: ModelCallInfo, signal?: AbortSignal): Promise<Response> {
+    return this.loggedCall(call, () =>
+      this.fetchWithRetry(PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUrl, body, userKey: this.userKey }),
+        signal,
+      })
+    );
+  }
+
+  /** Last user message text for log rows (binary parts become placeholders). */
+  private describePrompt(messages: Message[]): string {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const m = messages[i];
+      if (m.role === 'user') {
+        if (typeof m.content === 'string') return m.content;
+        if (Array.isArray(m.content)) {
+          return m.content
+            .map((part) => (part.type === 'text' ? (part.text || '') : '[image]'))
+            .join(' ');
+        }
+      }
+    }
+    return '';
   }
 
   // Helper for exponential backoff retry logic
@@ -143,8 +208,9 @@ export class ChutesService {
     // We use a non-streaming approach for simplicity here, 
     // but reusing streamChat is cleaner to keep the codebase consistent.
     let fullResponse = '';
-    // Use a fast model for this
-    const stream = this.streamChat(messages, systemPrompt, 'Qwen/Qwen3-32B-TEE');
+    // Use a fast model for this. Prompt-enhance repeats are intentionally NOT
+    // cached (lane B covers real chat requests only).
+    const stream = this.streamChat(messages, systemPrompt, 'Qwen/Qwen3-32B-TEE', undefined, null, undefined, undefined, undefined, { cacheEligible: false, logMode: 'prompt_enhance' });
 
     for await (const chunk of stream) {
       if (chunk.type === 'content') {
@@ -156,6 +222,17 @@ export class ChutesService {
     return finalPrompt.length > 1000 ? finalPrompt.slice(0, 1000).trim() : finalPrompt;
   }
 
+  /**
+   * Public chat stream (spec §3 lane B wrapper). On an identical repeated
+   * request within TTL the cached completion is replayed through THIS same
+   * generator, so the UX is identical on the hit path; the hit is observable
+   * via `query_cache.hit_count` + a `model_call_log` row with cache_hit=true.
+   *
+   * opts.cacheEligible: only the normal send path opts in. Branching/
+   * regenerate paths (deliberate re-rolls) pass false and never read or write
+   * the cache. Only clean, complete, non-empty, secret-free responses are
+   * cached (whole assistant responses — never partial streams).
+   */
   async *streamChat(
     messages: Message[],
     systemPrompt: string,
@@ -164,7 +241,66 @@ export class ChutesService {
     toolRuntime?: { executeTool: (name: string, args: Record<string, unknown>) => Promise<Record<string, unknown>> } | null,
     onToolResult?: (payload: { tool: string; result: Record<string, unknown> }) => void,
     onStatusChange?: (status: string | null) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    opts?: { cacheEligible?: boolean; logMode?: ModelCallMode }
+  ): AsyncGenerator<{ type: 'thinking' | 'content' | 'sources' | 'tool_result' | 'done'; text?: string; sources?: SearchSource[]; tool?: string; result?: Record<string, unknown> }, void, unknown> {
+    const logMode: ModelCallMode = opts?.logMode ?? 'chat';
+    const cacheParams = {
+      searchEnabled: Boolean(searchConfig?.enabled && searchConfig?.provider),
+      searchProvider: searchConfig?.provider ?? null,
+      hasTools: Boolean(toolRuntime),
+      maxTokens: 5000,
+      temperature: 1,
+    };
+
+    const ctx = getAppUserContext();
+    const cacheEligible = Boolean(opts?.cacheEligible) && Boolean(ctx?.userId);
+
+    if (cacheEligible && ctx?.userId) {
+      const cached = await getCachedChat({
+        userId: ctx.userId,
+        model,
+        systemPrompt,
+        messages: messages as unknown as Array<Record<string, unknown>>,
+        params: cacheParams,
+      });
+      if (cached) {
+        yield { type: 'content', text: cached };
+        yield { type: 'done' };
+        return;
+      }
+    }
+
+    let fullText = '';
+    let sawDone = false;
+    for await (const chunk of this.streamChatCore(messages, systemPrompt, model, searchConfig, toolRuntime, onToolResult, onStatusChange, signal, logMode)) {
+      if (chunk.type === 'content' && chunk.text) fullText += chunk.text;
+      if (chunk.type === 'done') sawDone = true;
+      yield chunk;
+    }
+
+    if (cacheEligible && sawDone && fullText.trim() && ctx?.userId) {
+      await setCachedChat({
+        userId: ctx.userId,
+        model,
+        systemPrompt,
+        messages: messages as unknown as Array<Record<string, unknown>>,
+        params: cacheParams,
+        text: fullText,
+      });
+    }
+  }
+
+  private async *streamChatCore(
+    messages: Message[],
+    systemPrompt: string,
+    model: string,
+    searchConfig?: { enabled: boolean; apiKey: string; provider: 'tavily' | 'brave' },
+    toolRuntime?: { executeTool: (name: string, args: Record<string, unknown>) => Promise<Record<string, unknown>> } | null,
+    onToolResult?: (payload: { tool: string; result: Record<string, unknown> }) => void,
+    onStatusChange?: (status: string | null) => void,
+    signal?: AbortSignal,
+    logMode: ModelCallMode = 'chat'
   ): AsyncGenerator<{ type: 'thinking' | 'content' | 'sources' | 'tool_result' | 'done'; text?: string; sources?: SearchSource[]; tool?: string; result?: Record<string, unknown> }, void, unknown> {
 
     // Setup Tools
@@ -247,7 +383,7 @@ export class ChutesService {
       body.tools = toolsPayload;
     }
 
-    const response = await this.proxyFetch(BASE_LLM_URL, body, signal);
+    const response = await this.proxyFetch(BASE_LLM_URL, body, { mode: logMode, model, prompt: this.describePrompt(messages) }, signal);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -428,7 +564,7 @@ export class ChutesService {
 
                 if (onStatusChange) onStatusChange(null);
 
-                yield* this.streamChat(newMessages, systemPrompt, model, searchConfig, toolRuntime, onToolResult, onStatusChange, signal);
+                yield* this.streamChat(newMessages, systemPrompt, model, searchConfig, toolRuntime, onToolResult, onStatusChange, signal, { cacheEligible: false, logMode });
                 return;
               }
 
@@ -467,7 +603,7 @@ export class ChutesService {
       text: request.text,
       speed: request.speed,
       voice: request.voice
-    });
+    }, { mode: 'tts', model: 'audiodojo-speak', prompt: request.text });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -481,6 +617,11 @@ export class ChutesService {
     const response = await this.proxyFetch(BASE_STT_URL, {
       audio_b64: request.audio_b64,
       language: request.language
+    }, {
+      mode: 'stt',
+      model: 'whisper',
+      // Binary audio is never persisted — placeholder only (spec §1c).
+      prompt: `[audio input]${request.language ? ` (lang=${request.language})` : ''}`
     });
 
     if (!response.ok) {
@@ -554,7 +695,7 @@ export class ChutesService {
       };
     }
 
-    const response = await this.proxyFetch(request.modelUrl, body, signal);
+    const response = await this.proxyFetch(request.modelUrl, body, { mode: 'image', model: request.modelId || modelFromUrl(request.modelUrl), prompt: request.prompt }, signal);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -582,7 +723,7 @@ export class ChutesService {
       num_inference_steps: 40
     };
 
-    const response = await this.proxyFetch(request.modelUrl, body, signal);
+    const response = await this.proxyFetch(request.modelUrl, body, { mode: 'image_edit', model: modelFromUrl(request.modelUrl), prompt: request.prompt }, signal);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -631,7 +772,11 @@ export class ChutesService {
       num_inference_steps: mode === 'remove_bg' ? 30 : mode === 'upscale' ? 50 : 40
     };
 
-    const response = await this.proxyFetch(request.modelUrl, body, signal);
+    const response = await this.proxyFetch(request.modelUrl, body, {
+      mode: 'image_edit',
+      model: modelFromUrl(request.modelUrl),
+      prompt: `[${mode}${stylePreset ? `/${stylePreset}` : ''}] ${finalPrompt}`
+    }, signal);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -680,14 +825,18 @@ export class ChutesService {
       };
     }
 
-    const response = await fetchWithRetry(
-      PROXY_URL,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUrl: request.modelUrl, body, userKey: this.userKey }),
-      },
-      { signal, onRetry }
+    const response = await this.loggedCall(
+      { mode: 'video', model: request.modelId || modelFromUrl(request.modelUrl), prompt: request.prompt },
+      () =>
+        fetchWithRetry(
+          PROXY_URL,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetUrl: request.modelUrl, body, userKey: this.userKey }),
+          },
+          { signal, onRetry }
+        )
     );
 
     if (!response.ok) {
@@ -718,7 +867,12 @@ export class ChutesService {
     };
 
     const doRequest = async (body: unknown) => {
-      return this.proxyFetch(request.modelUrl || BASE_MUSETALK_URL, body, signal);
+      return this.proxyFetch(request.modelUrl || BASE_MUSETALK_URL, body, {
+        mode: 'lip_sync',
+        model: modelFromUrl(request.modelUrl) || 'musetalk',
+        // Binary video/audio inputs are never persisted — placeholder only.
+        prompt: '[video+audio inputs]'
+      }, signal);
     };
 
     let response = await doRequest(payload);
