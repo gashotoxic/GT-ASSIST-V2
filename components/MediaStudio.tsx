@@ -725,7 +725,7 @@ const MediaStudio: React.FC<MediaStudioProps> = ({ settings, isAuthenticated, on
                                 setEditSourceImage(reader.result as string);
                             };
                             reader.readAsDataURL(blob);
-                        } catch {}
+                        } catch { /* ignore */ }
                     } else {
                         await transferToLipSyncFromVideo(item.url);
                     }

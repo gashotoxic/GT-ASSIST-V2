@@ -291,7 +291,7 @@ export const useMediaHandlers = ({
 
         // Refund credits on failure
 
-        try { await supabaseService.refundCredits?.(userId, getCreditCost('image', selectedImageModel)); } catch {}
+        try { await supabaseService.refundCredits?.(userId, getCreditCost('image', selectedImageModel)); } catch { /* ignore */ }
 
       }
   } else {
@@ -389,7 +389,7 @@ export const useMediaHandlers = ({
 
         // Refund credits on failure
 
-        try { await supabaseService.refundCredits?.(userId, getCreditCost('edit')); } catch {}
+        try { await supabaseService.refundCredits?.(userId, getCreditCost('edit')); } catch { /* ignore */ }
 
       }
   } else {
@@ -509,7 +509,7 @@ export const useMediaHandlers = ({
 
         // Refund credits on failure
 
-        try { await supabaseService.refundCredits?.(userId, getCreditCost('video', selectedVideoModel)); } catch {}
+        try { await supabaseService.refundCredits?.(userId, getCreditCost('video', selectedVideoModel)); } catch { /* ignore */ }
 
       }
   } else {
@@ -618,7 +618,7 @@ export const useMediaHandlers = ({
 
         // Refund credits on failure
 
-        try { await supabaseService.refundCredits?.(userId, getCreditCost('video', 'musetalk')); } catch {}
+        try { await supabaseService.refundCredits?.(userId, getCreditCost('video', 'musetalk')); } catch { /* ignore */ }
 
       }
   } else {
@@ -932,7 +932,7 @@ export const useMediaHandlers = ({
 
         updateGenStatus('edit', { error: err.message || 'Edit failed' });
 
-        try { await supabaseService.refundCredits?.(userId, getCreditCost('edit', editMode === 'upscale' ? 'upscale' : 'qwen-image-edit')); } catch {}
+        try { await supabaseService.refundCredits?.(userId, getCreditCost('edit', editMode === 'upscale' ? 'upscale' : 'qwen-image-edit')); } catch { /* ignore */ }
 
       }
   } else {
