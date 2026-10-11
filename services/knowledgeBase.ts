@@ -6,6 +6,7 @@
 import { AppSettings } from '../types';
 import { validateEmbeddingResponse, validateKnowledgeResults, formatErrors } from './toolOutputValidation';
 import { getCachedKnowledge, setCachedKnowledge } from './queryCache';
+import { logModelCall } from './modelCallLog';
 
 // =============================================================================
 // Types
@@ -266,6 +267,52 @@ export class KnowledgeBaseService {
     }
 
     /**
+     * Single logging boundary for every embedding call (spec §1: every provider
+     * call crosses one logged boundary and writes exactly one model_call_log row,
+     * successes and failures alike). Logging is fire-and-forget and can never
+     * break the call itself.
+     */
+    private async embedRequest(input: string[] | string): Promise<Response> {
+        const started = Date.now();
+        const prompt = Array.isArray(input) ? `embedding batch (${input.length} chunks)` : input;
+        try {
+            const response = await fetch('/api/chutes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    targetUrl: EMBEDDING_URL,
+                    body: {
+                        model: EMBEDDING_MODEL,
+                        input,
+                    },
+                    userKey: this.chutesApiKey || undefined,
+                }),
+            });
+            void logModelCall({
+                mode: 'embedding',
+                model: EMBEDDING_MODEL,
+                prompt,
+                latency_ms: Date.now() - started,
+                status: response.ok ? 'ok' : 'error',
+                error: response.ok ? null : `HTTP ${response.status}`,
+            });
+            return response;
+        } catch (err) {
+            void logModelCall({
+                mode: 'embedding',
+                model: EMBEDDING_MODEL,
+                prompt,
+                latency_ms: Date.now() - started,
+                status: 'error',
+                error: err instanceof Error ? err.message : 'request failed',
+            });
+            throw err;
+        }
+    }
+
+    /**
      * Generate embeddings for chunks using Chutes API
      */
     private async embedChunks(
@@ -278,20 +325,7 @@ export class KnowledgeBaseService {
         for (let i = 0; i < chunks.length; i += batchSize) {
             const batch = chunks.slice(i, i + batchSize);
 
-            const response = await fetch('/api/chutes', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    targetUrl: EMBEDDING_URL,
-                    body: {
-                        model: EMBEDDING_MODEL,
-                        input: batch,
-                    },
-                    userKey: this.chutesApiKey || undefined,
-                }),
-            });
+            const response = await this.embedRequest(batch);
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -415,20 +449,7 @@ export class KnowledgeBaseService {
 
         // Generate embedding for query (via the server-side proxy — never a
         // client-built Authorization header)
-        const response = await fetch('/api/chutes', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                targetUrl: EMBEDDING_URL,
-                body: {
-                    model: EMBEDDING_MODEL,
-                    input: query,
-                },
-                userKey: this.chutesApiKey || undefined,
-            }),
-        });
+        const response = await this.embedRequest(query);
 
         if (!response.ok) {
             throw new Error('Failed to generate query embedding');
