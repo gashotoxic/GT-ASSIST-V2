@@ -235,7 +235,11 @@ export const useChatSendMessage = ({
         toolRuntime ? { executeTool: toolRuntime.executeTool } : null,
         null,
         (status) => setLoadingStatus(status),
-        abortControllerRef.current.signal
+        abortControllerRef.current.signal,
+        // Repeat-query cache (spec §3 lane B) is opt-in: only the normal send
+        // path. A historyOverride means retry/edit — a deliberate re-roll that
+        // must hit the model again, never the cache.
+        { cacheEligible: historyOverride === undefined }
       );
 
       for await (const chunk of stream) {

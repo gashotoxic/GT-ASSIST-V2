@@ -3,9 +3,9 @@
  *
  * SECURITY CONTRACT: the Chutes API key NEVER reaches the browser. All Chutes
  * calls from the client go through this route; the Authorization header is
- * injected here from server-side environment variables (CHUTES_API_KEY, with a
- * transitional fallback to VITE_CHUTES_API_KEY until the Vercel env is
- * migrated).
+ * injected here from the server-side environment variable CHUTES_API_KEY (the
+ * public VITE_ variant was removed in the 2026-10-07 key-leak sweep — Vite
+ * inlines VITE_* into the client bundle; never reintroduce a VITE_ secret).
  *
  * - POST { targetUrl, body, userKey? } -> forwards a JSON POST to targetUrl.
  * - targetUrl must be https on port 443 at chutes.ai / *.chutes.ai (allowlist =

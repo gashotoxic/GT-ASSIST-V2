@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "scan:secrets": "node scripts/scan-dist-secrets.mjs",
-    "test:api": "node scripts/api_smoke.mjs"
+    "test:api": "node scripts/api_smoke.mjs",
+    "test:tier1": "node scripts/model_call_log_smoke.mjs && node scripts/tool_validation_smoke.mjs && node scripts/query_cache_smoke.mjs"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.3",

@@ -2,6 +2,7 @@ import { ChutesService } from './chutes';
 import { SupabaseService } from './supabase';
 import { AVAILABLE_EDIT_MODELS, AVAILABLE_IMAGE_MODELS, ImageAspectRatio, MediaItem } from '../types';
 import { getCreditCost } from './creditCosts';
+import { validateToolResult } from './toolOutputValidation';
 
 type SubscriptionTier = 'free' | 'basic' | 'plus' | 'pro';
 
@@ -36,6 +37,17 @@ function normalizeBase64(input: string): string {
     return input.split('base64,')[1] || '';
   }
   return input;
+}
+
+/**
+ * Runtime schema gate (spec §2): every constructed BrandStudioToolResult is
+ * validated before it reaches the caller — a malformed result degrades to a
+ * typed error instead of flowing into the UI or back to the model.
+ */
+function validatedToolResultOrError(result: BrandStudioToolResult): BrandStudioToolResult {
+  const check = validateToolResult(result);
+  if (check.ok) return check.value;
+  return { type: 'error', message: 'Tool returned malformed output — rejected.' };
 }
 
 export function createBrandStudioToolRuntime(args: {
@@ -102,7 +114,7 @@ export function createBrandStudioToolRuntime(args: {
         await saveToGallery(item, blob);
         const url = (await resolveSavedUrl(id)) || URL.createObjectURL(blob);
 
-        return { type: 'image', url, mediaItemId: id, prompt };
+        return validatedToolResultOrError({ type: 'image', url, mediaItemId: id, prompt });
       }
 
       if (name === 'edit_image') {
@@ -134,7 +146,7 @@ export function createBrandStudioToolRuntime(args: {
         await saveToGallery(item, blob);
         const url = (await resolveSavedUrl(id)) || URL.createObjectURL(blob);
 
-        return { type: 'image', url, mediaItemId: id, prompt };
+        return validatedToolResultOrError({ type: 'image', url, mediaItemId: id, prompt });
       }
 
       return { type: 'error', message: `Unknown tool: ${name}` };

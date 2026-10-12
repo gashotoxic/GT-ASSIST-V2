@@ -79,16 +79,17 @@ try {
 
   delete process.env.CHUTES_API_KEY;
   process.env.VITE_CHUTES_API_KEY = platformKey;
-  await chutesMod.POST(chutesPost({ targetUrl: 'https://llm.chutes.ai/x', body: {} }));
-  assert.equal(calls[2].init.headers['Authorization'], 'Bearer ' + platformKey, 'legacy env fallback works');
+  const legacyRes = await chutesMod.POST(chutesPost({ targetUrl: 'https://llm.chutes.ai/x', body: {} }));
+  assert.equal(legacyRes.status, 503, 'public VITE_ fallback must NOT resolve a key (removed 2026-10-07)');
+  assert.equal(calls.length, 2, 'no upstream call via VITE_ fallback');
   delete process.env.VITE_CHUTES_API_KEY;
-  console.log('PASS chutes: legacy env fallback');
+  console.log('PASS chutes: public VITE_ key fallback absent (503, no upstream call)');
 
   for (const bad of ['https://evil.example.com/x', 'http://llm.chutes.ai/v1', 'https://llm.chutes.ai.evil.com/x', 'not-a-url', 'https://api.tavily.com/search', 'https://llm.chutes.ai:8443/v1']) {
     const r = await chutesMod.POST(chutesPost({ targetUrl: bad, body: {} }));
     assert.equal(r.status, 400, 'must reject: ' + bad);
   }
-  assert.equal(calls.length, 3, 'no upstream call for rejected targets');
+  assert.equal(calls.length, 2, 'no upstream call for rejected targets');
   console.log('PASS chutes: allowlist rejects non-https, non-443, off-host and malformed targets');
 
   assert.equal((await chutesMod.GET(new Request('http://localhost/api/chutes', { method: 'GET' }))).status, 405);

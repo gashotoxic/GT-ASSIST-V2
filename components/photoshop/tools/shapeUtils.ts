@@ -56,7 +56,7 @@ export function drawShapeOnCanvas(
       for (let i = 0; i < n; i++) {
         const a = (i * 2 * Math.PI) / n - Math.PI / 2;
         const px = cx + r * Math.cos(a), py = cy + r * Math.sin(a);
-        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       }
       ctx.closePath();
       if (fill) ctx.fill();
@@ -72,7 +72,7 @@ export function drawShapeOnCanvas(
         const r = i % 2 === 0 ? outerR : innerR;
         const a = (i * Math.PI) / n - Math.PI / 2;
         const px = cx + r * Math.cos(a), py = cy + r * Math.sin(a);
-        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
       }
       ctx.closePath();
       if (fill) ctx.fill();

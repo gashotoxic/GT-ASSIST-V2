@@ -1,3 +1,4 @@
+import { validateTavilyResponse, validateBraveResponse } from './toolOutputValidation';
 
 export class SearchService {
   private apiKey: string;
@@ -39,8 +40,14 @@ export class SearchService {
       }
 
       const data = await response.json();
-      
-      const results = data.results.map((r: Record<string, unknown>) => 
+
+      // Fail closed on malformed provider output (tier1: toolOutputsValidated).
+      const validated = validateTavilyResponse(data);
+      if (!validated.ok) {
+        throw new Error(`Tavily response failed schema validation: ${validated.errors.join('; ')}`);
+      }
+
+      const results = validated.value.map((r) =>
         `Title: ${r.title}\nURL: ${r.url}\nContent: ${r.content}`
       ).join('\n\n');
 
@@ -75,10 +82,15 @@ export class SearchService {
       }
 
       const data = await response.json();
-      
-      // Check if 'web' and 'results' exist
-      const results = data.web?.results?.map((r: Record<string, unknown>) => 
-        `Title: ${r.title}\nURL: ${r.url}\nDescription: ${r.description}`
+
+      // Fail closed on malformed provider output (tier1: toolOutputsValidated).
+      const validated = validateBraveResponse(data);
+      if (!validated.ok) {
+        throw new Error(`Brave response failed schema validation: ${validated.errors.join('; ')}`);
+      }
+
+      const results = validated.value.map((r) =>
+        `Title: ${r.title}\nURL: ${r.url}\nDescription: ${r.content}`
       ).join('\n\n');
 
       return results ? `Search Results for "${query}":\n\n${results}` : "No results found.";

@@ -16,6 +16,7 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
+import { SECRET_RULES } from '../lib/secretPatterns.mjs';
 
 const distDir = process.argv[2] || 'dist';
 const TEXT_EXTENSIONS = new Set([
@@ -23,25 +24,11 @@ const TEXT_EXTENSIONS = new Set([
   '.svg', '.map', '.webmanifest', '.xml',
 ]);
 
-// Each rule: [name, regex]. Values are NEVER printed — only the rule name and
-// the file/line of the hit (redacted excerpt) so build logs don't leak the key.
-const RULES = [
-  ['CHUTES_KEY (cpk_)', /cpk_[A-Za-z0-9_]{8,}/],
-  ['TAVILY_KEY (tvly-)', /tvly-[A-Za-z0-9]{8,}/],
-  ['OPENAI_STYLE_KEY (sk-)', /\bsk-[A-Za-z0-9_-]{16,}/],
-  ['SERVICE_KEY (sk_)', /\bsk_[A-Za-z0-9_]{16,}/],
-  ['AWS_ACCESS_KEY (AKIA)', /AKIA[0-9A-Z]{16}/],
-  ['GITHUB_TOKEN (ghp_/PAT)', /(?:ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}/],
-  ['SLACK_TOKEN (xox)', /xox[baprs]-[A-Za-z0-9-]{10,}/],
-  ['GOOGLE_API_KEY (AIza)', /AIza[0-9A-Za-z_-]{30,}/],
-  ['PRIVATE_KEY_BLOCK', /-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY/],
-  // Tripwire: a VITE_-prefixed secret NAME surviving into the bundle means a
-  // dynamic import.meta.env access re-inlined it. Names of publishable keys
-  // (CLERK, SUPABASE, PAYSTACK) are intentionally not covered.
-  ['VITE_SECRET_NAME_IN_BUNDLE', /VITE_(?:CHUTES|TAVILY|BRAVE)[A-Z0-9_]*/],
-  // Heuristic "api key shape": a *key/secret* property assigned a long literal.
-  ['API_KEY_LITERAL', /(?:api[_-]?key|apikey|secret)["']?\s*[:=]\s*["'][A-Za-z0-9_.-]{24,}["']/i],
-];
+// Rules live in lib/secretPatterns.mjs — shared with the client-side prompt
+// scrubber (services/modelCallLog.ts) so the two can never drift apart.
+// Values are NEVER printed — only the rule name and the file/line of the hit
+// (redacted excerpt) so build logs don't leak the key.
+const RULES = SECRET_RULES;
 
 const redact = (line) => line.length > 40 ? `${line.slice(0, 40)}…` : line;
 

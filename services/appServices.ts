@@ -1,6 +1,7 @@
 import { AppSettings } from '../types';
 import { ChutesService } from './chutes';
 import { SupabaseService } from './supabase';
+import { setAppUserContext } from './userContext';
 
 export type AppServices = {
   supabaseService: SupabaseService;
@@ -63,6 +64,14 @@ export const getAppServices = (
   authToken?: string | null
 ): AppServices => {
   const effectiveSettings = getEffectiveSettings(settings, isSignedIn);
+  // Keep the cross-service user context (model call log + query cache) in sync
+  // with the freshest Clerk session token on every service resolution.
+  setAppUserContext({
+    userId: isSignedIn ? (userId ?? null) : null,
+    accessToken: authToken ?? null,
+    supabaseUrl: effectiveSettings.supabaseUrl || '',
+    supabaseKey: effectiveSettings.supabaseKey || '',
+  });
   return {
     effectiveSettings,
     supabaseService: getAppSupabaseService(settings, isSignedIn, userId, authToken),
