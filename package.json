@@ -13,7 +13,7 @@
     "test:tier1": "node scripts/model_call_log_smoke.mjs && node scripts/tool_validation_smoke.mjs && node scripts/query_cache_smoke.mjs"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.61.3",
+    "@clerk/clerk-react": "^5.61.11",
     "@radix-ui/react-tooltip": "^1.4.1",
     "@supabase/supabase-js": "^2.117.3",
     "@vercel/analytics": "^1.6.1",
