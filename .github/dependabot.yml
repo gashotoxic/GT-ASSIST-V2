@@ -11,6 +11,25 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # Majors that need deliberate migrations and can never land as bot PRs:
+    # - react family: react-paystack@6 peers cap at React 18 (no React-19-compatible
+    #   release exists), so a react-dom major always ends in an npm ERESOLVE install failure
+    # - tailwindcss: v4 moves the PostCSS plugin to @tailwindcss/postcss and renames
+    #   ~150 utility usages here (shadow-sm, blur-sm, outline-none, flex-shrink-*, ring/border defaults)
+    # - react-joyride: v2->v3 is to be landed together with the React 19 migration
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-joyride"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

@@ -86,6 +86,11 @@ Default section order:
 - **Coding style:** conventional commits, tests before pushing, DOX pass after changes
 - **Photoshop Corner v2:** manual client-side editing is primary, AI is secondary
 
+## Dependency Policy
+
+- Dependabot ignores semver-major for react, react-dom, @types/react, @types/react-dom, tailwindcss, react-joyride (reasons live in .github/dependabot.yml)
+- Major migrations run on deliberate feature branches with build proof, visual QA, and owner preview sign-off — never as bot PRs
+
 ## Child DOX Index
 
 - [components/](./components/AGENTS.md) -- React UI components
