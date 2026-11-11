@@ -8,6 +8,7 @@
     "build": "vite build && node scripts/scan-dist-secrets.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
     "scan:secrets": "node scripts/scan-dist-secrets.mjs",
     "test:api": "node scripts/api_smoke.mjs",
     "test:tier1": "node scripts/model_call_log_smoke.mjs && node scripts/tool_validation_smoke.mjs && node scripts/query_cache_smoke.mjs"
@@ -27,15 +28,16 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@types/node": "^20.0.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
+    "@vitejs/plugin-react": "^5.2.0",
     "autoprefixer": "^10.6.2",
     "eslint": "^10.14.0",
     "postcss": "^8.5.32",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.72.1",
-    "vite": "^5.4.1"
+    "vite": "^6.4.6"
   }
 }
