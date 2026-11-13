@@ -88,7 +88,7 @@ Default section order:
 
 ## CI
 
-- .github/workflows/ci.yml runs on PRs targeting main/master and pushes to main/master: typecheck (gating), lint (continue-on-error), build + dist secret scan — stacked PRs with a non-main base queue no Actions run, so verify their battery locally
+- .github/workflows/ci.yml runs on PRs targeting main/master and pushes to main/master: typecheck (gating), lint (gating), tier-1 smoke tests `npm run test:tier1` (gating), build + dist secret scan — stacked PRs with a non-main base queue no Actions run, so verify their battery locally
 - `npm run typecheck` (tsc --noEmit) must stay exit-0; note strictNullChecks is off, so `!x.ok` does not narrow discriminated unions — narrow with `x.ok === false`; an eslint `no-restricted-syntax` rule in eslint.config.js guards the ValidationResult variable names in services/
 
 ## Child DOX Index

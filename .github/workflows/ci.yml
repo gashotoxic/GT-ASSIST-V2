@@ -27,7 +27,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
-        continue-on-error: true
+
+      - name: Tier-1 smoke tests
+        run: npm run test:tier1
 
       - name: Build
         run: npm run build
