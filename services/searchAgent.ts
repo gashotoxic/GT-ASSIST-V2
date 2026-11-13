@@ -294,7 +294,7 @@ export class SearchAgent {
         // Fail closed (spec §2): invalid provider output is a provider failure —
         // executeSearch falls back to the next provider; it never reaches the prompt.
         const validated = validateTavilyResponse(data);
-        if (validated.ok === false) {
+        if (!validated.ok) {
             throw new Error(`Tavily response failed schema validation: ${formatErrors(validated)}`);
         }
         if (validated.dropped > 0) {
