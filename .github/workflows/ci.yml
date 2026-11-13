@@ -6,12 +6,22 @@ on:
   pull_request:
     branches: [main, master]
 
+# Least privilege: every run (PR and push) executes with a token that can only
+# read. No step in this workflow needs write access.
+permissions:
+  contents: read
+
 jobs:
   lint-and-build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Don't leave GITHUB_TOKEN in .git/config for the steps that run
+          # PR-controlled code (npm ci lifecycle scripts, smokes, build).
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
