@@ -28,13 +28,16 @@ export default [
     },
   },
   {
-    // ValidationResult narrowing contract (services/AGENTS.md): the failure
-    // branch must be narrowed with `ok === false` — with strictNullChecks off,
-    // `!x.ok` does not narrow the discriminated union, so any later direct
-    // read of `.errors`/`.value` is a latent TS2339. Name-scoped to the
-    // ValidationResult variable names used in services/ so legitimate
-    // `!response.ok` / `!res.ok` fetch checks stay untouched; extend the
-    // selector list when a new ValidationResult variable is introduced.
+    // ValidationResult narrowing contract (services/AGENTS.md): narrow the
+    // failure branch with `ok === false` — with strictNullChecks off, `!x.ok`
+    // does not narrow the discriminated union, so a direct `.errors` read
+    // inside the failure branch does not typecheck (TS2339). These sites pass
+    // the result to formatErrors() today; the guard keeps the narrowing form
+    // stable for any future direct read. Name-scoped to the ValidationResult
+    // variable names used in services/ so legitimate `!response.ok` /
+    // `!res.ok` fetch checks stay untouched. Known limits: a renamed
+    // variable or `!x?.ok` escapes the guard — keep ValidationResult
+    // variables on these names or extend the selector list.
     files: ['services/**/*.ts'],
     rules: {
       'no-restricted-syntax': ['error',
