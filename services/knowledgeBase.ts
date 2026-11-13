@@ -334,7 +334,7 @@ export class KnowledgeBaseService {
 
             const data: unknown = await response.json();
             const validated = validateEmbeddingResponse(data);
-            if (!validated.ok) {
+            if (validated.ok === false) {
                 throw new Error(`Embedding API returned malformed output: ${formatErrors(validated)}`);
             }
             for (const embedding of validated.value) {
@@ -457,7 +457,7 @@ export class KnowledgeBaseService {
 
         const data: unknown = await response.json();
         const validatedEmbedding = validateEmbeddingResponse(data);
-        if (!validatedEmbedding.ok || validatedEmbedding.value.length === 0) {
+        if (validatedEmbedding.ok === false || validatedEmbedding.value.length === 0) {
             throw new Error(`Query embedding failed schema validation: ${validatedEmbedding.ok ? 'empty embedding' : formatErrors(validatedEmbedding)}`);
         }
         const queryEmbedding = validatedEmbedding.value[0];
@@ -489,7 +489,7 @@ export class KnowledgeBaseService {
         // a malformed envelope degrades to a typed error — never the prompt/UI.
         const rawRows: unknown = await searchResponse.json();
         const validatedRows = validateKnowledgeResults(rawRows);
-        if (!validatedRows.ok) {
+        if (validatedRows.ok === false) {
             throw new Error(`Knowledge search returned malformed output: ${formatErrors(validatedRows)}`);
         }
         if (validatedRows.dropped > 0) {
