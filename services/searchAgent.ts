@@ -294,7 +294,7 @@ export class SearchAgent {
         // Fail closed (spec §2): invalid provider output is a provider failure —
         // executeSearch falls back to the next provider; it never reaches the prompt.
         const validated = validateTavilyResponse(data);
-        if (!validated.ok) {
+        if (validated.ok === false) {
             throw new Error(`Tavily response failed schema validation: ${formatErrors(validated)}`);
         }
         if (validated.dropped > 0) {
@@ -333,7 +333,7 @@ export class SearchAgent {
         // Fail closed (spec §2): invalid provider output degrades to a typed
         // error and the fallback provider takes over.
         const validated = validateBraveResponse(data);
-        if (!validated.ok) {
+        if (validated.ok === false) {
             throw new Error(`Brave response failed schema validation: ${formatErrors(validated)}`);
         }
         if (validated.dropped > 0) {

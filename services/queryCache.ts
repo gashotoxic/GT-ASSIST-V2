@@ -260,7 +260,7 @@ async function validatedGet<T>(
   const raw = await getCacheEntry(kind, cacheKey);
   if (raw === null) return null;
   const check = validate(raw);
-  if (!check.ok) return null; // corrupted entry behaves like a miss
+  if (check.ok === false) return null; // corrupted entry behaves like a miss
   await recordCacheHit(kind, cacheKey, { ...observed, latencyMs: Date.now() - started });
   return check.value;
 }

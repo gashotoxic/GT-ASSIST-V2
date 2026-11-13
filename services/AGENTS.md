@@ -19,4 +19,4 @@
 - Credit deduction pattern: deductCredits(userId, action, model_used?) returns boolean
 - All AI operations are credit-gated via isAuthenticated + deductCredits
 - Video generation (generateVideo) retries Chutes 429 ("Infrastructure at maximum capacity") up to 3 times with ~2s/4s/8s + jitter backoff via fetchWithRetry; other 4xx are never retried
-- ValidationResult<T> is { ok: true; value; dropped } | { ok: false; errors } — narrow the failure branch with `ok === false`, never `!ok`: strictNullChecks is off in tsconfig, so `!ok` does not narrow the union (see formatErrors)
+- ValidationResult<T> is { ok: true; value; dropped } | { ok: false; errors } — narrow the failure branch with `ok === false`, never `!ok`: strictNullChecks is off in tsconfig, so `!ok` does not narrow the union (see formatErrors). Every ValidationResult call site in services/ uses this idiom; an eslint `no-restricted-syntax` rule (eslint.config.js, services/**) fails lint on `!<validated|validatedEmbedding|validatedRows|check>.ok`. The guard is name-based — a renamed variable or `!x?.ok` escapes it, so keep the names or extend the selector list
