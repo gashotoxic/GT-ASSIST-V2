@@ -86,6 +86,11 @@ Default section order:
 - **Coding style:** conventional commits, tests before pushing, DOX pass after changes
 - **Photoshop Corner v2:** manual client-side editing is primary, AI is secondary
 
+## CI
+
+- .github/workflows/ci.yml runs on PRs targeting main/master and pushes to main/master: typecheck (gating), lint (continue-on-error), build + dist secret scan — stacked PRs with a non-main base queue no Actions run, so verify their battery locally
+- `npm run typecheck` (tsc --noEmit) must stay exit-0; note strictNullChecks is off, so `!x.ok` does not narrow discriminated unions — narrow with `x.ok === false`
+
 ## Child DOX Index
 
 - [components/](./components/AGENTS.md) -- React UI components

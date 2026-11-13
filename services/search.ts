@@ -43,7 +43,9 @@ export class SearchService {
 
       // Fail closed on malformed provider output (tier1: toolOutputsValidated).
       const validated = validateTavilyResponse(data);
-      if (!validated.ok) {
+      // `ok === false`, not `!ok`: with strictNullChecks off, `!ok` does not
+      // narrow the ValidationResult union (formatErrors uses the same form).
+      if (validated.ok === false) {
         throw new Error(`Tavily response failed schema validation: ${validated.errors.join('; ')}`);
       }
 
@@ -85,7 +87,7 @@ export class SearchService {
 
       // Fail closed on malformed provider output (tier1: toolOutputsValidated).
       const validated = validateBraveResponse(data);
-      if (!validated.ok) {
+      if (validated.ok === false) {
         throw new Error(`Brave response failed schema validation: ${validated.errors.join('; ')}`);
       }
 
